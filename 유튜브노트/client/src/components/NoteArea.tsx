@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { OverlayData } from "./TextOverlay";
 import OverlayInput from "./OverlayInput";
 import RecordingSessionList from "./RecordingSessionList";
+import { UISettings } from "./SettingsPanel";
 
 // 녹화 관련 인터페이스
 export interface RawTimestamp {
@@ -75,6 +76,7 @@ interface NoteAreaProps {
   onDeleteRecordingSession: (sessionId: string) => void;
   onCopyRecordingSession: (session: RecordingSession) => void;
   onApplyRecordingToNote: (session: RecordingSession) => void;
+  uiSettings: UISettings;
 }
 
 const NoteArea: React.FC<NoteAreaProps> = ({
@@ -97,6 +99,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   onDeleteRecordingSession,
   onCopyRecordingSession,
   onApplyRecordingToNote,
+  uiSettings,
 }) => {
   const [noteText, setNoteText] = useState("");
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
@@ -1894,7 +1897,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           </Button>
         </div>
 
-        <div className="mt-0">
+        {uiSettings.재생컨트롤.전체표시 && (
+          <div className="mt-0">
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-gray-700">재생 컨트롤</p>
               <div className="flex items-center space-x-1 text-sm text-gray-600 font-mono">
@@ -1949,16 +1953,17 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                 style={{ height: `${volume || 100}%` }}
               />
             </div>
-          </div>
 
-        {/* 1줄 컨트롤 바 - 세로 라벨 + 반응형 */}
-        <div className="flex items-center gap-1 mb-1 mt-1 overflow-x-auto">
+            {/* 1줄 컨트롤 바 - 세로 라벨 + 반응형 */}
+            <div className="flex items-center gap-1 mb-1 mt-1 overflow-x-auto">
           {/* 볼륨 */}
-          <div className="flex flex-col items-center leading-none flex-shrink-0">
-            <span className="text-xs text-gray-500">볼</span>
-            <span className="text-xs text-gray-500">륨</span>
-          </div>
-          <input
+          {uiSettings.재생컨트롤.볼륨 && (
+            <>
+              <div className="flex flex-col items-center leading-none flex-shrink-0">
+                <span className="text-xs text-gray-500">볼</span>
+                <span className="text-xs text-gray-500">륨</span>
+              </div>
+              <input
             type="range"
             min="0"
             max="100"
@@ -1991,14 +1996,18 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             }}
             className="flex-1 h-2 min-w-[20px] max-w-[100px]"
           />
-          <span className="text-xs text-gray-600 w-7 flex-shrink-0 text-right">{Math.round(volume || 100)}%</span>
+              <span className="text-xs text-gray-600 w-7 flex-shrink-0 text-right">{Math.round(volume || 100)}%</span>
+            </>
+          )}
           
           {/* 속도 */}
-          <div className="flex flex-col items-center leading-none flex-shrink-0 ml-1">
-            <span className="text-xs text-gray-500">속</span>
-            <span className="text-xs text-gray-500">도</span>
-          </div>
-          <input
+          {uiSettings.재생컨트롤.속도 && (
+            <>
+              <div className="flex flex-col items-center leading-none flex-shrink-0 ml-1">
+                <span className="text-xs text-gray-500">속</span>
+                <span className="text-xs text-gray-500">도</span>
+              </div>
+              <input
             type="range"
             min="0.25"
             max="2.0"
@@ -2034,7 +2043,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             }}
             className="flex-1 h-1 min-w-[20px] max-w-[100px]"
           />
-          <span className="text-xs text-gray-600 w-9 flex-shrink-0 text-right">{(playbackRate || 1.0).toFixed(2)}x</span>
+              <span className="text-xs text-gray-600 w-9 flex-shrink-0 text-right">{(playbackRate || 1.0).toFixed(2)}x</span>
+            </>
+          )}
           
           {/* 지속시간 */}
           <div className="flex flex-col items-center leading-none flex-shrink-0 ml-1">
@@ -2068,40 +2079,47 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           <span className="text-xs text-gray-500 flex-shrink-0">초</span>
           
           {/* 타임스탬프 버튼 */}
-          <Button
-            onClick={addTimestamp}
-            disabled={!isTimestampButtonEnabled}
-            size="sm"
-            variant="destructive"
-            className="flex-shrink-0 ml-1 text-xs px-2 py-1 h-7"
-          >
-            <Clock className="w-3 h-3 mr-1" />
-            도장
-          </Button>
+          {uiSettings.재생컨트롤.도장 && (
+            <Button
+              onClick={addTimestamp}
+              disabled={!isTimestampButtonEnabled}
+              size="sm"
+              variant="destructive"
+              className="flex-shrink-0 ml-1 text-xs px-2 py-1 h-7"
+            >
+              <Clock className="w-3 h-3 mr-1" />
+              도장
+            </Button>
+          )}
           
           {/* 녹화 버튼 */}
-          <Button
-            onClick={녹화중 ? 녹화종료하기 : 녹화시작하기}
-            disabled={!isPlayerReady}
-            size="sm"
-            variant={녹화중 ? "outline" : "default"}
-            className={`flex-shrink-0 ml-1 text-xs px-2 py-1 h-7 ${
-              녹화중 ? "border-red-500 text-red-600 bg-red-50" : ""
-            }`}
-          >
-            {녹화중 ? (
-              <>
-                <Square className="w-3 h-3 mr-1 fill-current" />
-                중단
-              </>
-            ) : (
-              <>
-                <Circle className="w-3 h-3 mr-1 fill-current text-red-500" />
-                녹화
-              </>
-            )}
-          </Button>
-        </div>
+          {uiSettings.재생컨트롤.녹화 && (
+            <Button
+              onClick={녹화중 ? 녹화종료하기 : 녹화시작하기}
+              disabled={!isPlayerReady}
+              size="sm"
+              variant={녹화중 ? "outline" : "default"}
+              className={`flex-shrink-0 ml-1 text-xs px-2 py-1 h-7 ${
+                녹화중 ? "border-red-500 text-red-600 bg-red-50" : ""
+              }`}
+            >
+              {녹화중 ? (
+                <>
+                  <Square className="w-3 h-3 mr-1 fill-current" />
+                  중단
+                </>
+              ) : (
+                <>
+                  <Circle className="w-3 h-3 mr-1 fill-current text-red-500" />
+                  녹화
+                </>
+              )}
+            </Button>
+          )}
+            </div>
+          </div>
+        )}
+
         {/* 세션 선택 버튼 */}
         {availableSessions.length > 1 && (
           <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
@@ -2201,7 +2219,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         {/* PC용 좌우 분할 레이아웃 (md 이상에서만 표시) */}
         <div className="hidden md:flex gap-6">
           {/* 좌측: 노트 입력 */}
-          <div className="flex-1">
+          {uiSettings.노트영역.표시 && (
+            <div className="flex-1">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-700 flex items-center">
                 <FileText className="w-4 h-4 mr-2" />
@@ -2283,10 +2302,12 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                 <span className={`text-xs ${getStatusClass()}`}>{getStatusMessage()}</span>
               </div>
             </div>
-          </div>
+            </div>
+          )}
           
           {/* 우측: 화면 텍스트 또는 녹화 세션 */}
-          <div className="flex-1">
+          {uiSettings.화면텍스트.패널표시 && (
+            <div className="flex-1">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-gray-700 flex items-center">
                 {rightPanelMode === "overlay" ? (
@@ -2328,6 +2349,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                 overlays={overlays}
                 setOverlays={setOverlays}
                 showNotification={showNotification}
+                uiSettings={uiSettings}
               />
             ) : (
               <RecordingSessionList
@@ -2347,7 +2369,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                 })() : 0}
               />
             )}
-          </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -14,6 +14,7 @@ interface VideoLoaderProps {
     thumbnailUrl: string;
   } | undefined>>;
   showNotification: (message: string, type: "info" | "success" | "warning" | "error") => void;
+  autoHide?: boolean;
 }
 
 const VideoLoader: React.FC<VideoLoaderProps> = ({
@@ -22,7 +23,10 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   setCurrentVideoId,
   setCurrentVideoInfo,
   showNotification,
+  autoHide = false,
 }) => {
+  const [isVisible, setIsVisible] = useState(!autoHide);
+  const [isHovering, setIsHovering] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<YoutubeVideo[]>([]);
@@ -104,10 +108,39 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     }
     
     setSearchResults([]); // 선택 후 검색 결과 닫기
+    
+    // 자동 숨김 모드에서는 검색 후 숨김
+    if (autoHide) {
+      setTimeout(() => setIsVisible(false), 1000);
+    }
   };
 
+  // 자동 숨김 모드에서의 표시/숨김 처리
+  const shouldShow = !autoHide || isVisible || isHovering;
+
   return (
-    <div className="mb-4">
+    <>
+      {/* 자동 숨김 모드 감지 영역 (최상단) */}
+      {autoHide && !shouldShow && (
+        <div 
+          className="fixed top-0 left-0 w-full h-16 z-30 cursor-pointer"
+          onMouseEnter={() => setIsVisible(true)}
+          onTouchStart={() => setIsVisible(true)}
+        />
+      )}
+      
+      <div 
+        className={`transition-all duration-300 ${
+          autoHide ? (
+            shouldShow 
+              ? 'mb-4 opacity-100 transform translate-y-0' 
+              : 'mb-0 opacity-0 transform -translate-y-4 pointer-events-none absolute top-0 left-0 right-0 z-40'
+          ) : 'mb-4'
+        }`}
+        onMouseEnter={() => autoHide && setIsHovering(true)}
+        onMouseLeave={() => autoHide && setIsHovering(false)}
+        onTouchStart={() => autoHide && setIsVisible(true)}
+      >
       {/* 검색 입력 */}
       <div className="flex gap-2 mb-3">
         <Input
@@ -134,7 +167,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       </div>
 
       {/* 검색 결과 목록 */}
-      {searchResults.length > 0 && (
+      {shouldShow && searchResults.length > 0 && (
         <div className="space-y-2 max-h-64 overflow-y-auto border rounded-lg p-2 bg-white">
           {searchResults.map((video) => (
             <div
@@ -159,7 +192,22 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
           ))}
         </div>
       )}
-    </div>
+      
+      {/* 자동 숨김 모드 토글 버튼 */}
+      {autoHide && shouldShow && (
+        <div className="text-center mt-2">
+          <Button 
+            size="sm" 
+            variant="ghost" 
+            onClick={() => setIsVisible(false)}
+            className="text-xs text-gray-500 hover:text-gray-700"
+          >
+            검색창 숨기기
+          </Button>
+        </div>
+      )}
+      </div>
+    </>
   );
 };
 

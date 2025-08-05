@@ -5,9 +5,12 @@ import NoteArea from "@/components/NoteArea";
 import VideoLoader from "@/components/VideoLoader";
 import Notification from "@/components/Notification";
 import { RecordingSession } from "@/components/RecordingMode";
+import SettingsPanel, { UISettings } from "@/components/SettingsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import { OverlayData } from "@/components/TextOverlay";
+import { Button } from "@/components/ui/button";
+import { Settings } from "lucide-react";
 
 const HomePage = () => {
   const [player, setPlayer] = useState<any | null>(null);
@@ -28,6 +31,17 @@ const HomePage = () => {
   const [currentPlayTime, setCurrentPlayTime] = useState(0); // 현재 재생 시간
   const { toast } = useToast();
   const { isKeyboardVisible, keyboardHeight } = useVirtualKeyboard();
+
+  // 설정 관련 상태
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [uiSettings, setUiSettings] = useState<UISettings>({
+    상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
+    검색창: { 유지: true },
+    재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
+    노트영역: { 표시: true },
+    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true },
+    프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
+  });
 
   // YouTubeIframeAPI 준비되면 호출되는 콜백
   useEffect(() => {
@@ -102,7 +116,7 @@ const HomePage = () => {
     }, 1000);
   };
 
-  // localStorage에서 녹화 세션 불러오기
+  // localStorage에서 녹화 세션 및 UI 설정 불러오기
   useEffect(() => {
     const savedSessions = localStorage.getItem('recordingSessions');
     if (savedSessions) {
@@ -113,7 +127,23 @@ const HomePage = () => {
         console.error('녹화 세션 로드 실패:', error);
       }
     }
+
+    const savedSettings = localStorage.getItem('uiSettings');
+    if (savedSettings) {
+      try {
+        const settings = JSON.parse(savedSettings);
+        setUiSettings(settings);
+      } catch (error) {
+        console.error('UI 설정 로드 실패:', error);
+      }
+    }
   }, []);
+
+  // UI 설정 변경 시 localStorage에 저장
+  const handleSettingsChange = (newSettings: UISettings) => {
+    setUiSettings(newSettings);
+    localStorage.setItem('uiSettings', JSON.stringify(newSettings));
+  };
 
   // 재생 시간 추적
   useEffect(() => {
@@ -138,12 +168,18 @@ const HomePage = () => {
         minHeight: isKeyboardVisible ? `calc(100vh - ${keyboardHeight}px)` : '100vh',
       }}
     >
-      <header className="mb-4">
-        <h1 className="text-2xl font-bold text-gray-800 mb-2">유튜브 노트</h1>
-        <p className="text-sm text-gray-600">
-          동영상을 보면서 타임스탬프와 함께 노트를 작성하세요
-        </p>
-      </header>
+      {(uiSettings.상단부.제목표시 || uiSettings.상단부.부제목표시) && (
+        <header className="mb-4">
+          {uiSettings.상단부.제목표시 && (
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">유튜브 노트</h1>
+          )}
+          {uiSettings.상단부.부제목표시 && (
+            <p className="text-sm text-gray-600">
+              {uiSettings.상단부.부제목내용}
+            </p>
+          )}
+        </header>
+      )}
 
       <VideoLoader
         player={player}
@@ -151,6 +187,7 @@ const HomePage = () => {
         setCurrentVideoId={setCurrentVideoId}
         setCurrentVideoInfo={setCurrentVideoInfo}
         showNotification={showNotification}
+        autoHide={!uiSettings.검색창.유지}
       />
 
       <div className={`transition-all duration-300 ${isKeyboardVisible ? 'mb-2' : 'mb-4'}`}>
@@ -168,32 +205,52 @@ const HomePage = () => {
         />
       </div>
 
-      <NoteArea
-        player={player}
-        isPlayerReady={isPlayerReady}
-        playerState={playerState}
-        availableRates={availableRates}
-        currentRate={currentRate}
-        setCurrentRate={setCurrentRate}
-        showNotification={showNotification}
-        isKeyboardVisible={isKeyboardVisible}
-        keyboardHeight={keyboardHeight}
-        currentVideoId={currentVideoId}
-        currentVideoInfo={currentVideoInfo}
-        timestamps={timestamps}
-        setTimestamps={setTimestamps}
-        overlays={overlays}
-        setOverlays={setOverlays}
-        onRecordingComplete={handleRecordingComplete}
-        sessionToApply={sessionToApply}
-        recordingSessions={recordingSessions}
-        onEditRecordingSession={handleEditSession}
-        onDeleteRecordingSession={handleDeleteSession}
-        onCopyRecordingSession={handleCopySession}
-        onApplyRecordingToNote={handleApplyToNote}
-      />
+      {(uiSettings.재생컨트롤.전체표시 || uiSettings.노트영역.표시 || uiSettings.화면텍스트.패널표시) && (
+        <NoteArea
+          player={player}
+          isPlayerReady={isPlayerReady}
+          playerState={playerState}
+          availableRates={availableRates}
+          currentRate={currentRate}
+          setCurrentRate={setCurrentRate}
+          showNotification={showNotification}
+          isKeyboardVisible={isKeyboardVisible}
+          keyboardHeight={keyboardHeight}
+          currentVideoId={currentVideoId}
+          currentVideoInfo={currentVideoInfo}
+          timestamps={timestamps}
+          setTimestamps={setTimestamps}
+          overlays={overlays}
+          setOverlays={setOverlays}
+          onRecordingComplete={handleRecordingComplete}
+          sessionToApply={sessionToApply}
+          recordingSessions={recordingSessions}
+          onEditRecordingSession={handleEditSession}
+          onDeleteRecordingSession={handleDeleteSession}
+          onCopyRecordingSession={handleCopySession}
+          onApplyRecordingToNote={handleApplyToNote}
+          uiSettings={uiSettings}
+        />
+      )}
 
       <Notification />
+
+      {/* 설정 FAB 버튼 */}
+      <Button
+        onClick={() => setIsSettingsOpen(true)}
+        className="fixed bottom-6 right-6 h-12 w-12 rounded-full shadow-lg z-40"
+        size="icon"
+      >
+        <Settings className="h-5 w-5" />
+      </Button>
+
+      {/* 설정 패널 */}
+      <SettingsPanel
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        settings={uiSettings}
+        onSettingsChange={handleSettingsChange}
+      />
     </div>
   );
 };

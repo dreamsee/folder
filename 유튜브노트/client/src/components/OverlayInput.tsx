@@ -8,6 +8,7 @@ import { Plus, X, Edit2, Save, Type } from "lucide-react";
 import { formatTime } from "@/lib/youtubeUtils";
 import { OverlayData, OverlayPosition, PositionMode, Coordinates } from "./TextOverlay";
 import CoordinateInput from "./CoordinateInput";
+import { UISettings } from "./SettingsPanel";
 
 interface OverlayInputProps {
   player: any | null;
@@ -15,6 +16,7 @@ interface OverlayInputProps {
   overlays: OverlayData[];
   setOverlays: React.Dispatch<React.SetStateAction<OverlayData[]>>;
   showNotification: (message: string, type: "info" | "success" | "warning" | "error") => void;
+  uiSettings?: UISettings;
 }
 
 const OverlayInput: React.FC<OverlayInputProps> = ({
@@ -23,6 +25,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   overlays,
   setOverlays,
   showNotification,
+  uiSettings,
 }) => {
   const [overlayText, setOverlayText] = useState("");
   const [positionMode] = useState<PositionMode>("coordinate"); // 항상 좌표 모드로 고정
@@ -32,7 +35,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   const [fontSize, setFontSize] = useState(20);
   const [textColor, setTextColor] = useState("#FFFFFF");
   const [bgColor, setBgColor] = useState("#000000");
-  const [bgOpacity, setBgOpacity] = useState(80); // 0-100 퍼센트
+  const [bgOpacity, setBgOpacity] = useState(0); // 0-100 퍼센트 (기본값 0 = 투명)
   const [padding, setPadding] = useState(10);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -197,57 +200,64 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       </div>
 
       {/* 위치 설정 */}
-      <div>
-        <CoordinateInput
-          coordinates={coordinates}
-          onCoordinatesChange={setCoordinates}
-        />
-      </div>
-
-      {/* 지속 시간 */}
-      <div>
-        <Label htmlFor="duration">지속 시간: {duration}초</Label>
-        <Slider
-          id="duration"
-          value={[duration]}
-          onValueChange={([value]) => setDuration(value)}
-          min={1}
-          max={30}
-          step={1}
-          className="mt-1"
-        />
-      </div>
-
-      {/* 스타일 설정 */}
-      <div className="grid grid-cols-2 gap-4">
+      {(!uiSettings || uiSettings.화면텍스트.좌표설정) && (
         <div>
-          <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
-          <Slider
-            id="font-size"
-            value={[fontSize]}
-            onValueChange={([value]) => setFontSize(value)}
-            min={12}
-            max={48}
-            step={2}
-            className="mt-1"
+          <CoordinateInput
+            coordinates={coordinates}
+            onCoordinatesChange={setCoordinates}
           />
         </div>
-        <div>
-          <Label htmlFor="padding">여백: {padding}px</Label>
-          <Slider
-            id="padding"
-            value={[padding]}
-            onValueChange={([value]) => setPadding(value)}
-            min={4}
-            max={20}
-            step={2}
-            className="mt-1"
-          />
-        </div>
-      </div>
+      )}
+
+      {/* 지속 시간 - 스타일 설정에 포함 */}
+      {(!uiSettings || uiSettings.화면텍스트.스타일설정) && (
+        <>
+          <div>
+            <Label htmlFor="duration">지속 시간: {duration}초</Label>
+            <Slider
+              id="duration"
+              value={[duration]}
+              onValueChange={([value]) => setDuration(value)}
+              min={1}
+              max={30}
+              step={1}
+              className="mt-1"
+            />
+          </div>
+
+          {/* 스타일 설정 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
+              <Slider
+                id="font-size"
+                value={[fontSize]}
+                onValueChange={([value]) => setFontSize(value)}
+                min={12}
+                max={48}
+                step={2}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="padding">여백: {padding}px</Label>
+              <Slider
+                id="padding"
+                value={[padding]}
+                onValueChange={([value]) => setPadding(value)}
+                min={4}
+                max={20}
+                step={2}
+                className="mt-1"
+              />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* 색상 설정 */}
-      <div className="space-y-4">
+      {(!uiSettings || uiSettings.화면텍스트.스타일설정) && (
+        <div className="space-y-4">
         {/* 글자 색상 */}
         <div>
           <Label htmlFor="text-color">글자 색상</Label>
@@ -307,7 +317,8 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
             <span>불투명</span>
           </div>
         </div>
-      </div>
+        </div>
+      )}
 
       {/* 추가/수정 버튼 */}
       <Button
