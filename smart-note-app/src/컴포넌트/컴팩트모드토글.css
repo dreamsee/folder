@@ -1,0 +1,225 @@
+/* 컴팩트 모드 토글 - 우측 상단 설정 아이콘 옆 */
+
+.compact-toggle-container {
+  position: relative;
+  display: inline-block;
+}
+
+.compact-toggle {
+  width: 70px;
+  height: 32px;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  outline: none;
+}
+
+.compact-toggle:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.compact-toggle:active {
+  transform: scale(0.98);
+}
+
+.compact-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* 개인모드 스타일 */
+.compact-toggle.personal {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.compact-toggle.personal:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* 공유모드 스타일 */
+.compact-toggle.shared {
+  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.compact-toggle.shared:hover {
+  box-shadow: 0 4px 12px rgba(250, 112, 154, 0.3);
+}
+
+/* 토글 슬라이더 */
+.toggle-slider {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* 토글 핸들 */
+.toggle-handle {
+  position: absolute;
+  top: 2px;
+  width: 28px;
+  height: 28px;
+  background: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 개인모드일 때 핸들 위치 */
+.compact-toggle.personal .toggle-handle {
+  left: 2px;
+}
+
+/* 공유모드일 때 핸들 위치 */
+.compact-toggle.shared .toggle-handle {
+  left: 40px;
+}
+
+/* 아이콘 */
+.toggle-icon {
+  font-size: 16px;
+  transition: transform 0.3s ease;
+}
+
+.compact-toggle.animating .toggle-icon {
+  transform: scale(0.8) rotate(180deg);
+}
+
+/* 설명 팝업 */
+.mode-explanation-popup {
+  position: absolute;
+  top: 45px;
+  right: 0;
+  background: white;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  min-width: 240px;
+  z-index: 1001;
+  animation: slideInDown 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards;
+}
+
+/* 설명 화살표 */
+.explanation-arrow {
+  position: absolute;
+  top: -8px;
+  right: 20px;
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid white;
+}
+
+.explanation-content {
+  text-align: left;
+}
+
+.explanation-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #2d3748;
+}
+
+.explanation-text {
+  font-size: 12px;
+  color: #718096;
+  line-height: 1.4;
+}
+
+/* 애니메이션 */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .compact-toggle {
+    width: 60px;
+    height: 28px;
+  }
+  
+  .toggle-handle {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .compact-toggle.shared .toggle-handle {
+    left: 34px;
+  }
+  
+  .toggle-icon {
+    font-size: 14px;
+  }
+  
+  .mode-explanation-popup {
+    right: -20px;
+    min-width: 200px;
+    padding: 12px;
+  }
+  
+  .explanation-arrow {
+    right: 35px;
+  }
+}
+
+/* 다크 모드 대응 */
+@media (prefers-color-scheme: dark) {
+  .mode-explanation-popup {
+    background: #2d3748;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .explanation-arrow {
+    border-bottom-color: #2d3748;
+  }
+  
+  .explanation-title {
+    color: #e2e8f0;
+  }
+  
+  .explanation-text {
+    color: #a0aec0;
+  }
+}
+
+/* 접근성 */
+.compact-toggle:focus-visible {
+  outline: 2px solid #4299e1;
+  outline-offset: 2px;
+}
+
+/* 애니메이션 중일 때 */
+.compact-toggle.animating {
+  transform: scale(0.95);
+}
+
+.compact-toggle.animating .toggle-handle {
+  transform: scale(0.9);
+}

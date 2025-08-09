@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { 스마트시간포맷팅 } from '../유틸/시간표시';
+import '../PersonalMode.css';
 
 // 아이콘 타입 정의
 type 아이콘타입 = '주인공' | '악당' | '주민' | '중요' | '기본';
@@ -84,6 +85,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
   const 시간표시정보 = 스마트시간포맷팅(new Date(타임스탬프));
   const 시간확장됨 = 확장된시간목록.has(아이디);
 
+  // 드래그 상태 관리
+  const [드래그중, 드래그중설정] = useState(false);
+  const [드래그시작위치, 드래그시작위치설정] = useState({ x: 0, y: 0 });
+  const 버블참조 = useRef<HTMLDivElement>(null);
+
   // 🔥 입력방식별 아이콘 표시 조건 설정 (기존 기능 보호)
   const 아이콘표시여부 = (() => {
     switch (입력방식) {
@@ -111,15 +117,47 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
     flexDirection: isRight ? 'row-reverse' : 'row',
   };
 
+  // 드래그 이벤트 핸들러
+  const 드래그시작처리 = (e: React.MouseEvent) => {
+    드래그중설정(true);
+    드래그시작위치설정({ x: e.clientX, y: e.clientY });
+    
+    // 글로벌 마우스 이벤트 등록
+    const 마우스업처리 = (moveEvent: MouseEvent) => {
+      드래그중설정(false);
+      
+      // 드래그 완료 처리
+      const 드래그거리 = Math.sqrt(
+        Math.pow(moveEvent.clientX - 드래그시작위치.x, 2) + 
+        Math.pow(moveEvent.clientY - 드래그시작위치.y, 2)
+      );
+      
+      if (드래그거리 > 20) {
+        // 드래그로 인식 - 커스텀 이벤트 발생
+        const 커스텀이벤트 = new CustomEvent('messageDrag', {
+          detail: {
+            메시지아이디: 아이디,
+            텍스트,
+            시작위치: 드래그시작위치,
+            끝위치: { x: moveEvent.clientX, y: moveEvent.clientY }
+          }
+        });
+        document.dispatchEvent(커스텀이벤트);
+      }
+      
+      document.removeEventListener('mouseup', 마우스업처리);
+    };
+    
+    document.addEventListener('mouseup', 마우스업처리);
+  };
+
+  // 개인형 버블 클래스 적용
+  const 버블클래스 = isRight ? 'my-thought-bubble' : 'ai-assistant-bubble';
+  const 드래그클래스 = 드래그중 ? 'draggable-message' : '';
+  
   const 버블스타일: React.CSSProperties = {
-    backgroundColor: isRight ? '#007bff' : 말풍선색상,
-    color: isRight ? 'white' : '#212529',
-    padding: '12px 16px',
-    borderRadius: '20px',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     wordBreak: 'break-word',
     position: 'relative',
-    border: isRight ? 'none' : '1px solid rgba(0,123,255,0.1)',
   };
 
   const 작성자스타일: React.CSSProperties = {
@@ -220,7 +258,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({
             )
           }}>
             {작성자 && <div style={작성자스타일}>{작성자}</div>}
-            <div style={버블스타일}>
+            <div 
+              ref={버블참조}
+              className={`${버블클래스} ${드래그클래스} hover-lift`}
+              style={버블스타일}
+              onMouseDown={드래그시작처리}
+              title="드래그해서 노트로 변환"
+            >
               {텍스트}
             </div>
           </div>

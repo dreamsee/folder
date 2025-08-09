@@ -1,8 +1,17 @@
-/* 채팅형 스마트 노트 시스템 메인 스타일 */
+/* 채팅형 스마트 노트 시스템 메인 스타일 - 개인형/공유형 통합 */
 
 .앱-컨테이너 {
   height: 100vh;
   overflow: hidden;
+  transition: all 0.8s ease;
+}
+
+.앱-컨테이너.personal-mode {
+  background-color: var(--current-bg);
+}
+
+.앱-컨테이너.shared-mode {
+  background-color: #f8f9fa;
 }
 
 .메인-레이아웃 {
@@ -15,8 +24,20 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e0e0e0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  transition: all 0.8s ease;
+}
+
+.personal-mode .왼쪽-패널 {
+  background: rgba(255, 255, 255, 0.05);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.shared-mode .왼쪽-패널 {
   background-color: #f9f9f9;
+  border-right: 1px solid #e0e0e0;
 }
 
 /* 오른쪽 패널 스타일 */
@@ -24,6 +45,16 @@
   flex: 2;
   display: flex;
   flex-direction: column;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  transition: all 0.8s ease;
+}
+
+.personal-mode .오른쪽-패널 {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.shared-mode .오른쪽-패널 {
   background-color: #ffffff;
 }
 
@@ -66,6 +97,14 @@
   padding: 16px;
   box-sizing: border-box;
   overflow: hidden; /* 전체 컨테이너 overflow 방지 */
+  transition: all 0.8s ease;
+}
+
+.personal-mode .채팅패널-컨테이너 {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border-radius: 16px;
+  margin: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
 }
 
 .채팅메시지-목록 {

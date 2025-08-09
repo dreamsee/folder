@@ -86,8 +86,8 @@ const 설정패널: React.FC = () => {
         onClick={() => 패널열림설정(true)}
         style={{ 
           position: 'fixed', 
-          top: '10px', 
-          right: '10px', 
+          bottom: '20px', 
+          left: '20px', 
           zIndex: 1000,
           fontSize: '12px',
           padding: '6px 12px'

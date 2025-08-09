@@ -1,0 +1,433 @@
+/* 🏠 개인형 모드 - "나만의 아늑한 서재" */
+
+/* CSS 변수 정의 - 시간대별 테마 */
+:root {
+  /* 아침 모드 (6-12시) - 상쾌한 시작 */
+  --morning-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --morning-bg: #fafbff;
+  --morning-accent: #5a67d8;
+  --morning-bubble-bg: #e6e9ff;
+  --morning-text: #4a5568;
+  --morning-shadow: 0 2px 10px rgba(102, 126, 234, 0.1);
+
+  /* 오후 모드 (12-18시) - 활기찬 낮 */
+  --afternoon-gradient: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+  --afternoon-bg: #fffef9;
+  --afternoon-accent: #f56565;
+  --afternoon-bubble-bg: #fff5f5;
+  --afternoon-text: #744210;
+  --afternoon-shadow: 0 2px 10px rgba(250, 112, 154, 0.1);
+
+  /* 저녁 모드 (18-22시) - 따뜻한 마무리 */
+  --evening-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --evening-bg: #fffaf0;
+  --evening-accent: #e53e3e;
+  --evening-bubble-bg: #ffe4e1;
+  --evening-text: #7b341e;
+  --evening-shadow: 0 2px 10px rgba(240, 147, 251, 0.1);
+
+  /* 심야 모드 (22-6시) - 고요한 집중 */
+  --night-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --night-bg: #0a0e27;
+  --night-accent: #4facfe;
+  --night-bubble-bg: #1a1f3a;
+  --night-text: #cbd5e0;
+  --night-shadow: 0 2px 10px rgba(79, 172, 254, 0.2);
+
+  /* 현재 테마 변수 (JavaScript로 동적 변경) */
+  --current-gradient: var(--morning-gradient);
+  --current-bg: var(--morning-bg);
+  --current-accent: var(--morning-accent);
+  --current-bubble-bg: var(--morning-bubble-bg);
+  --current-text: var(--morning-text);
+  --current-shadow: var(--morning-shadow);
+}
+
+/* 개인형 모드 전체 컨테이너 */
+.personal-mode {
+  background-color: var(--current-bg);
+  color: var(--current-text);
+  transition: all 0.8s ease;
+  min-height: 100vh;
+}
+
+/* 시간대 인사말 */
+.time-greeting {
+  background: var(--current-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 24px;
+  font-weight: 600;
+  text-align: center;
+  padding: 20px;
+  animation: fadeInDown 0.8s ease;
+}
+
+/* 채팅 버블 - 나의 생각 */
+.my-thought-bubble {
+  background: var(--current-bubble-bg);
+  border-radius: 20px 20px 5px 20px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  max-width: 80%;
+  align-self: flex-end;
+  box-shadow: var(--current-shadow);
+  position: relative;
+  animation: slideInRight 0.3s ease;
+  transition: transform 0.2s ease;
+}
+
+.my-thought-bubble:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* 타이핑 애니메이션 */
+.typing-animation {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typing 1s steps(30, end);
+}
+
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+/* AI 비서 버블 - 전문적이지만 따뜻한 */
+.ai-assistant-bubble {
+  background: linear-gradient(135deg, #fff 0%, var(--current-bubble-bg) 100%);
+  border-radius: 20px 20px 20px 5px;
+  padding: 12px 16px;
+  margin: 8px 0;
+  max-width: 80%;
+  align-self: flex-start;
+  box-shadow: var(--current-shadow);
+  position: relative;
+  animation: slideInLeft 0.3s ease;
+}
+
+.ai-assistant-bubble::before {
+  content: "🤖";
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 24px;
+  filter: hue-rotate(var(--ai-hue, 0deg));
+}
+
+/* 드래그 인터랙션 */
+.draggable-message {
+  cursor: grab;
+  transition: all 0.2s ease;
+}
+
+.draggable-message:active {
+  cursor: grabbing;
+  transform: scale(0.95) rotate(2deg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  opacity: 0.8;
+}
+
+/* 드롭 존 */
+.drop-zone {
+  border: 2px dashed transparent;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a0aec0;
+}
+
+.drop-zone.active {
+  border-color: var(--current-accent);
+  background: rgba(90, 103, 216, 0.05);
+  transform: scale(1.02);
+}
+
+.drop-zone.hover {
+  background: rgba(90, 103, 216, 0.1);
+  border-color: var(--current-accent);
+  color: var(--current-accent);
+}
+
+/* 미세 인터랙션 */
+.interactive-button {
+  background: var(--current-accent);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.interactive-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.interactive-button:active {
+  transform: translateY(0);
+}
+
+/* 물결 효과 */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+  transform: scale(0);
+  animation: ripple-animation 0.6s ease-out;
+}
+
+@keyframes ripple-animation {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+/* 로딩 애니메이션 - 펜이 글을 쓰는 모습 */
+.loading-pen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.pen-icon {
+  font-size: 32px;
+  animation: writing 2s ease-in-out infinite;
+}
+
+@keyframes writing {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(10px) rotate(-5deg); }
+  75% { transform: translateX(-10px) rotate(5deg); }
+}
+
+.loading-text {
+  margin-left: 12px;
+  color: var(--current-text);
+  opacity: 0.7;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* 빈 상태 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--current-text);
+  opacity: 0.6;
+}
+
+.empty-state-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  filter: grayscale(0.3);
+}
+
+.empty-state-title {
+  font-size: 20px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.empty-state-subtitle {
+  font-size: 16px;
+  opacity: 0.8;
+}
+
+/* 성취감 피드백 */
+.achievement-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 12px;
+  padding: 16px 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: slideInRight 0.5s ease, slideOutRight 0.5s ease 2s forwards;
+  z-index: 1000;
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 계절별 특수 효과 */
+.seasonal-effect {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 999;
+}
+
+/* 봄 - 벚꽃 효과 */
+.sakura-petal {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffb7c5;
+  border-radius: 0 100% 0 100%;
+  animation: fall 10s linear infinite;
+}
+
+/* 겨울 - 눈 효과 */
+.snowflake {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.8;
+  animation: fall 8s linear infinite;
+}
+
+@keyframes fall {
+  to {
+    transform: translateY(100vh) rotate(360deg);
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .my-thought-bubble,
+  .ai-assistant-bubble {
+    max-width: 90%;
+    font-size: 14px;
+  }
+
+  .time-greeting {
+    font-size: 20px;
+    padding: 16px;
+  }
+
+  /* 모바일 한 손 조작 모드 */
+  .one-hand-mode {
+    transform: translateY(30%);
+    transition: transform 0.3s ease;
+  }
+}
+
+/* 다크 모드 자동 감지 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --current-gradient: var(--night-gradient);
+    --current-bg: var(--night-bg);
+    --current-accent: var(--night-accent);
+    --current-bubble-bg: var(--night-bubble-bg);
+    --current-text: var(--night-text);
+    --current-shadow: var(--night-shadow);
+  }
+}
+
+/* 부드러운 스크롤 */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--current-accent) transparent;
+}
+
+.smooth-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.smooth-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.smooth-scroll::-webkit-scrollbar-thumb {
+  background: var(--current-accent);
+  border-radius: 3px;
+}
+
+/* 호버 효과 */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* 빛 스치는 효과 */
+.shine-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine-effect::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 70%
+  );
+  transform: rotate(45deg) translateX(-100%);
+  transition: transform 0.6s;
+}
+
+.shine-effect:hover::after {
+  transform: rotate(45deg) translateX(100%);
+}

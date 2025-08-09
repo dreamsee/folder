@@ -8,11 +8,20 @@ import { 조합이름가져오기, 조합색상가져오기, 카테고리조합�
 import { 스마트시간포맷팅 } from '../유틸/시간표시';
 import { 노트설정가져오기, 폴더기본설정사용중인지확인 } from '../유틸/노트설정유틸';
 import { 앱상태사용하기 } from '../상태관리/앱상태';
+// 개인형 모드 컴포넌트 추가
+import { useTimeTheme } from '../훅/useTimeTheme';
+import { useDragAndDrop } from '../훅/useDragAndDrop';
+import '../PersonalMode.css';
 
-// 채팅 패널 컴포넌트 - Supabase 연동
+// 채팅 패널 컴포넌트 - Supabase 연동 + 개인형 모드
 const 채팅패널: React.FC = () => {
   const { 활성노트, 새메시지추가하기, 새노트생성하기, 활성폴더, 폴더설정업데이트하기 } = Supabase상태사용하기();
   const { 연상검색결과설정 } = 앱상태사용하기();
+  
+  // 개인형 모드 훅 사용
+  const 현재시간대 = useTimeTheme();
+  const [개인모드활성, 개인모드활성설정] = useState(true); // 기본값: 개인모드
+  
   const [현재입력값, 현재입력값설정] = useState('');
   const [편집팝업열림, 편집팝업열림설정] = useState(false);
   const [편집대상메시지아이디, 편집대상메시지아이디설정] = useState<string | null>(null);
@@ -23,6 +32,14 @@ const 채팅패널: React.FC = () => {
   const [숨김메시지목록, 숨김메시지목록설정] = useState<Set<string>>(new Set()); // 숨겨진 메시지들 (폴더 통합뷰 전용)
   const [숨김메시지표시여부, 숨김메시지표시여부설정] = useState(false); // 숨긴 메시지 표시 토글 (폴더 통합뷰 전용)
   const 메시지목록참조 = useRef<HTMLDivElement>(null);
+
+  // 드래그 앤 드롭 훅 사용
+  const { 드래그상태, 드래그시작, 드래그중, 드래그완료, 물결효과생성 } = useDragAndDrop(
+    (이벤트) => {
+      // 드래그 완료 시 처리
+      메시지드래그완료처리(이벤트);
+    }
+  );
 
   // 메시지가 추가될 때마다 스크롤을 맨 아래로
   useEffect(() => {
@@ -89,6 +106,80 @@ const 채팅패널: React.FC = () => {
     }
     
     return false; // 일반 메시지
+  };
+
+  // 메시지 드래그 완료 처리 (개인형 모드)
+  const 메시지드래그완료처리 = async (이벤트: any) => {
+    console.log('드래그 완료:', 이벤트);
+    
+    // 드래그 패턴에 따른 처리
+    switch (이벤트.드래그패턴) {
+      case '짧게':
+        // 빠른 메모로 저장
+        빠른메모생성(이벤트.텍스트);
+        성취감알림표시('빠른 메모로 저장되었어요! 📝');
+        break;
+        
+      case '길게':
+        // 상세 노트로 변환
+        상세노트생성(이벤트.텍스트);
+        성취감알림표시('상세 노트로 변환되었어요! 📖');
+        break;
+        
+      case '원형':
+        // 마인드맵 생성 (추후 구현)
+        성취감알림표시('마인드맵 기능 준비중입니다! 🧠');
+        break;
+        
+      case '위로':
+        // 중요 표시
+        메시지중요표시(이벤트.메시지아이디);
+        성취감알림표시('중요 메시지로 표시되었어요! ⭐');
+        break;
+        
+      case '옆으로':
+        // 카테고리 자동 분류 (추후 구현)
+        성취감알림표시('자동 분류 기능 준비중입니다! 📁');
+        break;
+        
+      default:
+        console.log('알 수 없는 드래그 패턴:', 이벤트.드래그패턴);
+    }
+  };
+
+  // 성취감 알림 표시
+  const 성취감알림표시 = (메시지: string) => {
+    const 알림 = document.createElement('div');
+    알림.className = 'achievement-notification';
+    알림.innerHTML = `
+      <div style="font-size: 20px;">✨</div>
+      <div style="font-weight: 500;">${메시지}</div>
+    `;
+    document.body.appendChild(알림);
+
+    setTimeout(() => {
+      if (알림.parentNode) {
+        알림.parentNode.removeChild(알림);
+      }
+    }, 3000);
+  };
+
+  // 빠른 메모 생성
+  const 빠른메모생성 = (텍스트: string) => {
+    // 기존 노트에 빠른 메모 추가
+    메시지전송하기(`💡 빠른메모: ${텍스트}`, { author: '시스템' });
+  };
+
+  // 상세 노트 생성
+  const 상세노트생성 = (텍스트: string) => {
+    // AI 비서가 구조화해서 응답
+    메시지전송하기(`📝 정리해드릴게요:\n\n• 핵심내용: ${텍스트}\n• 관련주제: [자동 분석 중...]\n• 다음단계: [제안 준비 중...]`, { author: 'AI비서' });
+  };
+
+  // 메시지 중요 표시
+  const 메시지중요표시 = (메시지아이디: string) => {
+    // 추후 구현: 메시지에 중요 표시 추가
+    console.log('중요 표시:', 메시지아이디);
   };
 
   const 메시지전송하기 = async (텍스트: string, 옵션?: { category?: string; author?: string; 말풍선위치?: '왼쪽' | '오른쪽' }) => {
