@@ -8,7 +8,7 @@ import { RecordingSession } from "@/components/RecordingMode";
 import SettingsPanel, { UISettings } from "@/components/SettingsPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
-import { OverlayData } from "@/components/TextOverlay";
+import { OverlayData, OverlayPosition } from "@/components/TextOverlay";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 
@@ -39,9 +39,10 @@ const HomePage = () => {
     검색창: { 유지: true },
     재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
     노트영역: { 표시: true },
-    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true },
+    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
   });
+
 
   // YouTubeIframeAPI 준비되면 호출되는 콜백
   useEffect(() => {
@@ -230,6 +231,7 @@ const HomePage = () => {
           onCopyRecordingSession={handleCopySession}
           onApplyRecordingToNote={handleApplyToNote}
           uiSettings={uiSettings}
+          onSettingsChange={handleSettingsChange}
         />
       )}
 
@@ -251,6 +253,7 @@ const HomePage = () => {
         settings={uiSettings}
         onSettingsChange={handleSettingsChange}
       />
+
     </div>
   );
 };

@@ -29,6 +29,7 @@ export interface UISettings {
     좌표설정: boolean;
     스타일설정: boolean;
     빠른설정: boolean;
+    빠른설정위치: string;
   };
   프리셋: {
     최소모드명: string;
@@ -55,7 +56,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     검색창: { 유지: true },
     재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
     노트영역: { 표시: true },
-    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true },
+    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
   };
 
@@ -80,7 +81,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           검색창: { 유지: false },
           재생컨트롤: { 전체표시: false, 볼륨: false, 속도: false, 도장: false, 녹화: false },
           노트영역: { 표시: false },
-          화면텍스트: { 패널표시: true, 좌표설정: false, 스타일설정: true, 빠른설정: true },
+          화면텍스트: { 패널표시: true, 좌표설정: false, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
           프리셋: settings.프리셋 || { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
         };
         break;
@@ -90,7 +91,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           검색창: { 유지: false },
           재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: false, 녹화: false },
           노트영역: { 표시: true },
-          화면텍스트: { 패널표시: false, 좌표설정: false, 스타일설정: false, 빠른설정: false },
+          화면텍스트: { 패널표시: false, 좌표설정: false, 스타일설정: false, 빠른설정: false, 빠른설정위치: "정중앙" },
           프리셋: settings.프리셋 || { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
         };
         break;
@@ -100,7 +101,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           검색창: { 유지: true },
           재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
           노트영역: { 표시: true },
-          화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true },
+          화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
           프리셋: settings.프리셋 || { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
         };
         break;
@@ -217,7 +218,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {/* 상단부 설정 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium pb-2 border-b border-gray-200">상단부</h3>
+            <h3 className="text-sm font-medium pb-2">상단부</h3>
             <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm">제목 표시</span>
@@ -262,101 +263,92 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {/* 재생 컨트롤 설정 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium pb-2 border-b border-gray-200">재생 컨트롤</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">전체 표시</span>
-                <Switch
-                  checked={settings.재생컨트롤.전체표시}
-                  onCheckedChange={(값) => 설정업데이트("재생컨트롤", "전체표시", 값)}
-                />
-              </div>
-              {settings.재생컨트롤.전체표시 && (
-                <div className="ml-4 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">볼륨</span>
-                    <Switch
-                      checked={settings.재생컨트롤.볼륨}
-                      onCheckedChange={(값) => 설정업데이트("재생컨트롤", "볼륨", 값)}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">속도</span>
-                    <Switch
-                      checked={settings.재생컨트롤.속도}
-                      onCheckedChange={(값) => 설정업데이트("재생컨트롤", "속도", 값)}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">도장</span>
-                    <Switch
-                      checked={settings.재생컨트롤.도장}
-                      onCheckedChange={(값) => 설정업데이트("재생컨트롤", "도장", 값)}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">녹화</span>
-                    <Switch
-                      checked={settings.재생컨트롤.녹화}
-                      onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)}
-                    />
-                  </div>
-                </div>
-              )}
+            <div className="flex justify-between items-center pb-2">
+              <h3 className="text-sm font-medium">재생 컨트롤</h3>
+              <Switch
+                checked={settings.재생컨트롤.전체표시}
+                onCheckedChange={(값) => 설정업데이트("재생컨트롤", "전체표시", 값)}
+              />
             </div>
+            {settings.재생컨트롤.전체표시 && (
+              <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">볼륨</span>
+                  <Switch
+                    checked={settings.재생컨트롤.볼륨}
+                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "볼륨", 값)}
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">속도</span>
+                  <Switch
+                    checked={settings.재생컨트롤.속도}
+                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "속도", 값)}
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">도장</span>
+                  <Switch
+                    checked={settings.재생컨트롤.도장}
+                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "도장", 값)}
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">녹화</span>
+                  <Switch
+                    checked={settings.재생컨트롤.녹화}
+                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 노트 영역 설정 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium pb-2 border-b border-gray-200">노트 영역</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">노트 영역 표시</span>
-                <Switch
-                  checked={settings.노트영역.표시}
-                  onCheckedChange={(값) => 설정업데이트("노트영역", "표시", 값)}
-                />
-              </div>
+            <div className="flex justify-between items-center pb-2">
+              <h3 className="text-sm font-medium">노트 영역</h3>
+              <Switch
+                checked={settings.노트영역.표시}
+                onCheckedChange={(값) => 설정업데이트("노트영역", "표시", 값)}
+              />
             </div>
           </div>
 
           {/* 화면 텍스트 설정 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium pb-2 border-b border-gray-200">화면 텍스트</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm">패널 표시</span>
-                <Switch
-                  checked={settings.화면텍스트.패널표시}
-                  onCheckedChange={(값) => 설정업데이트("화면텍스트", "패널표시", 값)}
-                />
-              </div>
-              {settings.화면텍스트.패널표시 && (
-                <div className="ml-4 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">좌표 설정</span>
-                    <Switch
-                      checked={settings.화면텍스트.좌표설정}
-                      onCheckedChange={(값) => 설정업데이트("화면텍스트", "좌표설정", 값)}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">스타일 설정</span>
-                    <Switch
-                      checked={settings.화면텍스트.스타일설정}
-                      onCheckedChange={(값) => 설정업데이트("화면텍스트", "스타일설정", 값)}
-                    />
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">빠른 설정</span>
-                    <Switch
-                      checked={settings.화면텍스트.빠른설정}
-                      onCheckedChange={(값) => 설정업데이트("화면텍스트", "빠른설정", 값)}
-                    />
-                  </div>
-                </div>
-              )}
+            <div className="flex justify-between items-center pb-2">
+              <h3 className="text-sm font-medium">화면 텍스트</h3>
+              <Switch
+                checked={settings.화면텍스트.패널표시}
+                onCheckedChange={(값) => 설정업데이트("화면텍스트", "패널표시", 값)}
+              />
             </div>
+            {settings.화면텍스트.패널표시 && (
+              <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">좌표 설정</span>
+                  <Switch
+                    checked={settings.화면텍스트.좌표설정}
+                    onCheckedChange={(값) => 설정업데이트("화면텍스트", "좌표설정", 값)}
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">빠른 설정</span>
+                  <Switch
+                    checked={settings.화면텍스트.빠른설정}
+                    onCheckedChange={(값) => 설정업데이트("화면텍스트", "빠른설정", 값)}
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">스타일 설정</span>
+                  <Switch
+                    checked={settings.화면텍스트.스타일설정}
+                    onCheckedChange={(값) => 설정업데이트("화면텍스트", "스타일설정", 값)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </div>

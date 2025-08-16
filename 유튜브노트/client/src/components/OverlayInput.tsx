@@ -17,6 +17,7 @@ interface OverlayInputProps {
   setOverlays: React.Dispatch<React.SetStateAction<OverlayData[]>>;
   showNotification: (message: string, type: "info" | "success" | "warning" | "error") => void;
   uiSettings?: UISettings;
+  onSettingsChange?: (settings: UISettings) => void;
 }
 
 const OverlayInput: React.FC<OverlayInputProps> = ({
@@ -26,6 +27,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   setOverlays,
   showNotification,
   uiSettings,
+  onSettingsChange,
 }) => {
   const [overlayText, setOverlayText] = useState("");
   const [positionMode] = useState<PositionMode>("coordinate"); // 항상 좌표 모드로 고정
@@ -161,6 +163,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     return "좌표 (50%, 90%)";
   };
 
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2 md:hidden">
@@ -200,12 +203,47 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       </div>
 
       {/* 위치 설정 */}
-      {(!uiSettings || uiSettings.화면텍스트.좌표설정) && (
-        <div>
-          <CoordinateInput
-            coordinates={coordinates}
-            onCoordinatesChange={setCoordinates}
-          />
+      {(!uiSettings || uiSettings.화면텍스트.좌표설정 || uiSettings.화면텍스트.빠른설정) && (
+        <div className="space-y-4">
+          
+          {/* 좌표설정이 켜져있으면 상세한 좌표 입력 표시 */}
+          {(!uiSettings || uiSettings.화면텍스트.좌표설정) && (
+            <CoordinateInput
+              coordinates={coordinates}
+              onCoordinatesChange={setCoordinates}
+            />
+          )}
+          
+          {/* 빠른 설정이 켜져있으면 9개 그리드 표시 */}
+          {uiSettings?.화면텍스트.빠른설정 && (
+            <div className="space-y-3">
+              <div className="text-sm text-gray-600 text-center">
+                빠른 설정:
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { name: "좌상단", x: 10, y: 10 },
+                  { name: "상단중앙", x: 50, y: 10 },
+                  { name: "우상단", x: 90, y: 10 },
+                  { name: "좌측중앙", x: 10, y: 50 },
+                  { name: "정중앙", x: 50, y: 50 },
+                  { name: "우측중앙", x: 90, y: 50 },
+                  { name: "좌하단", x: 10, y: 90 },
+                  { name: "하단중앙", x: 50, y: 90 },
+                  { name: "우하단", x: 90, y: 90 },
+                ].map((position, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => setCoordinates({ x: position.x, y: position.y, unit: "%" })}
+                    className="px-2 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm border border-gray-300 hover:border-gray-400 transition-colors"
+                  >
+                    {position.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -377,6 +415,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
           </div>
         </div>
       )}
+
     </div>
   );
 };

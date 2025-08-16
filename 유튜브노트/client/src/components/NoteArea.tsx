@@ -77,6 +77,7 @@ interface NoteAreaProps {
   onCopyRecordingSession: (session: RecordingSession) => void;
   onApplyRecordingToNote: (session: RecordingSession) => void;
   uiSettings: UISettings;
+  onSettingsChange?: (settings: UISettings) => void; // UI 설정 변경 콜백
 }
 
 const NoteArea: React.FC<NoteAreaProps> = ({
@@ -100,6 +101,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   onCopyRecordingSession,
   onApplyRecordingToNote,
   uiSettings,
+  onSettingsChange,
 }) => {
   const [noteText, setNoteText] = useState("");
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
@@ -2212,6 +2214,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               overlays={overlays}
               setOverlays={setOverlays}
               showNotification={showNotification}
+              uiSettings={uiSettings}
+              onSettingsChange={onSettingsChange}
             />
           )}
         </div>
@@ -2350,6 +2354,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                 setOverlays={setOverlays}
                 showNotification={showNotification}
                 uiSettings={uiSettings}
+                onSettingsChange={onSettingsChange}
               />
             ) : (
               <RecordingSessionList
