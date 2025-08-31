@@ -64,6 +64,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     const 새설정 = { ...settings };
     (새설정[카테고리] as any)[키] = 값;
     onSettingsChange(새설정);
+    // localStorage에 즉시 저장
+    localStorage.setItem('uiSettings', JSON.stringify(새설정));
   };
 
   const 프리셋선택 = (프리셋: "최소" | "노트") => {
@@ -308,10 +310,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="space-y-3">
             <div className="flex justify-between items-center pb-2">
               <h3 className="text-sm font-medium">노트 영역</h3>
-              <Switch
-                checked={settings.노트영역.표시}
-                onCheckedChange={(값) => 설정업데이트("노트영역", "표시", 값)}
-              />
+              <div 
+                className="touch-manipulation" 
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Switch
+                  checked={settings.노트영역.표시}
+                  onCheckedChange={(값) => 설정업데이트("노트영역", "표시", 값)}
+                />
+              </div>
             </div>
           </div>
 
@@ -319,10 +326,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="space-y-3">
             <div className="flex justify-between items-center pb-2">
               <h3 className="text-sm font-medium">화면 텍스트</h3>
-              <Switch
-                checked={settings.화면텍스트.패널표시}
-                onCheckedChange={(값) => 설정업데이트("화면텍스트", "패널표시", 값)}
-              />
+              <div 
+                className="touch-manipulation" 
+                style={{ WebkitTapHighlightColor: 'transparent' }}
+              >
+                <Switch
+                  checked={settings.화면텍스트.패널표시}
+                  onCheckedChange={(값) => 설정업데이트("화면텍스트", "패널표시", 값)}
+                />
+              </div>
             </div>
             {settings.화면텍스트.패널표시 && (
               <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-// import type { YoutubeSearchResponse, YoutubeVideo } from "@shared/schema"; // 현재 미사용
+import type { YoutubeSearchResponse, YoutubeVideo } from "@shared/schema";
 
 interface VideoLoaderProps {
   player: any | null;

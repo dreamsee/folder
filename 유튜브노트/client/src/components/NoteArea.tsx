@@ -2083,11 +2083,21 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           {/* 타임스탬프 버튼 */}
           {uiSettings.재생컨트롤.도장 && (
             <Button
-              onClick={addTimestamp}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addTimestamp();
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                addTimestamp();
+              }}
               disabled={!isTimestampButtonEnabled}
               size="sm"
               variant="destructive"
-              className="flex-shrink-0 ml-1 text-xs px-2 py-1 h-7"
+              className="flex-shrink-0 ml-1 text-xs px-2 py-1 h-7 touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               <Clock className="w-3 h-3 mr-1" />
               도장

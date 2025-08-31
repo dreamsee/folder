@@ -6,7 +6,8 @@ import VideoLoader from "@/components/VideoLoader";
 import Notification from "@/components/Notification";
 import { RecordingSession } from "@/components/RecordingMode";
 import SettingsPanel, { UISettings } from "@/components/SettingsPanel";
-import { useToast } from "@/hooks/use-toast";
+import ScreenLock from "@/components/ScreenLock";
+// import { useToast } from "@/hooks/use-toast"; // 토스트 비활성화
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import { OverlayData, OverlayPosition } from "@/components/TextOverlay";
 import { Button } from "@/components/ui/button";
@@ -29,11 +30,17 @@ const HomePage = () => {
   const [recordingSessions, setRecordingSessions] = useState<RecordingSession[]>([]); // 녹화 세션 목록
   const [sessionToApply, setSessionToApply] = useState<RecordingSession | null>(null); // 노트에 적용할 세션
   const [currentPlayTime, setCurrentPlayTime] = useState(0); // 현재 재생 시간
-  const { toast } = useToast();
+  // const { toast } = useToast(); // 토스트 비활성화
   const { isKeyboardVisible, keyboardHeight } = useVirtualKeyboard();
 
   // 설정 관련 상태
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isScreenLocked, setIsScreenLocked] = useState(false);
+  const [magnifierSettings, setMagnifierSettings] = useState({
+    enabled: true,
+    zoom: 2.0,
+    size: 2, // 1: 소, 2: 중, 3: 대
+  });
   const [uiSettings, setUiSettings] = useState<UISettings>({
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
     검색창: { 유지: true },
@@ -48,20 +55,13 @@ const HomePage = () => {
   useEffect(() => {
     // @ts-ignore - YouTube API는 전역 객체에 함수를 추가함
     window.onYouTubeIframeAPIReady = () => {
-      toast({
-        title: "준비 완료",
-        description: "YouTube 플레이어가 초기화되었습니다. 동영상을 로드하세요.",
-      });
+      console.log("YouTube 플레이어가 초기화되었습니다. 동영상을 로드하세요.");
     };
-  }, [toast]);
+  }, []);
 
-  // 알림 표시 함수
+  // 알림 표시 함수 (토스트 비활성화)
   const showNotification = (message: string, type: "info" | "success" | "warning" | "error") => {
-    toast({
-      title: type.charAt(0).toUpperCase() + type.slice(1),
-      description: message,
-      variant: type === "error" ? "destructive" : "default",
-    });
+    console.log(`${type.toUpperCase()}: ${message}`);
   };
 
   // 드래그로 오버레이 위치 변경 처리
@@ -163,12 +163,21 @@ const HomePage = () => {
   }, [player, isPlayerReady]);
 
   return (
-    <div 
-      className="container mx-auto px-4 py-4 max-w-none md:max-w-4xl min-h-screen bg-secondary transition-all duration-300"
-      style={{
-        minHeight: isKeyboardVisible ? `calc(100vh - ${keyboardHeight}px)` : '100vh',
-      }}
-    >
+    <>
+      {/* 화면 잠금 컨트롤 */}
+      <ScreenLock
+        isLocked={isScreenLocked}
+        onLockToggle={() => setIsScreenLocked(!isScreenLocked)}
+        magnifierSettings={magnifierSettings}
+        onMagnifierSettingsChange={setMagnifierSettings}
+      />
+      
+      <div 
+        className={`container mx-auto px-4 py-4 max-w-none md:max-w-4xl min-h-screen bg-secondary transition-all duration-300 pt-16 ${isScreenLocked ? 'screen-locked' : 'screen-unlocked'}`}
+        style={{
+          minHeight: isKeyboardVisible ? `calc(100vh - ${keyboardHeight}px)` : '100vh',
+        }}
+      >
       {(uiSettings.상단부.제목표시 || uiSettings.상단부.부제목표시) && (
         <header className="mb-4">
           {uiSettings.상단부.제목표시 && (
@@ -203,11 +212,12 @@ const HomePage = () => {
           timestamps={timestamps}
           overlays={overlays}
           onOverlayPositionChange={handleOverlayPositionChange}
+          isLocked={isScreenLocked}
+          magnifierSettings={magnifierSettings}
         />
       </div>
 
-      {(uiSettings.재생컨트롤.전체표시 || uiSettings.노트영역.표시 || uiSettings.화면텍스트.패널표시) && (
-        <NoteArea
+      <NoteArea
           player={player}
           isPlayerReady={isPlayerReady}
           playerState={playerState}
@@ -233,7 +243,6 @@ const HomePage = () => {
           uiSettings={uiSettings}
           onSettingsChange={handleSettingsChange}
         />
-      )}
 
       <Notification />
 
@@ -255,6 +264,7 @@ const HomePage = () => {
       />
 
     </div>
+    </>
   );
 };
 
