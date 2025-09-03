@@ -170,7 +170,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     if (event.data === window.YT.PlayerState.PLAYING && currentVideoId) {
       const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
       
-      // 이미 기록이 있으면 업데이트, 없으면 새로 생성
+      // 첫 재생시에만 기록 생성
       if (!watchHistory[currentVideoId]) {
         watchHistory[currentVideoId] = {
           videoId: currentVideoId,
@@ -182,18 +182,15 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           duration: player?.getDuration() || 0,
         };
         
+        localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+        
         // 새 영상이면 기본값 다시 적용 (YouTube가 가끔 초기화하는 경우 대비)
         setTimeout(() => {
           if (player && event.target) {
             applyDefaultSettings(event.target);
           }
         }, 1000);
-      } else {
-        watchHistory[currentVideoId].lastWatchedAt = new Date().toISOString();
-        watchHistory[currentVideoId].watchCount += 1;
       }
-      
-      localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
     }
   };
 

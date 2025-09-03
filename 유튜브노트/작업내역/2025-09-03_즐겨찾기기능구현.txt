@@ -1,0 +1,76 @@
+작업 날짜: 2025-09-03
+작업명: YouTube 영상 즐겨찾기 및 폴더 관리 기능 구현
+
+구현 내용:
+본 영상을 즐겨찾기로 저장하고 폴더별로 분류할 수 있는 기능 추가, 폴더 선택 모달과 즐겨찾기 필터 구현
+
+수정 파일 및 변경 내용:
+
+1. client/src/components/VideoLoader.tsx
+
+   삭제됨:
+   - filterMode 타입: 'watched' | 'blacklisted' | 'unwatched'
+   - applyFilter 함수에서 favorites 처리 없음
+   - 즐겨찾기 관련 함수 없음
+
+   추가됨:
+   - filterMode 타입: 'watched' | 'blacklisted' | 'unwatched' | 'favorites'
+   - const [folderSelectorOpen, setFolderSelectorOpen] = useState(false);
+   - const [selectedVideoForFolder, setSelectedVideoForFolder] = useState<YoutubeVideo | null>(null);
+   - import FolderSelector from "./FolderSelector";
+   - applyFilter 함수에 favorites 모드 처리 추가
+   - startAddToFavorites 함수: 즐겨찾기 추가/제거 및 폴더 선택 모달 열기
+   - addToFavoritesWithFolder 함수: 폴더 선택 완료 시 즐겨찾기에 추가
+   - isFavorite 함수: 즐겨찾기 여부 확인
+   - 즐겨찾기 필터 버튼 UI 추가
+   - 본 영상에서 별표 버튼 추가 (startAddToFavorites 호출)
+   - 즐겨찾기 필터에서 별표 버튼 추가 (제거 기능)
+   - 필터링 결과 없음 메시지에 '즐겨찾기한 영상이 없습니다.' 추가
+   - FolderSelector 컴포넌트 렌더링 추가
+
+2. client/src/components/FolderSelector.tsx (신규 생성)
+
+   추가됨:
+   - Folder 인터페이스 정의 (id, name, color, createdAt, order)
+   - FolderSelectorProps 인터페이스 정의
+   - Dialog 기반 폴더 선택 모달 UI
+   - 8가지 색상 선택 기능 (#3B82F6, #EF4444, #10B981 등)
+   - loadFolders 함수: favoriteFolders localStorage에서 폴더 목록 로드
+   - createNewFolder 함수: 새 폴더 생성 및 저장
+   - 미분류 폴더 (folderId: null) 기본 제공
+   - 폴더별 생성일 표시
+   - 새 폴더 생성 시 이름과 색상 선택 UI
+
+데이터 구조:
+localStorage.videoFavorites = {
+  [videoId]: {
+    videoId: string,
+    title: string,
+    channelTitle: string,
+    thumbnail: string,
+    folderId: string | null (신규),
+    addedAt: ISO 날짜 (신규)
+  }
+}
+
+localStorage.favoriteFolders = {
+  [folderId]: {
+    id: string (신규),
+    name: string (신규),
+    color: string (신규),
+    createdAt: ISO 날짜 (신규),
+    order: number (신규)
+  }
+} (신규)
+
+삭제된 기능: 없음
+
+추가된 기능:
+- 본 영상에서 즐겨찾기 추가/제거 (별표 버튼)
+- 폴더 선택 모달을 통한 즐겨찾기 분류
+- 새 폴더 생성 (이름, 색상 설정)
+- 즐겨찾기 필터 탭 (검색 결과 중 즐겨찾기된 영상만 표시)
+- 즐겨찾기 영상을 추가된 날짜 기준 최신순 정렬
+- 미분류 폴더 기본 제공
+- 폴더별 영상 개수 실시간 표시
+- 즐겨찾기 추가 시 폴더명 알림 표시

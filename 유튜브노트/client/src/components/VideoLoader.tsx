@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
 import type { YoutubeSearchResponse, YoutubeVideo } from "@shared/schema";
+import FolderSelector from "./FolderSelector";
 
 interface VideoLoaderProps {
   player: any | null;
@@ -33,21 +34,35 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   const [filterMode, setFilterMode] = useState<'watched' | 'blacklisted' | 'unwatched'>('unwatched');
   const [filteredResults, setFilteredResults] = useState<YoutubeVideo[]>([]);
   const [watchedSortOrder, setWatchedSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [folderSelectorOpen, setFolderSelectorOpen] = useState(false);
+  const [selectedVideoForFolder, setSelectedVideoForFolder] = useState<YoutubeVideo | null>(null);
 
   // 검색을 통한 영상 찾기
-  const handleSearch = async () => {
-    if (searchQuery.trim() === "") {
+  const handleSearch = async (pageToken?: string) => {
+    if (!pageToken && searchQuery.trim() === "") {
       showNotification("검색어를 입력해주세요.", "error");
       return;
     }
 
-    setIsSearching(true);
+    const isInitialSearch = !pageToken;
+    if (isInitialSearch) {
+      setIsSearching(true);
+      setSearchResults([]);
+      setNextPageToken(null);
+    } else {
+      setIsLoadingMore(true);
+    }
 
     try {
-      console.log("API 호출 시작:", searchQuery);
-      const response = await fetch(
-        `/api/youtube/search?q=${encodeURIComponent(searchQuery)}`,
-      );
+      console.log("API 호출 시작:", searchQuery, "pageToken:", pageToken);
+      let url = `/api/youtube/search?q=${encodeURIComponent(searchQuery)}`;
+      if (pageToken) {
+        url += `&pageToken=${pageToken}`;
+      }
+      
+      const response = await fetch(url);
       console.log("API 응답 상태:", response.status);
       
       if (!response.ok) {
@@ -70,28 +85,47 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
           errorMessage = `서버 에러 (${response.status})`;
         }
         showNotification(errorMessage, "error");
-        setSearchResults([]);
+        if (isInitialSearch) {
+          setSearchResults([]);
+        }
         return;
       }
       
-      const data: YoutubeSearchResponse = await response.json();
+      const data: any = await response.json();
 
       if (data.videos && data.videos.length > 0) {
-        setSearchResults(data.videos);
+        const newVideos = isInitialSearch 
+          ? data.videos 
+          : [...searchResults, ...data.videos];
+        
+        setSearchResults(newVideos);
+        setNextPageToken(data.nextPageToken || null);
+        
         // 필터링 적용
-        applyFilter(data.videos, filterMode);
-        showNotification(`${data.videos.length}개의 검색 결과를 찾았습니다.`, "success");
+        applyFilter(newVideos, filterMode);
+        
+        if (isInitialSearch) {
+          showNotification(`${data.videos.length}개의 검색 결과를 찾았습니다.`, "success");
+        }
       } else {
-        setSearchResults([]);
-        setFilteredResults([]);
-        showNotification("검색 결과가 없습니다.", "error");
+        if (isInitialSearch) {
+          setSearchResults([]);
+          setFilteredResults([]);
+          showNotification("검색 결과가 없습니다.", "error");
+        }
       }
     } catch (error) {
       console.error("검색 에러:", error);
       showNotification("검색 중 오류가 발생했습니다.", "error");
-      setSearchResults([]);
+      if (isInitialSearch) {
+        setSearchResults([]);
+      }
     } finally {
-      setIsSearching(false);
+      if (isInitialSearch) {
+        setIsSearching(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
   };
 
@@ -123,8 +157,24 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     }
   };
 
+  // 안본 영상이 15개 미만일 때 자동으로 더 로드
+  const autoLoadForUnwatchedVideos = async (videos: YoutubeVideo[]) => {
+    if (filterMode !== 'unwatched' || !nextPageToken || isLoadingMore) return;
+    
+    const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+    const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
+    const unwatchedCount = videos.filter(video => 
+      !watchHistory[video.videoId] && !blacklist[video.videoId]
+    ).length;
+    
+    if (unwatchedCount < 15) {
+      console.log(`안본 영상 ${unwatchedCount}개, 추가 로드 시작`);
+      await handleSearch(nextPageToken);
+    }
+  };
+
   // 필터링 함수
-  const applyFilter = (videos: YoutubeVideo[], mode: 'watched' | 'blacklisted' | 'unwatched') => {
+  const applyFilter = async (videos: YoutubeVideo[], mode: 'watched' | 'blacklisted' | 'unwatched') => {
     const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
     const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
     
@@ -147,11 +197,15 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       // 안 본 영상: 시청 기록도 없고 블랙리스트도 아닌 영상
       filtered = videos.filter(video => !watchHistory[video.videoId] && !blacklist[video.videoId]);
       
-      // 최대 15개만 표시
-      filtered = filtered.slice(0, 15);
+      // 15개 제한 제거 - 모든 안본 영상 표시
     }
     
     setFilteredResults(filtered);
+    
+    // 안본 영상 모드일 때 자동 로드 체크
+    if (mode === 'unwatched') {
+      await autoLoadForUnwatchedVideos(videos);
+    }
   };
   
   // 블랙리스트에 추가
@@ -178,6 +232,54 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     // 현재 결과 재필터링
     applyFilter(searchResults, filterMode);
     showNotification(`블랙리스트에서 제거했습니다.`, "info");
+  };
+  
+  // 즐겨찾기 추가 시작 (폴더 선택 모달 열기)
+  const startAddToFavorites = (video: YoutubeVideo) => {
+    const favorites = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
+    
+    if (favorites[video.videoId]) {
+      // 이미 즐겨찾기에 있으면 제거
+      delete favorites[video.videoId];
+      localStorage.setItem('videoFavorites', JSON.stringify(favorites));
+      showNotification(`"${video.title}"을(를) 즐겨찾기에서 제거했습니다.`, "info");
+      applyFilter(searchResults, filterMode);
+    } else {
+      // 폴더 선택 모달 열기
+      setSelectedVideoForFolder(video);
+      setFolderSelectorOpen(true);
+    }
+  };
+
+  // 폴더 선택 완료 시 즐겨찾기에 추가
+  const addToFavoritesWithFolder = (folderId: string | null) => {
+    if (!selectedVideoForFolder) return;
+
+    const favorites = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
+    favorites[selectedVideoForFolder.videoId] = {
+      videoId: selectedVideoForFolder.videoId,
+      title: selectedVideoForFolder.title,
+      channelTitle: selectedVideoForFolder.channelTitle,
+      thumbnail: selectedVideoForFolder.thumbnail,
+      folderId: folderId,
+      addedAt: new Date().toISOString()
+    };
+    localStorage.setItem('videoFavorites', JSON.stringify(favorites));
+
+    const folderName = folderId ? 
+      JSON.parse(localStorage.getItem('favoriteFolders') || '{}')[folderId]?.name || '폴더' : 
+      '미분류';
+    
+    showNotification(`"${selectedVideoForFolder.title}"을(를) ${folderName} 폴더에 추가했습니다.`, "success");
+    
+    setSelectedVideoForFolder(null);
+    applyFilter(searchResults, filterMode);
+  };
+  
+  // 즐겨찾기 여부 확인
+  const isFavorite = (videoId: string) => {
+    const favorites = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
+    return !!favorites[videoId];
   };
   
   // 필터 모드 및 정렬 순서 변경 시 재필터링
@@ -269,11 +371,11 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
             onClick={() => setFilterMode('unwatched')}
             className="text-xs"
           >
-            안 본 영상 ({Math.min(15, searchResults.filter(v => {
+            안 본 영상 ({searchResults.filter(v => {
               const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
               const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
               return !watchHistory[v.videoId] && !blacklist[v.videoId];
-            }).length)})
+            }).length})
           </Button>
         </div>
       )}
@@ -338,7 +440,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
                   </h3>
                   <p className="text-xs text-gray-500 mt-1">
                     {video.channelTitle}
-                    {watchInfo && watchInfo.watchCount > 1 && (
+                    {watchInfo && watchInfo.watchCount >= 1 && (
                       <span className="ml-2 text-blue-500">
                         {watchInfo.watchCount}회 시청
                       </span>
@@ -346,6 +448,22 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
                   </p>
                 </div>
                 
+                {/* 본 영상에서 즐겨찾기 버튼 표시 */}
+                {filterMode === 'watched' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startAddToFavorites(video);
+                    }}
+                    className={`text-xs px-2 py-1 h-6 ${isFavorite(video.videoId) ? 'text-yellow-500' : 'text-gray-400'}`}
+                    title={isFavorite(video.videoId) ? "즐겨찾기에서 제거" : "즐겨찾기에 추가"}
+                  >
+                    ⭐
+                  </Button>
+                )}
+
                 {/* 안 본 영상에서만 블랙리스트 버튼 표시 */}
                 {filterMode === 'unwatched' && (
                   <Button
@@ -377,9 +495,31 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
                     ↻
                   </Button>
                 )}
+                
               </div>
             );
           })}
+          
+          {/* 더 보기 버튼 - 안본 영상에서만 표시 */}
+          {nextPageToken && !isLoadingMore && filterMode === 'unwatched' && (
+            <div className="text-center py-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleSearch(nextPageToken)}
+                className="text-xs"
+              >
+                더 많은 영상 보기
+              </Button>
+            </div>
+          )}
+          
+          {/* 로딩 표시 */}
+          {isLoadingMore && (
+            <div className="text-center py-2">
+              <div className="text-xs text-gray-500">추가 영상 로딩 중...</div>
+            </div>
+          )}
         </div>
       )}
       
@@ -406,6 +546,17 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
         </div>
       )}
       </div>
+      
+      {/* 폴더 선택 모달 */}
+      <FolderSelector
+        isOpen={folderSelectorOpen}
+        onClose={() => {
+          setFolderSelectorOpen(false);
+          setSelectedVideoForFolder(null);
+        }}
+        onSelectFolder={addToFavoritesWithFolder}
+        videoTitle={selectedVideoForFolder?.title || ""}
+      />
     </>
   );
 };

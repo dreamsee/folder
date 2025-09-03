@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Lock, Unlock, Search, Settings2 } from 'lucide-react';
+import { Lock, Unlock, Search, Settings2, Star } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import {
   Popover,
@@ -17,6 +17,7 @@ interface ScreenLockProps {
     size: number;
   };
   onMagnifierSettingsChange: (settings: any) => void;
+  onFavoritesOpen?: () => void;
 }
 
 const ScreenLock: React.FC<ScreenLockProps> = ({
@@ -24,6 +25,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   onLockToggle,
   magnifierSettings,
   onMagnifierSettingsChange,
+  onFavoritesOpen,
 }) => {
   const [showMagnifier, setShowMagnifier] = useState(false);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
@@ -123,14 +125,26 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
             )}
           </div>
 
-          {/* 설정 버튼 (PC만) */}
-          {!isMobile && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Settings2 className="h-4 w-4" />
-                </Button>
-              </PopoverTrigger>
+          <div className="flex items-center gap-2">
+            {/* 즐겨찾기 버튼 */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onFavoritesOpen}
+              className="flex items-center gap-2"
+            >
+              <Star className="h-4 w-4" />
+              <span className="hidden sm:inline">즐겨찾기</span>
+            </Button>
+
+            {/* 설정 버튼 (PC만) */}
+            {!isMobile && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Settings2 className="h-4 w-4" />
+                  </Button>
+                </PopoverTrigger>
               <PopoverContent className="w-80">
                 <div className="space-y-4">
                   <h3 className="font-medium text-sm">확대 설정</h3>
@@ -178,7 +192,8 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
                 </div>
               </PopoverContent>
             </Popover>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
