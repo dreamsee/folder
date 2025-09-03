@@ -1,9 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, RotateCcw } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface UISettings {
   상단부: {
@@ -35,6 +39,10 @@ export interface UISettings {
     최소모드명: string;
     노트모드명: string;
   };
+  재생기본값?: {
+    defaultPlaybackRate: number;
+    defaultVolume: number;
+  };
 }
 
 interface SettingsPanelProps {
@@ -58,6 +66,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
+    재생기본값: { defaultPlaybackRate: 1, defaultVolume: 100 },
   };
 
   const 설정업데이트 = (카테고리: keyof UISettings, 키: string, 값: boolean | string) => {
@@ -65,6 +74,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     (새설정[카테고리] as any)[키] = 값;
     onSettingsChange(새설정);
     // localStorage에 즉시 저장
+    localStorage.setItem('uiSettings', JSON.stringify(새설정));
+  };
+
+  const handleSettingChange = (카테고리: keyof UISettings, 값: any) => {
+    const 새설정 = { ...settings };
+    새설정[카테고리] = 값;
+    onSettingsChange(새설정);
     localStorage.setItem('uiSettings', JSON.stringify(새설정));
   };
 
@@ -125,21 +141,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       />
       
       {/* 설정 패널 */}
-      <div className="relative w-80 h-full bg-white border-l shadow-lg overflow-y-auto">
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-lg">화면 설정</CardTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {/* 프리셋 버튼들 */}
-          <div className="space-y-2">
-            <h3 className="text-sm font-medium pb-2 border-b border-gray-200">빠른 설정</h3>
-            <div className="grid grid-cols-2 gap-2">
+      <div className="relative w-80 h-full bg-white border-l shadow-lg flex flex-col">
+        {/* 스크롤 가능한 콘텐츠 영역 */}
+        <div className="flex-1 overflow-y-auto">
+          <CardContent className="space-y-6 pt-6">
+          {/* 탭 메뉴 */}
+          <Tabs defaultValue="quick-settings" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="quick-settings">빠른 설정</TabsTrigger>
+              <TabsTrigger value="playback-defaults">재생 기본값</TabsTrigger>
+            </TabsList>
+            
+            {/* 빠른 설정 탭 */}
+            <TabsContent value="quick-settings" className="space-y-2 mt-4">
+              <div className="grid grid-cols-2 gap-2">
               <Button 
                 variant={selectedPreset === "최소" ? "default" : "outline"} 
                 size="sm" 
@@ -216,7 +231,72 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               </div>
             )}
-          </div>
+          </TabsContent>
+            
+            {/* 재생 기본값 탭 */}
+            <TabsContent value="playback-defaults" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                {/* 기본 재생 속도 설정 */}
+                <div>
+                  <Label htmlFor="default-playback-rate" className="text-sm font-medium">
+                    기본 재생 속도
+                  </Label>
+                  <Select 
+                    value={settings.재생기본값?.defaultPlaybackRate?.toString() || "1"} 
+                    onValueChange={(value) => 
+                      handleSettingChange('재생기본값', {
+                        ...settings.재생기본값,
+                        defaultPlaybackRate: parseFloat(value)
+                      })
+                    }
+                  >
+                    <SelectTrigger className="w-full mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0.25">0.25x</SelectItem>
+                      <SelectItem value="0.5">0.5x</SelectItem>
+                      <SelectItem value="0.75">0.75x</SelectItem>
+                      <SelectItem value="1">1x (기본)</SelectItem>
+                      <SelectItem value="1.25">1.25x</SelectItem>
+                      <SelectItem value="1.5">1.5x</SelectItem>
+                      <SelectItem value="1.75">1.75x</SelectItem>
+                      <SelectItem value="2">2x</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 기본 볼륨 설정 */}
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label htmlFor="default-volume" className="text-sm font-medium">
+                      기본 볼륨
+                    </Label>
+                    <span className="text-sm text-gray-500">
+                      {settings.재생기본값?.defaultVolume || 100}%
+                    </span>
+                  </div>
+                  <Slider
+                    value={[settings.재생기본값?.defaultVolume || 100]}
+                    onValueChange={([value]) =>
+                      handleSettingChange('재생기본값', {
+                        ...settings.재생기본값,
+                        defaultVolume: value
+                      })
+                    }
+                    min={0}
+                    max={100}
+                    step={5}
+                    className="w-full"
+                  />
+                </div>
+
+                <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded">
+                  💡 이 설정은 새로 재생하는 모든 영상에 자동으로 적용됩니다.
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
 
           {/* 상단부 설정 */}
           <div className="space-y-3">
@@ -363,6 +443,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             )}
           </div>
         </CardContent>
+        </div>
+        
+        {/* 하단 헤더 (제목 + 닫기 버튼) */}
+        <div className="border-t bg-white">
+          <CardHeader className="pb-3">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-lg">화면 설정</CardTitle>
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+        </div>
       </div>
     </div>
   );

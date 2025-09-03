@@ -109,11 +109,44 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
   }, [currentVideoId, player, setPlayer]);
 
+  // 저장된 기본값 적용 함수
+  const applyDefaultSettings = (player: any) => {
+    try {
+      // 설정에서 기본값 가져오기
+      const uiSettings = localStorage.getItem('uiSettings');
+      if (uiSettings) {
+        const settings = JSON.parse(uiSettings);
+        const 재생기본값 = settings.재생기본값;
+        
+        if (재생기본값) {
+          // 기본 재생 속도 적용
+          if (재생기본값.defaultPlaybackRate) {
+            const availableRates = player.getAvailablePlaybackRates();
+            if (availableRates.includes(재생기본값.defaultPlaybackRate)) {
+              player.setPlaybackRate(재생기본값.defaultPlaybackRate);
+              setCurrentRate(재생기본값.defaultPlaybackRate);
+            }
+          }
+          
+          // 기본 볼륨 적용
+          if (재생기본값.defaultVolume !== undefined) {
+            player.setVolume(재생기본값.defaultVolume);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('기본 설정 적용 중 오류:', error);
+    }
+  };
+
   // 플레이어 준비 이벤트 핸들러
   const onPlayerReady = (event: any) => {
     console.log('플레이어 준비 완료');
     setIsPlayerReady(true);
     setAvailableRates(event.target.getAvailablePlaybackRates());
+    
+    // 저장된 기본값 적용
+    applyDefaultSettings(event.target);
     
     // 비디오 ID가 있으면 즉시 로드
     if (currentVideoId) {
@@ -132,6 +165,36 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     setPlayerState(event.data);
     // 재생 상태 업데이트
     setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
+    
+    // 영상 재생 시작 시 시청 기록 저장 및 기본값 재적용
+    if (event.data === window.YT.PlayerState.PLAYING && currentVideoId) {
+      const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+      
+      // 이미 기록이 있으면 업데이트, 없으면 새로 생성
+      if (!watchHistory[currentVideoId]) {
+        watchHistory[currentVideoId] = {
+          videoId: currentVideoId,
+          firstWatchedAt: new Date().toISOString(),
+          lastWatchedAt: new Date().toISOString(),
+          watchCount: 1,
+          totalWatchTime: 0,
+          lastPosition: 0,
+          duration: player?.getDuration() || 0,
+        };
+        
+        // 새 영상이면 기본값 다시 적용 (YouTube가 가끔 초기화하는 경우 대비)
+        setTimeout(() => {
+          if (player && event.target) {
+            applyDefaultSettings(event.target);
+          }
+        }, 1000);
+      } else {
+        watchHistory[currentVideoId].lastWatchedAt = new Date().toISOString();
+        watchHistory[currentVideoId].watchCount += 1;
+      }
+      
+      localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+    }
   };
 
   // 플레이어 오류 이벤트 핸들러
@@ -249,7 +312,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     };
   }, [isMobile, isLocked, isTouchHolding]);
 
-  // 현재 시간과 영상 길이 업데이트
+  // 현재 시간과 영상 길이 업데이트 및 시청 진행률 저장
   useEffect(() => {
     if (!player || !isPlayerReady) return;
 
@@ -257,8 +320,22 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       try {
         // 플레이어가 여전히 유효한지 확인
         if (player && typeof player.getCurrentTime === 'function') {
-          setCurrentTime(player.getCurrentTime());
-          setDuration(player.getDuration());
+          const current = player.getCurrentTime();
+          const total = player.getDuration();
+          
+          setCurrentTime(current);
+          setDuration(total);
+          
+          // 시청 진행률 업데이트 (5초마다)
+          if (currentVideoId && current > 0 && total > 0 && Math.floor(current) % 5 === 0) {
+            const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+            if (watchHistory[currentVideoId]) {
+              watchHistory[currentVideoId].lastPosition = current;
+              watchHistory[currentVideoId].totalWatchTime = (watchHistory[currentVideoId].totalWatchTime || 0) + 5;
+              watchHistory[currentVideoId].progress = Math.round((current / total) * 100);
+              localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+            }
+          }
         }
       } catch (error) {
         // 플레이어가 준비되지 않았을 때 무시
@@ -266,7 +343,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [player, isPlayerReady]);
+  }, [player, isPlayerReady, currentVideoId]);
 
   // 진행바 클릭 핸들러
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {

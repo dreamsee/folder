@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -30,6 +30,9 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<YoutubeVideo[]>([]);
+  const [filterMode, setFilterMode] = useState<'watched' | 'blacklisted' | 'unwatched'>('unwatched');
+  const [filteredResults, setFilteredResults] = useState<YoutubeVideo[]>([]);
+  const [watchedSortOrder, setWatchedSortOrder] = useState<'desc' | 'asc'>('desc');
 
   // 검색을 통한 영상 찾기
   const handleSearch = async () => {
@@ -75,9 +78,12 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
 
       if (data.videos && data.videos.length > 0) {
         setSearchResults(data.videos);
+        // 필터링 적용
+        applyFilter(data.videos, filterMode);
         showNotification(`${data.videos.length}개의 검색 결과를 찾았습니다.`, "success");
       } else {
         setSearchResults([]);
+        setFilteredResults([]);
         showNotification("검색 결과가 없습니다.", "error");
       }
     } catch (error) {
@@ -107,7 +113,9 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       showNotification(`"${video.title}" 영상을 준비하고 있습니다.`, "info");
     }
     
-    setSearchResults([]); // 선택 후 검색 결과 닫기
+    // 검색 결과 자동 닫기
+    setSearchResults([]);
+    setFilteredResults([]);
     
     // 자동 숨김 모드에서는 검색 후 숨김
     if (autoHide) {
@@ -115,8 +123,91 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     }
   };
 
+  // 필터링 함수
+  const applyFilter = (videos: YoutubeVideo[], mode: 'watched' | 'blacklisted' | 'unwatched') => {
+    const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+    const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
+    
+    let filtered = videos;
+    
+    if (mode === 'watched') {
+      // 본 영상: 시청 기록이 있는 영상
+      filtered = videos.filter(video => watchHistory[video.videoId]);
+      
+      // 시청 횟수로 정렬
+      filtered.sort((a, b) => {
+        const aCount = watchHistory[a.videoId]?.watchCount || 0;
+        const bCount = watchHistory[b.videoId]?.watchCount || 0;
+        return watchedSortOrder === 'desc' ? bCount - aCount : aCount - bCount;
+      });
+    } else if (mode === 'blacklisted') {
+      // 안 볼 영상: 블랙리스트에 있는 영상
+      filtered = videos.filter(video => blacklist[video.videoId]);
+    } else if (mode === 'unwatched') {
+      // 안 본 영상: 시청 기록도 없고 블랙리스트도 아닌 영상
+      filtered = videos.filter(video => !watchHistory[video.videoId] && !blacklist[video.videoId]);
+      
+      // 최대 15개만 표시
+      filtered = filtered.slice(0, 15);
+    }
+    
+    setFilteredResults(filtered);
+  };
+  
+  // 블랙리스트에 추가
+  const addToBlacklist = (video: YoutubeVideo) => {
+    const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
+    blacklist[video.videoId] = {
+      title: video.title,
+      channelTitle: video.channelTitle,
+      addedAt: new Date().toISOString()
+    };
+    localStorage.setItem('videoBlacklist', JSON.stringify(blacklist));
+    
+    // 현재 결과 재필터링
+    applyFilter(searchResults, filterMode);
+    showNotification(`"${video.title}"을(를) 안 볼 영상으로 이동했습니다.`, "info");
+  };
+  
+  // 블랙리스트에서 제거
+  const removeFromBlacklist = (videoId: string) => {
+    const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
+    delete blacklist[videoId];
+    localStorage.setItem('videoBlacklist', JSON.stringify(blacklist));
+    
+    // 현재 결과 재필터링
+    applyFilter(searchResults, filterMode);
+    showNotification(`블랙리스트에서 제거했습니다.`, "info");
+  };
+  
+  // 필터 모드 및 정렬 순서 변경 시 재필터링
+  useEffect(() => {
+    if (searchResults.length > 0) {
+      applyFilter(searchResults, filterMode);
+    }
+  }, [filterMode, searchResults, watchedSortOrder]);
+  
   // 자동 숨김 모드에서의 표시/숨김 처리
   const shouldShow = !autoHide || isVisible || isHovering;
+  
+  // 시청 기록 가져오기
+  const getWatchInfo = (videoId: string) => {
+    const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+    return watchHistory[videoId];
+  };
+  
+  // 날짜 포맷팅
+  const formatWatchDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffHours < 1) return '방금 전';
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    if (diffHours < 48) return '어제';
+    if (diffHours < 168) return `${Math.floor(diffHours / 24)}일 전`;
+    return date.toLocaleDateString('ko-KR');
+  };
 
   return (
     <>
@@ -141,6 +232,52 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
         onMouseLeave={() => autoHide && setIsHovering(false)}
         onTouchStart={() => autoHide && setIsVisible(true)}
       >
+      {/* 필터 토글 버튼 - 검색 결과가 있을 때만 표시 */}
+      {searchResults.length > 0 && (
+        <div className="flex gap-1 mb-2">
+          <Button
+            size="sm"
+            variant={filterMode === 'watched' ? 'default' : 'outline'}
+            onClick={() => {
+              setFilterMode('watched');
+              if (filterMode === 'watched') {
+                // 정렬 순서 토글
+                setWatchedSortOrder(watchedSortOrder === 'desc' ? 'asc' : 'desc');
+              }
+            }}
+            className="text-xs flex items-center gap-1"
+          >
+            ✓ 본 영상 ({searchResults.filter(v => getWatchInfo(v.videoId)).length})
+            {filterMode === 'watched' && (
+              <span>{watchedSortOrder === 'desc' ? '↓' : '↑'}</span>
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant={filterMode === 'blacklisted' ? 'default' : 'outline'}
+            onClick={() => setFilterMode('blacklisted')}
+            className="text-xs"
+          >
+            안 볼 영상 ({searchResults.filter(v => {
+              const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
+              return blacklist[v.videoId];
+            }).length})
+          </Button>
+          <Button
+            size="sm"
+            variant={filterMode === 'unwatched' ? 'default' : 'outline'}
+            onClick={() => setFilterMode('unwatched')}
+            className="text-xs"
+          >
+            안 본 영상 ({Math.min(15, searchResults.filter(v => {
+              const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+              const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
+              return !watchHistory[v.videoId] && !blacklist[v.videoId];
+            }).length)})
+          </Button>
+        </div>
+      )}
+      
       {/* 검색 입력 */}
       <div className="flex gap-2 mb-3">
         <Input
@@ -167,29 +304,91 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       </div>
 
       {/* 검색 결과 목록 */}
-      {shouldShow && searchResults.length > 0 && (
+      {shouldShow && filteredResults.length > 0 && (
         <div className="space-y-2 max-h-64 overflow-y-auto border rounded-lg p-2 bg-white">
-          {searchResults.map((video) => (
-            <div
-              key={video.videoId}
-              className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer"
-              onClick={() => handleVideoSelect(video)}
-            >
-              <img
-                src={video.thumbnail}
-                alt={video.title}
-                className="w-16 h-12 object-cover rounded flex-shrink-0"
-              />
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-medium text-gray-900 line-clamp-2">
-                  {video.title}
-                </h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  {video.channelTitle}
-                </p>
+          {filteredResults.map((video) => {
+            const watchInfo = getWatchInfo(video.videoId);
+            return (
+              <div
+                key={video.videoId}
+                className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded cursor-pointer relative"
+                onClick={() => handleVideoSelect(video)}
+              >
+                {/* 시청 표시 */}
+                {watchInfo && (
+                  <div className="absolute top-1 right-1 flex items-center gap-1">
+                    <span className="text-xs text-green-600 font-medium">✓</span>
+                    <span className="text-xs text-gray-500">{formatWatchDate(watchInfo.lastWatchedAt)}</span>
+                    {watchInfo.progress > 0 && (
+                      <span className="text-xs text-blue-600">{watchInfo.progress}%</span>
+                    )}
+                  </div>
+                )}
+                
+                <img
+                  src={video.thumbnail}
+                  alt={video.title}
+                  className="w-16 h-12 object-cover rounded flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h3 className={`text-sm font-medium line-clamp-2 ${
+                    watchInfo ? 'text-gray-600' : 'text-gray-900'
+                  }`}>
+                    {video.title}
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {video.channelTitle}
+                    {watchInfo && watchInfo.watchCount > 1 && (
+                      <span className="ml-2 text-blue-500">
+                        {watchInfo.watchCount}회 시청
+                      </span>
+                    )}
+                  </p>
+                </div>
+                
+                {/* 안 본 영상에서만 블랙리스트 버튼 표시 */}
+                {filterMode === 'unwatched' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addToBlacklist(video);
+                    }}
+                    className="text-xs px-2 py-1 h-6"
+                    title="안 볼 영상으로 이동"
+                  >
+                    ×
+                  </Button>
+                )}
+                
+                {/* 블랙리스트에서 제거 버튼 */}
+                {filterMode === 'blacklisted' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      removeFromBlacklist(video.videoId);
+                    }}
+                    className="text-xs px-2 py-1 h-6"
+                    title="블랙리스트에서 제거"
+                  >
+                    ↻
+                  </Button>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+        </div>
+      )}
+      
+      {/* 필터링 결과 없음 메시지 */}
+      {shouldShow && searchResults.length > 0 && filteredResults.length === 0 && (
+        <div className="text-center py-4 text-gray-500 text-sm">
+          {filterMode === 'watched' ? '시청한 영상이 없습니다.' : 
+           filterMode === 'blacklisted' ? '안 볼 영상이 없습니다.' : 
+           '새로운 영상이 없습니다.'}
         </div>
       )}
       

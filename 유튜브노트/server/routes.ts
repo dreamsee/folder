@@ -36,26 +36,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!apiKey) {
         console.error("YouTube API 키가 설정되지 않음 - 목업 데이터 반환");
-        // 목업 데이터 반환 (개발용)
-        const mockVideos = [
-          {
-            videoId: "dQw4w9WgXcQ",
-            title: `검색 결과: ${query}`,
-            thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
-            channelTitle: "테스트 채널"
-          },
-          {
-            videoId: "jNQXAC9IVRw",
-            title: `샘플 영상: ${query}`,
-            thumbnail: "https://i.ytimg.com/vi/jNQXAC9IVRw/mqdefault.jpg",
-            channelTitle: "샘플 채널"
-          }
-        ];
+        // 목업 데이터 반환 (개발용) - 테스트용 20개 데이터
+        const mockVideos = [];
+        for (let i = 0; i < 20; i++) {
+          mockVideos.push({
+            videoId: `video_${i}_${Date.now()}`,
+            title: `${query} 검색 결과 ${i + 1}`,
+            thumbnail: `https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg`,
+            channelTitle: `채널 ${i % 5 + 1}`
+          });
+        }
         return res.json({ videos: mockVideos });
       }
 
-      // YouTube API 호출
-      const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(
+      // YouTube API 호출 - 검색 결과 개수 증가 (5 -> 40)
+      const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=40&q=${encodeURIComponent(
         query
       )}&type=video&key=${apiKey}`;
       

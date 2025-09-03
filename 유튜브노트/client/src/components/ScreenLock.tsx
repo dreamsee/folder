@@ -29,6 +29,8 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
   const magnifierRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
+  const [isClicked, setIsClicked] = useState(false);
 
   useEffect(() => {
     // 모바일 감지
@@ -41,30 +43,33 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isLocked || isMobile) {
+    if (!isLocked) {
       setShowMagnifier(false);
+      setIsClicked(false);
       return;
     }
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (magnifierSettings.enabled && isLocked && !isMobile) {
-        setShowMagnifier(true);
-        setMagnifierPosition({ x: e.clientX, y: e.clientY });
+    const handleClick = (e: MouseEvent) => {
+      // 영상 영역 클릭인지 확인 (YouTube player 영역)
+      const playerElement = document.querySelector('.youtube-player-container');
+      if (playerElement && playerElement.contains(e.target as Node)) {
+        if (magnifierSettings.enabled && isLocked && !isMobile) {
+          setClickPosition({ x: e.clientX, y: e.clientY });
+          setIsClicked(true);
+          // 2초 후 자동으로 확대 해제
+          setTimeout(() => {
+            setIsClicked(false);
+          }, 2000);
+        }
       }
     };
 
-    const handleMouseLeave = () => {
-      setShowMagnifier(false);
-    };
-
-    if (magnifierSettings.enabled) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseleave', handleMouseLeave);
+    if (magnifierSettings.enabled && !isMobile) {
+      document.addEventListener('click', handleClick);
     }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('click', handleClick);
     };
   }, [isLocked, magnifierSettings.enabled, isMobile]);
 
@@ -100,12 +105,12 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
               )}
             </Button>
 
-            {/* PC에서만 돋보기 설정 표시 */}
+            {/* PC에서 확대 설정 표시 */}
             {!isMobile && isLocked && (
               <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  {magnifierSettings.zoom.toFixed(1)}x
+                  클릭하여 {magnifierSettings.zoom.toFixed(1)}x 확대
                 </span>
               </div>
             )}
@@ -128,11 +133,11 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
               </PopoverTrigger>
               <PopoverContent className="w-80">
                 <div className="space-y-4">
-                  <h3 className="font-medium text-sm">돋보기 설정</h3>
+                  <h3 className="font-medium text-sm">확대 설정</h3>
                   
-                  {/* 돋보기 활성화 */}
+                  {/* 확대 활성화 */}
                   <div className="flex items-center justify-between">
-                    <label className="text-sm">돋보기 사용</label>
+                    <label className="text-sm">클릭 확대 사용</label>
                     <Button
                       variant={magnifierSettings.enabled ? 'default' : 'outline'}
                       size="sm"
@@ -170,32 +175,6 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
                     />
                   </div>
 
-                  {/* 크기 조절 */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">돋보기 크기</label>
-                      <span className="text-sm text-muted-foreground">
-                        {magnifierSettings.size === 1
-                          ? '소'
-                          : magnifierSettings.size === 2
-                          ? '중'
-                          : '대'}
-                      </span>
-                    </div>
-                    <Slider
-                      value={[magnifierSettings.size]}
-                      onValueChange={([value]) =>
-                        onMagnifierSettingsChange({
-                          ...magnifierSettings,
-                          size: value,
-                        })
-                      }
-                      min={1}
-                      max={3}
-                      step={1}
-                      className="w-full"
-                    />
-                  </div>
                 </div>
               </PopoverContent>
             </Popover>
@@ -203,45 +182,58 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
         </div>
       </div>
 
-      {/* PC 돋보기 효과 - CSS transform 사용 */}
-      {!isMobile && isLocked && magnifierSettings.enabled && (
+      {/* PC 클릭 확대 효과 - 영상 영역만 확대 */}
+      {!isMobile && isLocked && magnifierSettings.enabled && isClicked && (
         <style>
           {`
-            body {
-              transform: scale(${showMagnifier ? magnifierSettings.zoom : 1});
-              transform-origin: ${magnifierPosition.x}px ${magnifierPosition.y}px;
-              transition: transform 0.1s ease-out;
+            .youtube-player-container {
+              transform: scale(${magnifierSettings.zoom});
+              transform-origin: ${clickPosition.x}px ${clickPosition.y - 64}px;
+              transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              z-index: 50;
+              position: relative;
             }
             
-            /* 돋보기 표시기 */
-            .magnifier-indicator::after {
+            /* 확대 시 그림자 효과 */
+            .youtube-player-container::after {
               content: '';
-              position: fixed;
-              left: ${magnifierPosition.x - 50}px;
-              top: ${magnifierPosition.y - 50}px;
-              width: 100px;
-              height: 100px;
-              border: 2px solid #3b82f6;
-              border-radius: 50%;
+              position: absolute;
+              inset: -10px;
+              background: radial-gradient(ellipse at center, rgba(0,0,0,0.2) 0%, transparent 70%);
               pointer-events: none;
-              z-index: 9999;
-              opacity: ${showMagnifier ? 0.5 : 0};
-              transition: opacity 0.2s;
             }
           `}
         </style>
       )}
       
-      {/* 모바일 터치 홀드 확대 효과는 이제 YouTubePlayer에서 처리됨 */}
-      
-      {/* PC 돋보기 표시기 */}
-      {!isMobile && showMagnifier && magnifierSettings.enabled && (
-        <div className="magnifier-indicator" />
+      {/* 확대되지 않은 상태의 기본 스타일 */}
+      {!isMobile && isLocked && magnifierSettings.enabled && !isClicked && (
+        <style>
+          {`
+            .youtube-player-container {
+              transform: scale(1);
+              transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+          `}
+        </style>
       )}
       
-      {/* 모바일 터치 인디케이터는 이제 YouTubePlayer에서 처리됨 */}
-
-      {/* 전체 화면 잠금 오버레이 제거됨 - 이제 YouTube 영역만 잠금 */}
+      {/* 모바일 터치 홀드 확대 효과는 YouTubePlayer에서 처리됨 */}
+      
+      {/* PC 클릭 위치 표시 */}
+      {!isMobile && isClicked && magnifierSettings.enabled && (
+        <div 
+          className="fixed pointer-events-none z-[60] animate-pulse"
+          style={{
+            left: clickPosition.x - 30,
+            top: clickPosition.y - 30,
+            width: 60,
+            height: 60,
+          }}
+        >
+          <div className="w-full h-full rounded-full border-2 border-blue-500 opacity-50" />
+        </div>
+      )}
     </>
   );
 };
