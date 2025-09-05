@@ -22,8 +22,9 @@ export interface UISettings {
     전체표시: boolean;
     볼륨: boolean;
     속도: boolean;
-    도장: boolean;
     녹화: boolean;
+    도장: boolean;
+    편집: boolean;
   };
   노트영역: {
     표시: boolean;
@@ -62,7 +63,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const 기본설정: UISettings = {
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
     검색창: { 유지: true },
-    재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
+    재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
@@ -97,7 +98,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         새설정 = {
           상단부: { 제목표시: false, 부제목표시: false, 부제목내용: settings.상단부?.부제목내용 || "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
           검색창: { 유지: false },
-          재생컨트롤: { 전체표시: false, 볼륨: false, 속도: false, 도장: false, 녹화: false },
+          재생컨트롤: { 전체표시: false, 볼륨: false, 속도: false, 녹화: false, 도장: false, 편집: false },
           노트영역: { 표시: false },
           화면텍스트: { 패널표시: true, 좌표설정: false, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
           프리셋: settings.프리셋 || { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
@@ -107,7 +108,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         새설정 = {
           상단부: { 제목표시: false, 부제목표시: false, 부제목내용: settings.상단부?.부제목내용 || "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
           검색창: { 유지: false },
-          재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: false, 녹화: false },
+          재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: false, 도장: false, 편집: false },
           노트영역: { 표시: true },
           화면텍스트: { 패널표시: false, 좌표설정: false, 스타일설정: false, 빠른설정: false, 빠른설정위치: "정중앙" },
           프리셋: settings.프리셋 || { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
@@ -117,7 +118,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         새설정 = {
           상단부: { 제목표시: true, 부제목표시: true, 부제목내용: settings.상단부?.부제목내용 || "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
           검색창: { 유지: true },
-          재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
+          재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
           노트영역: { 표시: true },
           화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
           프리셋: settings.프리셋 || { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
@@ -369,6 +370,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   />
                 </div>
                 <div className="flex justify-between items-center">
+                  <span className="text-sm">녹화</span>
+                  <Switch
+                    checked={settings.재생컨트롤.녹화}
+                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)}
+                  />
+                </div>
+                <div className="flex justify-between items-center">
                   <span className="text-sm">도장</span>
                   <Switch
                     checked={settings.재생컨트롤.도장}
@@ -376,10 +384,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   />
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm">녹화</span>
+                  <span className="text-sm">편집</span>
                   <Switch
-                    checked={settings.재생컨트롤.녹화}
-                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)}
+                    checked={settings.재생컨트롤.편집}
+                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "편집", 값)}
                   />
                 </div>
               </div>

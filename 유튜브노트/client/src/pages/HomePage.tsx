@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import YouTubePlayer from "@/components/YouTubePlayer";
 import { Coordinates } from "@/components/TextOverlay";
 import NoteArea from "@/components/NoteArea";
+import SimpleNoteArea from "@/components/SimpleNoteArea";
 import VideoLoader from "@/components/VideoLoader";
 import Notification from "@/components/Notification";
 import { RecordingSession } from "@/components/RecordingMode";
@@ -205,7 +206,7 @@ const HomePage = () => {
         autoHide={!uiSettings.검색창.유지}
       />
 
-      <div className={`transition-all duration-300 ${isKeyboardVisible ? 'mb-2' : 'mb-4'}`}>
+      <div className="transition-all duration-300">
         <YouTubePlayer
           player={player}
           setPlayer={setPlayer}
@@ -223,6 +224,15 @@ const HomePage = () => {
         />
       </div>
 
+      {/* SimpleNoteArea - 참고용으로 보관 (주석 처리)
+      <SimpleNoteArea
+          player={player}
+          isPlayerReady={isPlayerReady}
+          showNotification={showNotification}
+      />
+      */}
+      
+      {/* 원래 NoteArea - 수정 완료하여 활성화 */}
       <NoteArea
           player={player}
           isPlayerReady={isPlayerReady}

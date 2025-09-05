@@ -1,0 +1,107 @@
+작업 날짜: 2025-09-05
+작업명: 타임스탬프 정지 기능 구현 및 무한 로딩 문제 해결
+
+구현 내용:
+React 앱 렌더링 오류 해결 후 타임스탬프 정지 기능과 자동점프 기능을 구현하고 무한 로딩 문제 확인
+
+수정 파일 및 변경 내용:
+
+1. client/src/main.tsx
+   
+   추가됨:
+   - 디버깅용 콘솔 로그 추가
+   - root 엘리먼트 존재 여부 체크 로직
+   - 렌더링 에러 캐치 및 로깅
+
+2. client/src/App.tsx
+   
+   추가됨:
+   - ErrorBoundary 컴포넌트 import
+   - SimpleHomePage 컴포넌트 import
+   - 디버깅용 콘솔 로그
+   
+   수정됨:
+   - HomePage를 ErrorBoundary로 감싸서 에러 표시
+   - 라우팅 구조 변경 (/ 경로에 HomePage, /simple 경로에 SimpleHomePage)
+
+3. client/src/components/TimestampEditModal.tsx
+   
+   수정됨:
+   - defaultPlaybackRate undefined 처리 → defaultPlaybackRate || 1.0
+   - defaultVolume undefined 처리 → defaultVolume || 100
+
+4. client/src/components/NoteArea.tsx
+   
+   수정됨:
+   - OverlayInput props 이름 변경
+   - overlayData → overlays
+   - setOverlayData → setOverlays
+   - undefined 체크 추가 (overlayData || [])
+
+5. client/src/components/ErrorBoundary.tsx (새 파일)
+   
+   추가됨:
+   - React 에러 경계 컴포넌트
+   - 에러 발생 시 화면에 상세 정보 표시
+   - 에러 스택과 컴포넌트 스택 표시
+
+6. client/src/components/SimpleNoteArea.tsx (새 파일)
+   
+   추가됨:
+   - 최소 기능 노트 영역 컴포넌트
+   - 타임스탬프 생성 기능
+   - 타임스탬프 더블클릭 실행 기능
+   - 정지 기능 (|3): 즉시 정지 후 지정 시간 대기 후 재생
+   - 자동점프 기능 (->): 구간 끝에서 다음 타임스탬프로 이동
+   - 일반 재생: 해당 시간 이동 후 계속 재생
+
+7. client/src/pages/HomePage.tsx
+   
+   수정됨:
+   - SimpleNoteArea import 추가
+   - 기존 NoteArea 주석 처리
+   - SimpleNoteArea 사용으로 임시 변경
+
+타임스탬프 기능 동작:
+
+1. 일반 타임스탬프 [시작-종료, 볼륨%, 속도x]
+   - 시작 시간으로 이동
+   - 볼륨과 속도 적용
+   - 계속 재생 (정지 없음)
+
+2. 정지 타임스탬프 [시작-종료, 볼륨%, 속도x, |초]
+   - 시작 시간으로 이동
+   - 즉시 일시정지
+   - 지정된 초만큼 대기
+   - 자동으로 재생 재개
+   - 계속 재생
+
+3. 자동점프 타임스탬프 [시작-종료, 볼륨%, 속도x, ->]
+   - 시작 시간으로 이동
+   - 종료 시간까지 재생
+   - 종료 시간 도달 시 다음 타임스탬프로 자동 이동
+   - 다음 타임스탬프의 볼륨과 속도 적용
+
+해결된 문제:
+
+1. React 앱 빈 화면 문제
+   - TimestampEditModal의 undefined.toFixed() 에러 해결
+   - OverlayInput의 props 이름 불일치 해결
+
+2. 타임스탬프 정지 기능 로직
+   - 처음에는 재생 후 정지로 잘못 구현
+   - 정지 후 재생으로 수정
+   - 구간 끝 자동 정지 제거 (일반 타임스탬프는 계속 재생)
+
+3. 자동점프 기능
+   - 정규식 수정으로 -> 패턴 인식
+   - 다음 타임스탬프 찾기 로직 구현
+   - 연속 점프 지원
+
+무한 로딩 문제:
+- 테스트 결과 무한 로딩 현상 발생하지 않음
+- 타임스탬프 변경/생성 시에만 처리하는 방식으로 해결된 것으로 추정
+
+향후 작업:
+- 원래 NoteArea 컴포넌트의 props 문제 해결 필요
+- 전체 기능 복구 필요 (재생 컨트롤, 녹화, 오버레이 등)

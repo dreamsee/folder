@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>타임스탬프 정지 기능 테스트</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .video-container { position: relative; width: 100%; height: 400px; background: #000; margin-bottom: 20px; }
+        textarea { width: 100%; height: 200px; margin-bottom: 10px; padding: 10px; }
+        button { padding: 10px 15px; margin-right: 10px; background: #007bff; color: white; border: none; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .status { background: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px; }
+        .timestamp { background: #e9ecef; padding: 2px 5px; cursor: pointer; }
+        .timestamp:hover { background: #dee2e6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>타임스탬프 정지 기능 테스트</h1>
+        
+        <div class="video-container" id="player">
+            <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: white;">
+                YouTube 동영상 로드 대기 중...
+            </div>
+        </div>
+        
+        <div>
+            <input type="text" id="videoInput" placeholder="YouTube 영상 ID 또는 URL 입력" style="width: 70%; padding: 10px;">
+            <button onclick="loadVideo()">영상 로드</button>
+        </div>
+        
+        <textarea id="noteArea" placeholder="테스트용 타임스탬프:
+
+[00:00:10-00:00:15, 100%, 1.00x, |3] - 3초 정지 테스트
+[00:00:20-00:00:25, 100%, 1.00x, ->] - 자동점프 테스트  
+[00:00:30-00:00:35, 100%, 1.00x] - 일반 구간재생 테스트
+
+사용법: 타임스탬프를 더블클릭하면 해당 시간으로 이동하고 기능이 실행됩니다.
+- |숫자: 해당 초만큼 정지 후 재생
+- ->: 구간 끝에서 다음 타임스탬프로 자동 이동
+- 없음: 구간 끝에서 정지"></textarea>
+        
+        <button onclick="addTimestamp()">현재시간 타임스탬프 추가</button>
+        <button onclick="testPause()">정지 기능 테스트</button>
+        
+        <div class="status" id="status">
+            상태: 준비됨
+        </div>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let player = null;
+        let isPlayerReady = false;
+
+        // YouTube API 준비 콜백
+        function onYouTubeIframeAPIReady() {
+            updateStatus('YouTube API 로드됨. 영상을 로드하세요.');
+        }
+
+        // 영상 로드
+        function loadVideo() {
+            const input = document.getElementById('videoInput').value;
+            let videoId = input;
+            
+            // URL에서 videoId 추출
+            if (input.includes('youtube.com/watch?v=')) {
+                videoId = input.split('v=')[1].split('&')[0];
+            } else if (input.includes('youtu.be/')) {
+                videoId = input.split('youtu.be/')[1].split('?')[0];
+            }
+            
+            if (!videoId) {
+                alert('유효한 YouTube 영상 ID나 URL을 입력하세요.');
+                return;
+            }
+
+            if (player) {
+                player.destroy();
+            }
+
+            player = new YT.Player('player', {
+                height: '400',
+                width: '100%',
+                videoId: videoId,
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange,
+                    'onError': onPlayerError
+                }
+            });
+        }
+
+        function onPlayerReady(event) {
+            isPlayerReady = true;
+            updateStatus('플레이어 준비됨. 타임스탬프 테스트 가능.');
+        }
+
+        function onPlayerStateChange(event) {
+            const states = ['종료', '재생중', '일시정지', '버퍼링', '?', '준비됨'];
+            updateStatus(`플레이어 상태: ${states[event.data + 1] || '알수없음'}`);
+        }
+
+        function onPlayerError(event) {
+            updateStatus(`플레이어 오류: ${event.data}`);
+        }
+
+        function updateStatus(message) {
+            document.getElementById('status').textContent = '상태: ' + message;
+            console.log('📱', message);
+        }
+
+        // 타임스탬프 추가
+        function addTimestamp() {
+            if (!player || !isPlayerReady) {
+                alert('플레이어가 준비되지 않았습니다.');
+                return;
+            }
+
+            const currentTime = player.getCurrentTime();
+            const endTime = currentTime + 5;
+            
+            const formatTime = (seconds) => {
+                const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+                const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+                const s = (seconds % 60).toFixed(0).padStart(2, '0');
+                return `${h}:${m}:${s}`;
+            };
+
+            const timestamp = `[${formatTime(currentTime)}-${formatTime(endTime)}, 100%, 1.00x]`;
+            
+            const noteArea = document.getElementById('noteArea');
+            noteArea.value += '\n' + timestamp + ' ';
+            
+            updateStatus(`타임스탬프 추가됨: ${timestamp}`);
+        }
+
+        // 정지 기능 테스트
+        function testPause() {
+            if (!player || !isPlayerReady) {
+                alert('플레이어가 준비되지 않았습니다.');
+                return;
+            }
+
+            updateStatus('3초 정지 테스트 시작...');
+            player.pauseVideo();
+            
+            setTimeout(() => {
+                player.playVideo();
+                updateStatus('3초 정지 후 재생 재개됨');
+            }, 3000);
+        }
+
+        // 타임스탬프 클릭 처리
+        document.getElementById('noteArea').addEventListener('dblclick', function(e) {
+            if (!player || !isPlayerReady) {
+                alert('플레이어가 준비되지 않았습니다.');
+                return;
+            }
+
+            const text = this.value;
+            const clickPosition = this.selectionStart;
+            
+            // 타임스탬프 정규식
+            const timestampRegex = /\[(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2}),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+            let match;
+            let clickedTimestamp = null;
+
+            // 클릭된 위치의 타임스탬프 찾기
+            while ((match = timestampRegex.exec(text)) !== null) {
+                if (clickPosition >= match.index && clickPosition <= match.index + match[0].length) {
+                    clickedTimestamp = match;
+                    break;
+                }
+            }
+
+            if (clickedTimestamp) {
+                // 시간 계산
+                const startHours = parseInt(clickedTimestamp[1]);
+                const startMinutes = parseInt(clickedTimestamp[2]);
+                const startSeconds = parseInt(clickedTimestamp[3]);
+                const endHours = parseInt(clickedTimestamp[4]);
+                const endMinutes = parseInt(clickedTimestamp[5]);
+                const endSeconds = parseInt(clickedTimestamp[6]);
+                
+                const startTime = startHours * 3600 + startMinutes * 60 + startSeconds;
+                const endTime = endHours * 3600 + endMinutes * 60 + endSeconds;
+                const volume = parseInt(clickedTimestamp[7]);
+                const speed = parseFloat(clickedTimestamp[8]);
+                const action = clickedTimestamp[9];
+
+                // 설정 적용
+                player.setVolume(volume);
+                player.setPlaybackRate(speed);
+                player.seekTo(startTime, true);
+                player.playVideo();
+
+                // 액션별 처리
+                if (action && action.startsWith('|')) {
+                    // 정지 모드
+                    const pauseSeconds = parseInt(action.substring(1));
+                    updateStatus(`재생 시작 - ${pauseSeconds}초 후 자동 정지`);
+                    
+                    setTimeout(() => {
+                        if (player.getPlayerState() === 1) { // 재생 중일 때만
+                            player.pauseVideo();
+                            updateStatus(`${pauseSeconds}초 정지 완료`);
+                        }
+                    }, pauseSeconds * 1000);
+                    
+                } else if (action === '->') {
+                    // 자동점프 모드
+                    const segmentDuration = (endTime - startTime) * 1000;
+                    updateStatus(`재생 시작 - ${(endTime - startTime).toFixed(1)}초 후 다음 스탬프로 자동 이동`);
+                    
+                    setTimeout(() => {
+                        if (player.getPlayerState() === 1) {
+                            updateStatus('구간 완료 - 다음 타임스탬프 찾는 중...');
+                        }
+                    }, segmentDuration);
+                    
+                } else {
+                    // 일반 모드
+                    const segmentDuration = (endTime - startTime) * 1000;
+                    updateStatus(`구간 재생 시작: ${startTime}초 - ${endTime}초 (${(endTime - startTime).toFixed(1)}초)`);
+                    
+                    setTimeout(() => {
+                        if (player.getPlayerState() === 1) {
+                            player.pauseVideo();
+                            updateStatus('구간 재생 완료');
+                        }
+                    }, segmentDuration);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
