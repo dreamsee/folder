@@ -320,7 +320,10 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             // 이미 ->나 |가 있는지 확인
             if (!기존타임스탬프.includes('->') && !기존타임스탬프.includes('|')) {
               const 새로운타임스탬프 = 기존타임스탬프.replace(/\]$/, ', ->]');
-              최종텍스트 = 최종텍스트.replace(기존타임스탬프, 새로운타임스탬프);
+              // 정확한 위치에서만 교체하도록 수정
+              const beforePart = 최종텍스트.substring(0, 마지막타임스탬프.index);
+              const afterPart = 최종텍스트.substring(마지막타임스탬프.index + 기존타임스탬프.length);
+              최종텍스트 = beforePart + 새로운타임스탬프 + afterPart;
             }
           }
         }
@@ -443,6 +446,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         const textarea = textareaRef.current;
         const cursorPosition = textarea.selectionStart;
         let updatedText = noteText;
+        let cursorOffset = 0; // 커서 위치 조정을 위한 오프셋
         
         // 커서 위치 기준으로 바로 이전 타임스탬프 1개 찾기
         const previousTimestamp = findPreviousTimestamp(noteText, cursorPosition);
@@ -461,10 +465,19 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           }
           
           if (shouldAddArrow) {
-            // 이전 타임스탬프에 `, ->` 추가
+            // 이전 타임스탬프에 `, ->` 추가 - 정확한 위치에서만 교체
             const oldTimestamp = previousTimestamp.match;
             const newTimestamp = oldTimestamp.replace(/\]$/, ', ->]');
-            updatedText = updatedText.replace(oldTimestamp, newTimestamp);
+            // 특정 위치(index)에서만 교체하도록 수정
+            const beforePart = updatedText.substring(0, previousTimestamp.index);
+            const afterPart = updatedText.substring(previousTimestamp.index + oldTimestamp.length);
+            updatedText = beforePart + newTimestamp + afterPart;
+            
+            // 커서 위치가 이전 타임스탬프보다 뒤에 있으면 오프셋 조정
+            if (cursorPosition > previousTimestamp.index) {
+              cursorOffset = newTimestamp.length - oldTimestamp.length; // `, ->` 길이만큼 추가
+            }
+            
             showNotification('이전 타임스탬프에 자동 이동 화살표가 추가되었습니다', 'info');
           }
         }
@@ -480,8 +493,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         
         timestamp += `]`;
         
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
+        const start = cursorPosition + cursorOffset;
+        const end = cursorPosition + cursorOffset;
         
         // 현재 커서 위치에 타임스탬프 삽입
         const newText = updatedText.substring(0, start) + timestamp + " " + "\n" + updatedText.substring(end);
