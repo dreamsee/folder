@@ -14,6 +14,12 @@ interface YouTubePlayerProps {
   timestamps?: any[]; // 타임스탬프 구간 하이라이트용
   overlays?: OverlayData[]; // 텍스트 오버레이 데이터
   onOverlayPositionChange?: (id: string, coordinates: Coordinates) => void;
+  isLocked?: boolean; // 화면 잠금 상태
+  magnifierSettings?: {
+    enabled: boolean;
+    zoom: number;
+    size: number;
+  };
 }
 
 const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
@@ -27,12 +33,21 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   timestamps = [],
   overlays = [],
   onOverlayPositionChange,
+  isLocked = false,
+  magnifierSettings = { enabled: true, zoom: 2.0, size: 2 },
 }) => {
   const [availableRates, setAvailableRates] = useState<number[]>([]);
   const [currentRate, setCurrentRate] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  
+  // 터치 홀드 확대 상태
+  const [isTouchHolding, setIsTouchHolding] = useState(false);
+  const [touchPosition, setTouchPosition] = useState({ x: 0, y: 0 });
+  const [isMobile, setIsMobile] = useState(false);
+  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
 
   // 재생/일시정지 토글 함수
   const togglePlayPause = () => {
@@ -94,11 +109,44 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
   }, [currentVideoId, player, setPlayer]);
 
+  // 저장된 기본값 적용 함수
+  const applyDefaultSettings = (player: any) => {
+    try {
+      // 설정에서 기본값 가져오기
+      const uiSettings = localStorage.getItem('uiSettings');
+      if (uiSettings) {
+        const settings = JSON.parse(uiSettings);
+        const 재생기본값 = settings.재생기본값;
+        
+        if (재생기본값) {
+          // 기본 재생 속도 적용
+          if (재생기본값.defaultPlaybackRate) {
+            const availableRates = player.getAvailablePlaybackRates();
+            if (availableRates.includes(재생기본값.defaultPlaybackRate)) {
+              player.setPlaybackRate(재생기본값.defaultPlaybackRate);
+              setCurrentRate(재생기본값.defaultPlaybackRate);
+            }
+          }
+          
+          // 기본 볼륨 적용
+          if (재생기본값.defaultVolume !== undefined) {
+            player.setVolume(재생기본값.defaultVolume);
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('기본 설정 적용 중 오류:', error);
+    }
+  };
+
   // 플레이어 준비 이벤트 핸들러
   const onPlayerReady = (event: any) => {
     console.log('플레이어 준비 완료');
     setIsPlayerReady(true);
     setAvailableRates(event.target.getAvailablePlaybackRates());
+    
+    // 저장된 기본값 적용
+    applyDefaultSettings(event.target);
     
     // 비디오 ID가 있으면 즉시 로드
     if (currentVideoId) {
@@ -117,6 +165,33 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     setPlayerState(event.data);
     // 재생 상태 업데이트
     setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
+    
+    // 영상 재생 시작 시 시청 기록 저장 및 기본값 재적용
+    if (event.data === window.YT.PlayerState.PLAYING && currentVideoId) {
+      const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+      
+      // 첫 재생시에만 기록 생성
+      if (!watchHistory[currentVideoId]) {
+        watchHistory[currentVideoId] = {
+          videoId: currentVideoId,
+          firstWatchedAt: new Date().toISOString(),
+          lastWatchedAt: new Date().toISOString(),
+          watchCount: 1,
+          totalWatchTime: 0,
+          lastPosition: 0,
+          duration: player?.getDuration() || 0,
+        };
+        
+        localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+        
+        // 새 영상이면 기본값 다시 적용 (YouTube가 가끔 초기화하는 경우 대비)
+        setTimeout(() => {
+          if (player && event.target) {
+            applyDefaultSettings(event.target);
+          }
+        }, 1000);
+      }
+    }
   };
 
   // 플레이어 오류 이벤트 핸들러
@@ -157,7 +232,84 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     };
   }, [player]);
 
-  // 현재 시간과 영상 길이 업데이트
+  // 모바일 감지
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // 터치 홀드 이벤트 처리 (영상 영역에서만)
+  useEffect(() => {
+    if (!isMobile || !isLocked || !playerContainerRef.current) return;
+
+    const container = playerContainerRef.current;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // 단일 터치만 처리
+      if (e.touches.length !== 1) return;
+      
+      const touch = e.touches[0];
+      const rect = container.getBoundingClientRect();
+      
+      // 터치가 영상 영역 안에서만 발생했는지 확인
+      if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+          touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+        
+        setTouchPosition({ x: touch.clientX, y: touch.clientY });
+        
+        // 300ms 후 확대 시작
+        touchTimerRef.current = setTimeout(() => {
+          setIsTouchHolding(true);
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+        }, 300);
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      // 터치 이동 시 타이머 취소 (스크롤과 구분)
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+      
+      // 이미 확대 중이면 터치 위치 업데이트
+      if (isTouchHolding && e.touches.length === 1) {
+        const touch = e.touches[0];
+        setTouchPosition({ x: touch.clientX, y: touch.clientY });
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+        touchTimerRef.current = null;
+      }
+      setIsTouchHolding(false);
+    };
+
+    container.addEventListener('touchstart', handleTouchStart);
+    container.addEventListener('touchmove', handleTouchMove);
+    container.addEventListener('touchend', handleTouchEnd);
+    container.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+      }
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [isMobile, isLocked, isTouchHolding]);
+
+  // 현재 시간과 영상 길이 업데이트 및 시청 진행률 저장
   useEffect(() => {
     if (!player || !isPlayerReady) return;
 
@@ -165,8 +317,22 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       try {
         // 플레이어가 여전히 유효한지 확인
         if (player && typeof player.getCurrentTime === 'function') {
-          setCurrentTime(player.getCurrentTime());
-          setDuration(player.getDuration());
+          const current = player.getCurrentTime();
+          const total = player.getDuration();
+          
+          setCurrentTime(current);
+          setDuration(total);
+          
+          // 시청 진행률 업데이트 (5초마다)
+          if (currentVideoId && current > 0 && total > 0 && Math.floor(current) % 5 === 0) {
+            const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+            if (watchHistory[currentVideoId]) {
+              watchHistory[currentVideoId].lastPosition = current;
+              watchHistory[currentVideoId].totalWatchTime = (watchHistory[currentVideoId].totalWatchTime || 0) + 5;
+              watchHistory[currentVideoId].progress = Math.round((current / total) * 100);
+              localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+            }
+          }
         }
       } catch (error) {
         // 플레이어가 준비되지 않았을 때 무시
@@ -174,7 +340,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [player, isPlayerReady]);
+  }, [player, isPlayerReady, currentVideoId]);
 
   // 진행바 클릭 핸들러
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -189,21 +355,62 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   };
 
   return (
-    <div className="mb-4">
-      <div className="relative w-full aspect-video bg-black rounded shadow-md youtube-player-container">
-        <div id="player" className="w-full h-full">
-          <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">
-            <p>동영상을 검색해 주세요</p>
+    <>
+      {/* 전체 화면 확대 효과 */}
+      {isMobile && isLocked && (
+        <style>
+          {`
+            body {
+              transform: scale(${isTouchHolding ? magnifierSettings.zoom : 1});
+              transform-origin: ${touchPosition.x}px ${touchPosition.y}px;
+              transition: transform ${isTouchHolding ? '0.3s' : '0.2s'} ease-out;
+            }
+          `}
+        </style>
+      )}
+
+      {/* 터치 홀드 오버레이 효과 */}
+      {isMobile && isLocked && isTouchHolding && (
+        <>
+          <div 
+            className="fixed inset-0 pointer-events-none z-[9998]"
+            style={{
+              background: `radial-gradient(circle at ${touchPosition.x}px ${touchPosition.y}px, transparent 100px, rgba(0, 0, 0, 0.3) 200px)`,
+              transition: 'background 0.3s ease-out',
+            }}
+          />
+        </>
+      )}
+
+      <div className="mb-4">
+        <div 
+          ref={playerContainerRef}
+          className="relative w-full aspect-video bg-black rounded shadow-md youtube-player-container"
+        >
+          <div id="player" className="w-full h-full">
+            <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">
+              <p>동영상을 검색해 주세요</p>
+            </div>
           </div>
+          {/* 텍스트 오버레이 */}
+          <TextOverlay 
+            overlays={overlays} 
+            currentTime={currentTime} 
+            isPlaying={isPlaying}
+            onOverlayPositionChange={onOverlayPositionChange}
+          />
+          {/* 영상 잠금 오버레이 */}
+          {isLocked && (
+            <div 
+              className="absolute inset-0 z-30 cursor-default"
+              style={{ 
+                pointerEvents: 'auto',
+                touchAction: 'none'
+              }}
+              title="화면이 잠금되었습니다"
+            />
+          )}
         </div>
-        {/* 텍스트 오버레이 */}
-        <TextOverlay 
-          overlays={overlays} 
-          currentTime={currentTime} 
-          isPlaying={isPlaying}
-          onOverlayPositionChange={onOverlayPositionChange}
-        />
-      </div>
       
       {/* 커스텀 진행바 (타임스탬프 하이라이트 포함) */}
       {isPlayerReady && duration > 0 && (
@@ -272,7 +479,8 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           )}
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 
   // 시간 포맷팅 함수

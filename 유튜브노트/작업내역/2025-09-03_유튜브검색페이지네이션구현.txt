@@ -1,0 +1,70 @@
+작업 날짜: 2025-09-03
+작업명: YouTube 검색 페이지네이션 구현 및 안본 영상 자동 로드
+
+구현 내용:
+YouTube API 페이지네이션을 통해 더 많은 영상을 가져오고, 안본 영상이 15개 미만일 때 자동으로 추가 페이지를 로드하는 기능 구현
+
+수정 파일 및 변경 내용:
+
+1. server/routes.ts
+
+   삭제됨:
+   - const query = req.query.q as string; (단일 파라미터만 받던 구조)
+   - maxResults=40 고정값
+   - 단순 videos 응답 구조
+   - 목업 데이터 20개 생성
+
+   추가됨:
+   - const query = req.query.q as string;
+   - const pageToken = req.query.pageToken as string; (페이지네이션 지원)
+   - maxResults=50으로 증가
+   - pageToken 파라미터를 apiUrl에 추가하는 로직
+   - 응답에 nextPageToken 포함: { videos, nextPageToken: data.nextPageToken || null }
+   - 목업 데이터 50개 생성 및 페이지네이션 시뮬레이션
+
+2. client/src/components/VideoLoader.tsx
+
+   삭제됨:
+   - const handleSearch = async () => { 단순 검색 로직
+   - applyFilter 동기 함수
+   - 안본 영상 15개 제한: filtered = filtered.slice(0, 15);
+
+   추가됨:
+   - const [nextPageToken, setNextPageToken] = useState<string | null>(null);
+   - const [isLoadingMore, setIsLoadingMore] = useState(false);
+   - const handleSearch = async (pageToken?: string) => { 페이지네이션 지원 검색
+   - isInitialSearch 플래그로 초기 검색과 추가 로드 구분
+   - url에 pageToken 파라미터 추가 로직
+   - newVideos 배열 병합: [...searchResults, ...data.videos]
+   - setNextPageToken(data.nextPageToken || null); 상태 업데이트
+   - autoLoadForUnwatchedVideos 함수: 안본 영상 15개 미만 시 자동 로드
+   - applyFilter를 async 함수로 변경하여 자동 로드 호출
+   - "더 많은 영상 보기" 버튼 UI
+   - isLoadingMore 상태 표시
+
+   수정됨:
+   - 안본 영상 개수 표시: Math.min(15, ...) → 제한 제거
+   - 필터링 로직에서 15개 제한 완전 제거
+
+데이터 구조:
+YouTube API 응답 구조 변경
+{
+  videos: YoutubeVideo[],
+  nextPageToken: string | null (신규)
+}
+
+상태 관리 추가
+- nextPageToken: 다음 페이지 토큰
+- isLoadingMore: 추가 로딩 상태
+
+삭제된 기능:
+- 안본 영상 15개 제한
+- 단일 페이지 검색 결과만 표시
+
+추가된 기능:
+- YouTube API 페이지네이션 완전 지원
+- 안본 영상 15개 미만 시 자동 추가 로드
+- "더 많은 영상 보기" 수동 로드 버튼
+- 추가 로딩 상태 표시
+- 서버에서 최대 50개씩 영상 로드 (기존 40개에서 증가)
+- 무제한 안본 영상 표시

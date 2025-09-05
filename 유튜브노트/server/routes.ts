@@ -26,8 +26,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/youtube/search", async (req, res) => {
     try {
       const query = req.query.q as string;
+      const pageToken = req.query.pageToken as string;
       
-      console.log("검색 요청:", query);
+      console.log("검색 요청:", query, "pageToken:", pageToken);
       console.log("API 키 존재 여부:", !!apiKey);
 
       if (!query) {
@@ -36,28 +37,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!apiKey) {
         console.error("YouTube API 키가 설정되지 않음 - 목업 데이터 반환");
-        // 목업 데이터 반환 (개발용)
-        const mockVideos = [
-          {
-            videoId: "dQw4w9WgXcQ",
-            title: `검색 결과: ${query}`,
-            thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
-            channelTitle: "테스트 채널"
-          },
-          {
-            videoId: "jNQXAC9IVRw",
-            title: `샘플 영상: ${query}`,
-            thumbnail: "https://i.ytimg.com/vi/jNQXAC9IVRw/mqdefault.jpg",
-            channelTitle: "샘플 채널"
-          }
-        ];
-        return res.json({ videos: mockVideos });
+        // 목업 데이터 반환 (개발용) - 테스트용 50개 데이터
+        const mockVideos = [];
+        const startIndex = pageToken ? parseInt(pageToken) * 50 : 0;
+        for (let i = 0; i < 50; i++) {
+          mockVideos.push({
+            videoId: `video_${startIndex + i}_${Date.now()}`,
+            title: `${query} 검색 결과 ${startIndex + i + 1}`,
+            thumbnail: `https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg`,
+            channelTitle: `채널 ${(startIndex + i) % 5 + 1}`
+          });
+        }
+        return res.json({ 
+          videos: mockVideos, 
+          nextPageToken: startIndex < 200 ? String(Math.floor(startIndex / 50) + 1) : null 
+        });
       }
 
-      // YouTube API 호출
-      const apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=5&q=${encodeURIComponent(
+      // YouTube API 호출 - 검색 결과 개수 증가 (40 -> 50) 및 페이지네이션 지원
+      let apiUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=50&q=${encodeURIComponent(
         query
       )}&type=video&key=${apiKey}`;
+      
+      if (pageToken) {
+        apiUrl += `&pageToken=${pageToken}`;
+      }
       
       console.log("API 호출 URL:", apiUrl.replace(apiKey, "***"));
 
@@ -95,7 +99,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         channelTitle: item.snippet.channelTitle
       }));
 
-      return res.json({ videos });
+      return res.json({ 
+        videos,
+        nextPageToken: data.nextPageToken || null
+      });
     } catch (error) {
       console.error("YouTube 검색 에러:", error);
       console.error("에러 스택:", error instanceof Error ? error.stack : error);

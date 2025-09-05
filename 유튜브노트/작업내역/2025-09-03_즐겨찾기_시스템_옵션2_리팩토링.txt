@@ -1,0 +1,67 @@
+작업 날짜: 2025-09-03
+작업명: 즐겨찾기 시스템을 옵션 2로 전면 리팩토링
+
+구현 내용:
+즐겨찾기 버튼을 화면 잠금 영역으로 이동하고, 전체 즐겨찾기를 표시하는 탭 방식 관리자로 변경
+
+수정 파일 및 변경 내용:
+
+1. client/src/components/ScreenLock.tsx
+   
+   추가됨:
+   - Star 아이콘 import 추가
+   - onFavoritesOpen 콜백 props 인터페이스에 추가
+   - 즐겨찾기 버튼을 설정 버튼과 같은 레벨에 배치
+   
+   수정됨:
+   - ScreenLockProps 인터페이스에 onFavoritesOpen?: () => void 추가
+
+2. client/src/components/FavoriteManager.tsx
+   
+   추가됨:
+   - 전체 컴포넌트 새로 생성
+   - Folder, FavoriteVideo 인터페이스 정의
+   - 탭 방식 폴더 네비게이션 구현 (전체/미분류/폴더별)
+   - 편집 모드와 일괄 삭제 기능
+   - 영상 선택 시 onVideoSelect 콜백 호출
+   - formatDate 함수로 날짜 표시
+   - getFolderInfo 함수로 폴더 정보 조회
+
+3. client/src/pages/HomePage.tsx
+   
+   추가됨:
+   - FavoriteManager 컴포넌트 import
+   - isFavoritesOpen 상태 추가
+   - ScreenLock에 onFavoritesOpen 콜백 연결
+   - FavoriteManager 컴포넌트를 JSX에 추가
+   - onVideoSelect로 setCurrentVideoId 연결
+
+4. client/src/components/VideoLoader.tsx
+   
+   삭제됨:
+   - 검색 필터 탭에서 "즐겨찾기" 옵션 제거
+   - 즐겨찾기 관련 모든 로직과 컴포넌트 제거
+   - FolderSelector 사용 코드 제거
+
+데이터 구조:
+기존 localStorage 구조 유지:
+- videoFavorites: {videoId: FavoriteVideo} 객체
+- favoriteFolders: {folderId: Folder} 객체
+
+FavoriteVideo 인터페이스:
+- videoId, title, channelTitle, thumbnail, folderId, addedAt
+
+Folder 인터페이스:
+- id, name, color, createdAt, order
+
+삭제된 기능:
+- VideoLoader의 즐겨찾기 필터 탭
+- 검색 결과 내에서만 즐겨찾기 표시하는 제한적 기능
+
+추가된 기능:
+- 상단 우측 즐겨찾기 버튼 (화면 잠금 영역)
+- 탭 방식 폴더별 즐겨찾기 관리
+- 전체 저장된 즐겨찾기 표시 (검색 결과와 무관)
+- 즐겨찾기에서 영상 선택 시 바로 재생 기능
+- 편집 모드로 일괄 삭제 지원
+- 폴더별 영상 개수 표시
