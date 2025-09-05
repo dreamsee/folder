@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { OverlayData } from "./TextOverlay";
 import OverlayInput from "./OverlayInput";
 import RecordingSessionList from "./RecordingSessionList";
+import TimestampEditModal from "./TimestampEditModal";
 import { UISettings } from "./SettingsPanel";
 
 // 녹화 관련 인터페이스
@@ -104,6 +105,36 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   onSettingsChange,
 }) => {
   const [noteText, setNoteText] = useState("");
+  
+  // 영상 변경 시 해당 영상의 텍스트 로드
+  useEffect(() => {
+    if (currentVideoId) {
+      try {
+        const saved = localStorage.getItem(`noteText_${currentVideoId}`);
+        const loadedText = saved || "";
+        setNoteText(loadedText);
+        
+        // 불러온 텍스트에서 타임스탬프 파싱하고 timestamps 상태에 반영
+        if (loadedText) {
+          const parsedTimestamps = parseTimestampsFromText(loadedText);
+          const timestampsForMarker = parsedTimestamps.map(parsed => ({
+            timeInSeconds: parsed.startTime,
+            timeFormatted: formatTime(parsed.startTime),
+            duration: parsed.endTime - parsed.startTime,
+            volume: parsed.volume,
+            playbackRate: parsed.playbackRate
+          }));
+          setTimestamps(timestampsForMarker);
+        } else {
+          setTimestamps([]);
+        }
+      } catch (error) {
+        console.error('영상별 텍스트 복원 오류:', error);
+        setNoteText("");
+        setTimestamps([]);
+      }
+    }
+  }, [currentVideoId]);
   const [currentSessionId, setCurrentSessionId] = useState<number | null>(null);
   const [availableSessions, setAvailableSessions] = useState<any[]>([]);
   const [showSessionSelector, setShowSessionSelector] = useState(false);
@@ -111,6 +142,10 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [inputMode, setInputMode] = useState<'note' | 'overlay'>('note');
+  
+  // 타임스탬프 모달 상태
+  const [isTimestampModalOpen, setIsTimestampModalOpen] = useState(false);
+  const [modalCurrentTime, setModalCurrentTime] = useState(0);
   
   // 녹화 관련 상태
   const [녹화중, set녹화중] = useState(false);
@@ -632,6 +667,32 @@ const NoteArea: React.FC<NoteAreaProps> = ({
     }
   }, [sessionTimestamps, setTimestamps]);
 
+  // 실시간 텍스트 파싱 및 상위 컴포넌트 상태 업데이트
+  useEffect(() => {
+    if (!noteText) return;
+
+    // 실시간으로 텍스트에서 타임스탬프 파싱
+    const parsedTimestamps = parseTimestampsFromText(noteText);
+    
+    // 파싱 결과를 프로그레스 바에서 사용할 수 있는 형태로 변환
+    const timestampsForProgressBar = parsedTimestamps.map((parsed, index) => ({
+      id: `parsed-${index}-${Date.now()}`,
+      sessionId: currentSessionId || 0,
+      timeInSeconds: parsed.startTime,
+      timeFormatted: formatTime(parsed.startTime),
+      duration: parsed.endTime - parsed.startTime,
+      volume: parsed.volume,
+      playbackRate: parsed.playbackRate,
+      memo: parsed.content || '',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    }));
+
+    // 상위 컴포넌트의 timestamps 상태 즉시 업데이트 (그래프바 마커용)
+    setTimestamps(timestampsForProgressBar);
+    
+  }, [noteText, currentSessionId, setTimestamps, formatTime]);
+
   // 텍스트 기반 DB 동기화 - 텍스트가 진실의 원천
   useEffect(() => {
     if (!currentSessionId || !noteText) return;
@@ -1048,19 +1109,24 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         // 활성 타임스탬프 설정 적용 (독점 모드일 때만)
         if (activeNow.length > 0) {
           const currentTimestamp = activeNow[0];
+          console.log('🎯 활성 타임스탬프 감지:', currentTimestamp);
           
-          // 볼륨과 속도 설정 적용 (현재 값과 다를 때만)
-          if (currentTimestamp.volume !== undefined && Math.abs(player.getVolume() - currentTimestamp.volume) > 1) {
+          // 볼륨과 속도 설정 적용 (모바일 호환성을 위해 조건 없이 무조건 적용)
+          if (currentTimestamp.volume !== undefined) {
             player.setVolume(currentTimestamp.volume);
             setVolume(currentTimestamp.volume);
+            console.log(`🎵 볼륨 적용: ${currentTimestamp.volume}%`);
           }
           
-          if (currentTimestamp.playbackRate !== undefined && Math.abs(player.getPlaybackRate() - currentTimestamp.playbackRate) > 0.01) {
+          if (currentTimestamp.playbackRate !== undefined) {
             player.setPlaybackRate(currentTimestamp.playbackRate);
             setCurrentRate(currentTimestamp.playbackRate);
             setPlaybackRate(currentTimestamp.playbackRate);
+            console.log(`⚡ 속도 적용: ${currentTimestamp.playbackRate}x`);
           }
-        } else if (activeTimestamps.length > 0 && activeNow.length === 0) {
+        }
+        
+        if (activeTimestamps.length > 0 && activeNow.length === 0) {
           // 타임스탬프가 방금 종료됨 - 기본 설정으로 복원
           player.setVolume(defaultVolume);
           player.setPlaybackRate(defaultPlaybackRate);
@@ -1396,6 +1462,32 @@ const NoteArea: React.FC<NoteAreaProps> = ({
       clearTimeout(saveTimeoutRef.current);
     }
 
+    // 영상별 localStorage 즉시 저장
+    if (currentVideoId) {
+      try {
+        localStorage.setItem(`noteText_${currentVideoId}`, noteText);
+      } catch (error) {
+        console.error('텍스트 저장 오류:', error);
+      }
+    }
+
+    // 텍스트에서 타임스탬프 파싱하여 timestamps 상태 실시간 업데이트
+    if (noteText) {
+      const parsedTimestamps = parseTimestampsFromText(noteText);
+      console.log('📋 파싱된 타임스탬프:', parsedTimestamps);
+      const timestampsForMarker = parsedTimestamps.map(parsed => ({
+        timeInSeconds: parsed.startTime,
+        timeFormatted: formatTime(parsed.startTime),
+        duration: parsed.endTime - parsed.startTime,
+        volume: parsed.volume,
+        playbackRate: parsed.playbackRate
+      }));
+      console.log('🎯 마커용 타임스탬프:', timestampsForMarker);
+      setTimestamps(timestampsForMarker);
+    } else {
+      setTimestamps([]);
+    }
+
     if (noteText && currentSessionId) {
       saveTimeoutRef.current = setTimeout(() => {
         saveNote(noteText);
@@ -1542,55 +1634,52 @@ const NoteArea: React.FC<NoteAreaProps> = ({
       controlRef.current.releasePointerCapture(e.pointerId);
     }
   };
-  // 타임스탬프 추가 함수 (영상 일시정지 기능 추가)
+  // 타임스탬프 추가 함수 - 모달 열기
   const addTimestamp = () => {
-    if (!isPlayerReady || !player || !currentSessionId) return;
+    if (!isPlayerReady || !player) {
+      showNotification('영상을 먼저 로드해주세요', 'warning');
+      return;
+    }
 
     try {
-      // 영상 일시정지
-      if (playerState === 1) {
-        player.pauseVideo();
-      }
-      
       const currentTime = player.getCurrentTime();
-      const newTimestampTime = currentTime; // 새로 추가될 타임스탬프 시간
-      const timeFormatted = formatTime(currentTime);
-      const endTime = currentTime + duration;
+      setModalCurrentTime(currentTime);
+      setIsTimestampModalOpen(true);
+      showNotification('타임스탬프 편집 모달 열림', 'success');
+    } catch (error) {
+      showNotification(`에러: ${error}`, 'error');
+    }
+  };
+  // 모달에서 타임스탬프 저장 함수
+  const addTimestampFromModal = useCallback((timestampData: {
+    startTime: number;
+    endTime: number;
+    volume: number;
+    playbackRate: number;
+    pauseDuration?: number;
+    autoJump: boolean;
+  }) => {
+    if (!isPlayerReady || !player) {
+      showNotification('플레이어가 준비되지 않았습니다', 'error');
+      return;
+    }
+
+    try {
+      const startTime = timestampData.startTime;
+      const endTime = timestampData.endTime;
+      const timeFormatted = formatTime(startTime);
       const endTimeFormatted = formatTime(endTime);
-      const timestamp = `[${timeFormatted}-${endTimeFormatted}, ${Math.round(volume || 100)}%, ${(playbackRate || 1.0).toFixed(2)}x]`;
       
-      // 이전 시간대 타임스탬프 감지 로직
-      // 커서 직전 타임스탬프와 비교하여 시간 순서 역순인지 확인
-      let 이전시간대여부 = false;
+      // 타임스탬프 형식 생성
+      let timestamp = `[${timeFormatted}-${endTimeFormatted}, ${timestampData.volume}%, ${timestampData.playbackRate.toFixed(2)}x`;
       
-      if (textareaRef.current) {
-        const 커서위치 = textareaRef.current.selectionStart;
-        const 커서이전텍스트 = noteText.substring(0, 커서위치);
-        
-        // 커서 이전 텍스트에서 가장 마지막 타임스탬프 찾기
-        const 타임스탬프정규식 = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
-        let 마지막매치 = null;
-        let 매치결과;
-        
-        while ((매치결과 = 타임스탬프정규식.exec(커서이전텍스트)) !== null) {
-          마지막매치 = 매치결과;
-        }
-        
-        if (마지막매치) {
-          // 직전 타임스탬프의 시작 시간 계산
-          const 직전시간 = parseInt(마지막매치[1]) * 3600 + parseInt(마지막매치[2]) * 60 + parseFloat(마지막매치[3]);
-          이전시간대여부 = newTimestampTime < 직전시간;
-          
-          console.log(`커서 직전 타임스탬프: ${직전시간}초, 새 타임스탬프: ${newTimestampTime}초, 이전시간대여부: ${이전시간대여부}`);
-        }
+      if (timestampData.pauseDuration && timestampData.pauseDuration > 0) {
+        timestamp += `, |${timestampData.pauseDuration}`;
+      } else if (timestampData.autoJump) {
+        timestamp += `, ->`;
       }
       
-      // 스크린샷 캡처
-      // 스크린샷 캡처는 나중에 필요시 추가 가능
-      // const screenshot = captureScreenshot();
-      
-      // DB에 직접 저장하지 않고 텍스트에만 추가
-      // 텍스트 변경 시 자동으로 DB 동기화됨
+      timestamp += `]`;
       
       if (textareaRef.current) {
         const textarea = textareaRef.current;
@@ -1601,6 +1690,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         const newText = noteText.substring(0, start) + timestamp + " " + "\n" + noteText.substring(end);
         setNoteText(newText);
         
+        showNotification(`타임스탬프 추가됨: ${timestamp}`, 'success');
+
         // 타임스탬프 삽입 후 커서 위치 조정
         setTimeout(() => {
           const newCursorPos = start + timestamp.length + 2;
@@ -1610,62 +1701,23 @@ const NoteArea: React.FC<NoteAreaProps> = ({
 
         // 즉시 저장
         setTimeout(() => {
-          saveNote(newText);
+          if (saveNote) {
+            saveNote(newText);
+          }
         }, 100);
-        
-        // 이전 시간대 타임스탬프인 경우 직전 타임스탬프에 -> 표시 추가
-        if (이전시간대여부) {
-          // 직전 타임스탬프에 -> 추가하기 위해 텍스트 수정
-          const 커서위치 = textareaRef.current.selectionStart;
-          const 커서이전텍스트 = noteText.substring(0, 커서위치);
-          const 커서이후텍스트 = noteText.substring(textarea.selectionEnd);
-          
-          // 직전 타임스탬프 찾아서 -> 추가
-          const 타임스탬프정규식 = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
-          let 수정된커서이전텍스트 = 커서이전텍스트;
-          let 마지막매치 = null;
-          let 마지막매치위치 = -1;
-          let 매치결과;
-          
-          while ((매치결과 = 타임스탬프정규식.exec(커서이전텍스트)) !== null) {
-            마지막매치 = 매치결과;
-            마지막매치위치 = 매치결과.index;
-          }
-          
-          if (마지막매치 && 마지막매치위치 >= 0) {
-            // 기존 타임스탬프를 -> 포함한 형태로 교체 (쉼표 포함)
-            const 기존타임스탬프 = 마지막매치[0];
-            const 새로운타임스탬프 = 기존타임스탬프.replace(/\]$/, ', ->]');
-            
-            수정된커서이전텍스트 = 커서이전텍스트.substring(0, 마지막매치위치) + 
-                                 새로운타임스탬프 + 
-                                 커서이전텍스트.substring(마지막매치위치 + 기존타임스탬프.length);
-          }
-          
-          // 전체 텍스트 재구성 (직전 타임스탬프 수정 + 새 타임스탬프 추가)
-          const 최종텍스트 = 수정된커서이전텍스트 + timestamp + " " + "\n" + 커서이후텍스트;
-          setNoteText(최종텍스트);
-          
-          // 저장
-          setTimeout(() => {
-            saveNote(최종텍스트);
-          }, 100);
-          
-          showNotification(`이전 시간대 타임스탬프 추가 - 직전 타임스탬프에 -> 표시됨`, "info");
-        } else {
-          showNotification(`타임스탬프 추가: ${timeFormatted}`, "success");
+
+        // 자동 점프가 체크되어 있으면 해당 시간으로 영상 재생
+        if (timestampData.autoJump) {
+          player.seekTo(startTime, true);
+          player.playVideo();
+          showNotification(`자동 점프: ${formatTime(startTime)}에서 재생 시작`, 'info');
         }
       }
-
-      // 녹화 중이면 수동 타임스탬프도 추가
-      if (녹화중) {
-        수동타임스탬프추가();
-      }
     } catch (error) {
-      console.error("타임스탬프 추가 중 오류:", error);
-      showNotification("타임스탬프 추가 중 오류가 발생했습니다.", "error");
+      console.error('타임스탬프 추가 오류:', error);
+      showNotification('타임스탬프 추가 중 오류가 발생했습니다', 'error');
     }
-  };
+  }, [isPlayerReady, player, noteText, formatTime, showNotification, saveNote]);
 
   // 타임스탬프 클릭 처리 - 더블클릭으로 변경
   const handleTimestampClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
@@ -1857,6 +1909,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   const isTimestampButtonEnabled = isPlayerReady && (playerState === 1 || playerState === 2);
 
   return (
+    <>
     <Card>
       <CardContent className="p-3">
         {/* 녹화 상태 표시 */}
@@ -2389,6 +2442,23 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         </div>
       </CardContent>
     </Card>
+    
+    {/* 타임스탬프 편집 모달 */}
+    {isTimestampModalOpen && (
+      <TimestampEditModal
+        isOpen={isTimestampModalOpen}
+        onClose={() => setIsTimestampModalOpen(false)}
+        player={player}
+        isPlayerReady={isPlayerReady}
+        currentTime={modalCurrentTime}
+        duration={duration}
+        volume={volume}
+        playbackRate={playbackRate}
+        onSave={addTimestampFromModal}
+        showNotification={showNotification}
+      />
+    )}
+    </>
   );
 };
 
