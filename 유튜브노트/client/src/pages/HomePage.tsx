@@ -78,6 +78,25 @@ const HomePage = () => {
     ));
   };
 
+  // 오버레이 저장/로드 함수들
+  const saveOverlaysForVideo = (videoId: string, overlays: OverlayData[]) => {
+    if (!videoId) return;
+    const storageKey = `overlays_${videoId}`;
+    localStorage.setItem(storageKey, JSON.stringify(overlays));
+  };
+
+  const loadOverlaysForVideo = (videoId: string): OverlayData[] => {
+    if (!videoId) return [];
+    const storageKey = `overlays_${videoId}`;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('오버레이 로드 실패:', error);
+      return [];
+    }
+  };
+
   // 녹화 세션 관련 함수들
   const handleRecordingComplete = (session: RecordingSession) => {
     setRecordingSessions(prev => [session, ...prev]);
@@ -150,6 +169,31 @@ const HomePage = () => {
     setUiSettings(newSettings);
     localStorage.setItem('uiSettings', JSON.stringify(newSettings));
   };
+
+  // 영상 변경 시 오버레이 저장/로드
+  useEffect(() => {
+    if (currentVideoId) {
+      // 이전 영상의 오버레이를 저장
+      const prevVideoId = localStorage.getItem('lastVideoId');
+      if (prevVideoId && prevVideoId !== currentVideoId) {
+        saveOverlaysForVideo(prevVideoId, overlays);
+      }
+      
+      // 새 영상의 오버레이를 로드
+      const videoOverlays = loadOverlaysForVideo(currentVideoId);
+      setOverlays(videoOverlays);
+      
+      // 현재 영상 ID 저장
+      localStorage.setItem('lastVideoId', currentVideoId);
+    }
+  }, [currentVideoId]);
+
+  // 오버레이 업데이트 시 자동 저장
+  useEffect(() => {
+    if (currentVideoId && overlays.length >= 0) {
+      saveOverlaysForVideo(currentVideoId, overlays);
+    }
+  }, [overlays, currentVideoId]);
 
   // 재생 시간 추적
   useEffect(() => {
@@ -284,7 +328,31 @@ const HomePage = () => {
         isOpen={isFavoritesOpen}
         onClose={() => setIsFavoritesOpen(false)}
         onVideoSelect={(videoId: string) => {
-          setCurrentVideoId(videoId);
+          // 즐겨찾기에서 영상 정보 가져오기
+          const favoritesData = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
+          const videoInfo = favoritesData[videoId];
+          
+          if (videoInfo) {
+            // 비디오 ID와 정보 설정
+            setCurrentVideoId(videoId);
+            setCurrentVideoInfo({
+              title: videoInfo.title,
+              channelName: videoInfo.channelTitle,
+              thumbnailUrl: videoInfo.thumbnail,
+            });
+            
+            // 플레이어가 준비된 경우 바로 로드
+            if (isPlayerReady && player) {
+              player.loadVideoById(videoId);
+              showNotification(`"${videoInfo.title}" 영상을 로드했습니다.`, "success");
+            } else {
+              showNotification(`"${videoInfo.title}" 영상을 준비하고 있습니다.`, "info");
+            }
+          } else {
+            // 즐겨찾기에서 정보를 찾을 수 없는 경우
+            setCurrentVideoId(videoId);
+            showNotification("영상을 로드했습니다.", "info");
+          }
         }}
       />
 

@@ -836,7 +836,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             </div>
 
             {/* 세부 컨트롤 바 */}
-            {(uiSettings?.재생컨트롤?.볼륨 !== false || uiSettings?.재생컨트롤?.속도 !== false) && (
+            {(uiSettings?.재생컨트롤?.볼륨 !== false || uiSettings?.재생컨트롤?.속도 !== false || uiSettings?.재생컨트롤?.도장 !== false || uiSettings?.재생컨트롤?.녹화 !== false || uiSettings?.재생컨트롤?.편집 !== false) && (
               <div className="flex items-center gap-1 overflow-x-auto">
                 {uiSettings?.재생컨트롤?.볼륨 !== false && (
                   <>
@@ -1020,6 +1020,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               showNotification={showNotification}
               uiSettings={uiSettings}
               onSettingsChange={onSettingsChange}
+              noteText={noteText}
+              currentVideoId={currentVideoId}
             />
           )}
 

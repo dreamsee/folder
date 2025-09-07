@@ -30,6 +30,7 @@ export interface OverlayData {
     color: string;
     backgroundColor: string;
     padding: number; // px
+    textAlign?: 'left' | 'center' | 'right'; // 텍스트 정렬
   };
 }
 
@@ -115,10 +116,22 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
   const getPositionStyle = (overlay: OverlayData): React.CSSProperties => {
     if (overlay.positionMode === "coordinate" && overlay.coordinates) {
       const { x, y, unit } = overlay.coordinates;
+      const textAlign = overlay.style.textAlign || 'left';
+      
+      // 텍스트 정렬에 따른 transform 설정
+      let transform = '';
+      if (textAlign === 'center') {
+        transform = 'translateX(-50%)';
+      } else if (textAlign === 'right') {
+        transform = 'translateX(-100%)';
+      }
+      
       return {
         position: "absolute",
         left: `${x}${unit}`,
         top: `${y}${unit}`,
+        transform,
+        textAlign,
       };
     } else if (overlay.positionMode === "preset" && overlay.position) {
       // 기존 preset 위치 로직
@@ -172,6 +185,7 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
               transform: isDraggingThis 
                 ? `${getPositionStyle(overlay).transform || ''} scale(1.05)` 
                 : getPositionStyle(overlay).transform,
+              textAlign: overlay.style.textAlign as any || 'left',
               transition: isDraggingThis ? 'none' : 'all 0.3s ease',
               border: isDraggingThis ? '2px solid #3b82f6' : 'none',
               // 그림자 제거, 배경만 유지
