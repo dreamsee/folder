@@ -203,11 +203,11 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       </div>
 
       {/* 위치 설정 */}
-      {(!uiSettings || uiSettings.화면텍스트.좌표설정 || uiSettings.화면텍스트.빠른설정) && (
+      {(uiSettings?.화면텍스트?.좌표설정 !== false || uiSettings?.화면텍스트?.빠른설정 !== false) && (
         <div className="space-y-4">
           
           {/* 좌표설정이 켜져있으면 상세한 좌표 입력 표시 */}
-          {(!uiSettings || uiSettings.화면텍스트.좌표설정) && (
+          {uiSettings?.화면텍스트?.좌표설정 !== false && (
             <CoordinateInput
               coordinates={coordinates}
               onCoordinatesChange={setCoordinates}
@@ -215,7 +215,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
           )}
           
           {/* 빠른 설정이 켜져있으면 9개 그리드 표시 */}
-          {uiSettings?.화면텍스트.빠른설정 && (
+          {uiSettings?.화면텍스트?.빠른설정 !== false && (
             <div className="space-y-3">
               <div className="text-sm text-gray-600 text-center">
                 빠른 설정:
@@ -248,97 +248,103 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       )}
 
       {/* 지속 시간 - 스타일 설정에 포함 */}
-      {(!uiSettings || uiSettings.화면텍스트.스타일설정) && (
-        <>
+      {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.지속시간 !== false && (
+        <div>
+          <Label htmlFor="duration">지속 시간: {duration}초</Label>
+          <Slider
+            id="duration"
+            value={[duration]}
+            onValueChange={([value]) => setDuration(value)}
+            min={1}
+            max={30}
+            step={1}
+            className="mt-1"
+          />
+        </div>
+      )}
+
+      {/* 글자크기, 여백 설정 */}
+      {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.글자크기여백 !== false && (
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="duration">지속 시간: {duration}초</Label>
+            <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
             <Slider
-              id="duration"
-              value={[duration]}
-              onValueChange={([value]) => setDuration(value)}
-              min={1}
-              max={30}
-              step={1}
+              id="font-size"
+              value={[fontSize]}
+              onValueChange={([value]) => setFontSize(value)}
+              min={12}
+              max={48}
+              step={2}
               className="mt-1"
             />
           </div>
-
-          {/* 스타일 설정 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
-              <Slider
-                id="font-size"
-                value={[fontSize]}
-                onValueChange={([value]) => setFontSize(value)}
-                min={12}
-                max={48}
-                step={2}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="padding">여백: {padding}px</Label>
-              <Slider
-                id="padding"
-                value={[padding]}
-                onValueChange={([value]) => setPadding(value)}
-                min={4}
-                max={20}
-                step={2}
-                className="mt-1"
-              />
-            </div>
+          <div>
+            <Label htmlFor="padding">여백: {padding}px</Label>
+            <Slider
+              id="padding"
+              value={[padding]}
+              onValueChange={([value]) => setPadding(value)}
+              min={4}
+              max={20}
+              step={2}
+              className="mt-1"
+            />
           </div>
-        </>
+        </div>
       )}
 
       {/* 색상 설정 */}
-      {(!uiSettings || uiSettings.화면텍스트.스타일설정) && (
+      {uiSettings?.화면텍스트?.스타일설정 !== false && (
         <div className="space-y-4">
-        {/* 글자 색상 */}
-        <div>
-          <Label htmlFor="text-color">글자 색상</Label>
-          <div className="flex items-center gap-2 mt-1">
-            <Input
-              id="text-color"
-              type="color"
-              value={textColor}
-              onChange={(e) => setTextColor(e.target.value)}
-              className="w-16 h-8 p-1"
-            />
-            <Input
-              type="text"
-              value={textColor}
-              onChange={(e) => setTextColor(e.target.value)}
-              className="flex-1"
-              placeholder="#FFFFFF"
-            />
+        {/* 글자 색상과 배경 색상을 좌우로 배치 */}
+        {uiSettings?.화면텍스트?.색상설정 !== false && (
+        <div className="grid grid-cols-2 gap-3">
+          {/* 글자 색상 */}
+          <div>
+            <Label htmlFor="text-color" className="text-sm">글자 색상</Label>
+            <div className="flex items-center gap-1 mt-1">
+              <Input
+                id="text-color"
+                type="color"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="w-12 h-7 p-0.5"
+              />
+              <Input
+                type="text"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="flex-1 h-7 text-xs"
+                placeholder="#FFFFFF"
+              />
+            </div>
+          </div>
+          
+          {/* 배경 색상 */}
+          <div>
+            <Label htmlFor="bg-color" className="text-sm">배경 색상</Label>
+            <div className="flex items-center gap-1 mt-1">
+              <Input
+                id="bg-color"
+                type="color"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="w-12 h-7 p-0.5"
+              />
+              <Input
+                type="text"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="flex-1 h-7 text-xs"
+                placeholder="#000000"
+              />
+            </div>
           </div>
         </div>
-
-        {/* 배경 색상 */}
-        <div>
-          <Label htmlFor="bg-color">배경 색상</Label>
-          <div className="flex items-center gap-2 mt-1">
-            <Input
-              id="bg-color"
-              type="color"
-              value={bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
-              className="w-16 h-8 p-1"
-            />
-            <Input
-              type="text"
-              value={bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
-              className="flex-1"
-              placeholder="#000000"
-            />
-          </div>
-        </div>
+        )}
 
         {/* 배경 투명도 */}
+        {uiSettings?.화면텍스트?.배경투명도 !== false && (
         <div>
           <Label htmlFor="bg-opacity">배경 투명도: {bgOpacity}%</Label>
           <Slider
@@ -355,6 +361,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
             <span>불투명</span>
           </div>
         </div>
+        )}
         </div>
       )}
 

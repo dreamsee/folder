@@ -998,7 +998,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                 
                 <div className="flex justify-between mt-2">
                   <p className="text-xs text-gray-500 flex items-center">
-                    <InfoIcon className="h-3 w-3 mr-1" /> 도장 형식: [HH:MM:SS, 100%, 1.00x]]
+                    <InfoIcon className="h-3 w-3 mr-1" /> 도장 형식: [HH:MM:SS.sss, 100%, 1.00x]
                   </p>
                   <div>
                     {녹화중 && (
@@ -1011,13 +1011,17 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           )}
 
           {/* 오버레이 입력 */}
-          <OverlayInput
-            overlays={overlays || []}
-            setOverlays={setOverlays}
-            isPlayerReady={isPlayerReady}
-            player={player}
-            showNotification={showNotification}
-          />
+          {uiSettings?.화면텍스트?.패널표시 !== false && (
+            <OverlayInput
+              overlays={overlays || []}
+              setOverlays={setOverlays}
+              isPlayerReady={isPlayerReady}
+              player={player}
+              showNotification={showNotification}
+              uiSettings={uiSettings}
+              onSettingsChange={onSettingsChange}
+            />
+          )}
 
 
           {/* 녹화 세션 목록 */}

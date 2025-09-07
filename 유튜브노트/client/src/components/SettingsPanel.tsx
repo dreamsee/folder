@@ -35,6 +35,10 @@ export interface UISettings {
     스타일설정: boolean;
     빠른설정: boolean;
     빠른설정위치: string;
+    지속시간: boolean;
+    글자크기여백: boolean;
+    색상설정: boolean;
+    배경투명도: boolean;
   };
   프리셋: {
     최소모드명: string;
@@ -65,7 +69,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     검색창: { 유지: true },
     재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
     노트영역: { 표시: true },
-    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
+    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
     재생기본값: { defaultPlaybackRate: 1, defaultVolume: 100 },
   };
@@ -120,7 +124,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           검색창: { 유지: true },
           재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
           노트영역: { 표시: true },
-          화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
+          화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
           프리셋: settings.프리셋 || { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
         };
         break;
@@ -354,41 +358,68 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               />
             </div>
             {settings.재생컨트롤.전체표시 && (
-              <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">볼륨</span>
-                  <Switch
-                    checked={settings.재생컨트롤.볼륨}
-                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "볼륨", 값)}
-                  />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">속도</span>
-                  <Switch
-                    checked={settings.재생컨트롤.속도}
-                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "속도", 값)}
-                  />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">녹화</span>
-                  <Switch
-                    checked={settings.재생컨트롤.녹화}
-                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)}
-                  />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">도장</span>
-                  <Switch
-                    checked={settings.재생컨트롤.도장}
-                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "도장", 값)}
-                  />
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm">편집</span>
-                  <Switch
-                    checked={settings.재생컨트롤.편집}
-                    onCheckedChange={(값) => 설정업데이트("재생컨트롤", "편집", 값)}
-                  />
+              <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-around items-start">
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-sm font-medium" style={{ color: '#3B82F6' }}>볼륨</span>
+                    <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                      <Switch
+                        checked={settings.재생컨트롤.볼륨}
+                        onCheckedChange={(값) => 설정업데이트("재생컨트롤", "볼륨", 값)}
+                        style={{ 
+                          backgroundColor: settings.재생컨트롤.볼륨 ? '#3B82F6' : '#E5E7EB'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-sm font-medium" style={{ color: '#10B981' }}>속도</span>
+                    <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                      <Switch
+                        checked={settings.재생컨트롤.속도}
+                        onCheckedChange={(값) => 설정업데이트("재생컨트롤", "속도", 값)}
+                        style={{ 
+                          backgroundColor: settings.재생컨트롤.속도 ? '#10B981' : '#E5E7EB'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-sm font-medium" style={{ color: '#EF4444' }}>녹화</span>
+                    <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                      <Switch
+                        checked={settings.재생컨트롤.녹화}
+                        onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)}
+                        style={{ 
+                          backgroundColor: settings.재생컨트롤.녹화 ? '#EF4444' : '#E5E7EB'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-sm font-medium" style={{ color: '#8B5CF6' }}>도장</span>
+                    <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                      <Switch
+                        checked={settings.재생컨트롤.도장}
+                        onCheckedChange={(값) => 설정업데이트("재생컨트롤", "도장", 값)}
+                        style={{ 
+                          backgroundColor: settings.재생컨트롤.도장 ? '#8B5CF6' : '#E5E7EB'
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center space-y-2">
+                    <span className="text-sm font-medium" style={{ color: '#F59E0B' }}>편집</span>
+                    <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                      <Switch
+                        checked={settings.재생컨트롤.편집}
+                        onCheckedChange={(값) => 설정업데이트("재생컨트롤", "편집", 값)}
+                        style={{ 
+                          backgroundColor: settings.재생컨트롤.편집 ? '#F59E0B' : '#E5E7EB'
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -447,6 +478,42 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     onCheckedChange={(값) => 설정업데이트("화면텍스트", "스타일설정", 값)}
                   />
                 </div>
+                {settings.화면텍스트.스타일설정 && (
+                  <div className="ml-4 space-y-2 border-l-2 border-gray-300 pl-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">지속시간</span>
+                      <Switch
+                        checked={settings.화면텍스트.지속시간 !== false}
+                        onCheckedChange={(값) => 설정업데이트("화면텍스트", "지속시간", 값)}
+                        className="scale-90"
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">글자크기, 여백</span>
+                      <Switch
+                        checked={settings.화면텍스트.글자크기여백 !== false}
+                        onCheckedChange={(값) => 설정업데이트("화면텍스트", "글자크기여백", 값)}
+                        className="scale-90"
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">글자 색상, 배경 색상</span>
+                      <Switch
+                        checked={settings.화면텍스트.색상설정 !== false}
+                        onCheckedChange={(값) => 설정업데이트("화면텍스트", "색상설정", 값)}
+                        className="scale-90"
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">배경 투명도</span>
+                      <Switch
+                        checked={settings.화면텍스트.배경투명도 !== false}
+                        onCheckedChange={(값) => 설정업데이트("화면텍스트", "배경투명도", 값)}
+                        className="scale-90"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
