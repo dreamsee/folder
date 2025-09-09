@@ -46,6 +46,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const [availableRates, setAvailableRates] = useState<number[]>([]);
   const [currentRate, setCurrentRate] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null); // 현재 시청 세션 ID
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -118,6 +119,11 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
   }, [currentVideoId, player, setPlayer]);
 
+  // 영상 변경 시 세션 초기화
+  useEffect(() => {
+    setCurrentSessionId(null);
+  }, [currentVideoId]);
+
   // 저장된 기본값 적용 함수
   const applyDefaultSettings = (player: any) => {
     try {
@@ -179,6 +185,10 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     if (event.data === window.YT.PlayerState.PLAYING && currentVideoId) {
       const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
       
+      // 새로운 세션인지 확인 (영상 변경 또는 세션이 없는 경우)
+      const videoSessionKey = `${currentVideoId}_session`;
+      const isNewSession = !currentSessionId || currentSessionId !== videoSessionKey;
+      
       if (!watchHistory[currentVideoId]) {
         // 새 영상 - 첫 시청 기록 생성 (watchCount: 1)
         watchHistory[currentVideoId] = {
@@ -191,18 +201,25 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           duration: player?.getDuration() || 0,
         };
         
+        // 새 세션 ID 설정
+        setCurrentSessionId(videoSessionKey);
+        
         // 새 영상이면 기본값 다시 적용 (YouTube가 가끔 초기화하는 경우 대비)
         setTimeout(() => {
           if (player && event.target) {
             applyDefaultSettings(event.target);
           }
         }, 1000);
-      } else {
-        // 기존 영상 - 재시청으로 횟수 증가 (watchCount++)
+      } else if (isNewSession) {
+        // 기존 영상이지만 새로운 세션 - 재시청으로 횟수 증가 (watchCount++)
         watchHistory[currentVideoId].watchCount = (watchHistory[currentVideoId].watchCount || 0) + 1;
         watchHistory[currentVideoId].lastWatchedAt = new Date().toISOString();
         watchHistory[currentVideoId].duration = player?.getDuration() || watchHistory[currentVideoId].duration || 0;
+        
+        // 새 세션 ID 설정
+        setCurrentSessionId(videoSessionKey);
       }
+      // else: 같은 세션 내에서의 재생 재개는 횟수를 증가시키지 않음
       
       // 시청 기록 저장 (localStorage에 통합 저장)
       localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
