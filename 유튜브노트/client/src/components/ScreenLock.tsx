@@ -18,6 +18,8 @@ interface ScreenLockProps {
   };
   onMagnifierSettingsChange: (settings: any) => void;
   onFavoritesOpen?: () => void;
+  onSearchOpen?: () => void;
+  showSearchIcon?: boolean;
 }
 
 const ScreenLock: React.FC<ScreenLockProps> = ({
@@ -26,6 +28,8 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   magnifierSettings,
   onMagnifierSettingsChange,
   onFavoritesOpen,
+  onSearchOpen,
+  showSearchIcon = false,
 }) => {
   const [showMagnifier, setShowMagnifier] = useState(false);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
@@ -126,6 +130,19 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* 검색 버튼 (검색창 유지 OFF일 때만 표시) */}
+            {showSearchIcon && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSearchOpen}
+                className="flex items-center gap-2"
+              >
+                <Search className="h-4 w-4" />
+                <span className="hidden sm:inline">검색</span>
+              </Button>
+            )}
+            
             {/* 즐겨찾기 버튼 */}
             <Button
               variant="ghost"

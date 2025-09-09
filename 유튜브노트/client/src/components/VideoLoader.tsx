@@ -16,6 +16,8 @@ interface VideoLoaderProps {
   } | undefined>>;
   showNotification: (message: string, type: "info" | "success" | "warning" | "error") => void;
   autoHide?: boolean;
+  isPopup?: boolean;
+  onClose?: () => void;
 }
 
 const VideoLoader: React.FC<VideoLoaderProps> = ({
@@ -25,6 +27,8 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   setCurrentVideoInfo,
   showNotification,
   autoHide = false,
+  isPopup = false,
+  onClose,
 }) => {
   const [isVisible, setIsVisible] = useState(!autoHide);
   const [isHovering, setIsHovering] = useState(false);
@@ -154,6 +158,11 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     // 자동 숨김 모드에서는 검색 후 숨김
     if (autoHide) {
       setTimeout(() => setIsVisible(false), 1000);
+    }
+    
+    // 팝업 모드에서는 영상 선택 후 즉시 닫기
+    if (isPopup && onClose) {
+      onClose();
     }
   };
 
@@ -324,36 +333,22 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       
       <div 
         className={`transition-all duration-300 ${
-          autoHide ? (
-            shouldShow 
-              ? 'mb-4 opacity-100 transform translate-y-0' 
-              : 'mb-0 opacity-0 transform -translate-y-4 pointer-events-none absolute top-0 left-0 right-0 z-40'
-          ) : 'mb-4'
+          isPopup 
+            ? 'bg-white rounded-lg shadow-xl p-3 border max-h-96 overflow-y-auto'
+            : autoHide ? (
+              shouldShow 
+                ? 'mb-4 opacity-100 transform translate-y-0' 
+                : 'mb-0 opacity-0 transform -translate-y-4 pointer-events-none absolute top-0 left-0 right-0 z-40'
+            ) : 'mb-4'
         }`}
         onMouseEnter={() => autoHide && setIsHovering(true)}
         onMouseLeave={() => autoHide && setIsHovering(false)}
         onTouchStart={() => autoHide && setIsVisible(true)}
       >
+      
       {/* 필터 토글 버튼 - 검색 결과가 있을 때만 표시 */}
       {searchResults.length > 0 && (
         <div className="flex gap-1 mb-2">
-          <Button
-            size="sm"
-            variant={filterMode === 'watched' ? 'default' : 'outline'}
-            onClick={() => {
-              setFilterMode('watched');
-              if (filterMode === 'watched') {
-                // 정렬 순서 토글
-                setWatchedSortOrder(watchedSortOrder === 'desc' ? 'asc' : 'desc');
-              }
-            }}
-            className="text-xs flex items-center gap-1"
-          >
-            ✓ 본 영상 ({searchResults.filter(v => getWatchInfo(v.videoId)).length})
-            {filterMode === 'watched' && (
-              <span>{watchedSortOrder === 'desc' ? '↓' : '↑'}</span>
-            )}
-          </Button>
           <Button
             size="sm"
             variant={filterMode === 'blacklisted' ? 'default' : 'outline'}
@@ -376,6 +371,23 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
               const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
               return !watchHistory[v.videoId] && !blacklist[v.videoId];
             }).length})
+          </Button>
+          <Button
+            size="sm"
+            variant={filterMode === 'watched' ? 'default' : 'outline'}
+            onClick={() => {
+              setFilterMode('watched');
+              if (filterMode === 'watched') {
+                // 정렬 순서 토글
+                setWatchedSortOrder(watchedSortOrder === 'desc' ? 'asc' : 'desc');
+              }
+            }}
+            className="text-xs flex items-center gap-1"
+          >
+            ✓ 본 영상 ({searchResults.filter(v => getWatchInfo(v.videoId)).length})
+            {filterMode === 'watched' && (
+              <span>{watchedSortOrder === 'desc' ? '↓' : '↑'}</span>
+            )}
           </Button>
         </div>
       )}
@@ -440,6 +452,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
                   </h3>
                   <p className="text-xs text-gray-500 mt-1">
                     {video.channelTitle}
+                    {/* 시청 횟수 표시 - 1회부터 표시 (이전에 안 뜨는 문제로 >= 1 조건 추가) */}
                     {watchInfo && watchInfo.watchCount >= 1 && (
                       <span className="ml-2 text-blue-500">
                         {watchInfo.watchCount}회 시청

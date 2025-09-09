@@ -54,8 +54,8 @@ const TimestampEditModal: React.FC<TimestampEditModalProps> = ({
   const [endTimeInput, setEndTimeInput] = useState('');
   
   // 재생 설정
-  const [volume, setVolume] = useState(defaultVolume);
-  const [playbackRate, setPlaybackRate] = useState(defaultPlaybackRate);
+  const [volume, setVolume] = useState(defaultVolume || 100);
+  const [playbackRate, setPlaybackRate] = useState(defaultPlaybackRate || 1.0);
   
   // 고급 설정
   const [pauseDuration, setPauseDuration] = useState('');
@@ -125,8 +125,8 @@ const TimestampEditModal: React.FC<TimestampEditModalProps> = ({
       setEndTime(current + defaultDuration);
       setStartTimeInput(formatTimeToString(current));
       setEndTimeInput(formatTimeToString(current + defaultDuration));
-      setVolume(defaultVolume);
-      setPlaybackRate(defaultPlaybackRate);
+      setVolume(defaultVolume || 100);
+      setPlaybackRate(defaultPlaybackRate || 1.0);
       setPauseDuration('');
       setAutoJump(false);
       setFocusedField(null);

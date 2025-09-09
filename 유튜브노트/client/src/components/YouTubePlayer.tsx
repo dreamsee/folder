@@ -166,12 +166,12 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     // 재생 상태 업데이트
     setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
     
-    // 영상 재생 시작 시 시청 기록 저장 및 기본값 재적용
+    // 영상 재생 시작 시 시청 기록 관리 (단일 책임: 모든 시청 기록은 여기서만 관리)
     if (event.data === window.YT.PlayerState.PLAYING && currentVideoId) {
       const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
       
-      // 첫 재생시에만 기록 생성
       if (!watchHistory[currentVideoId]) {
+        // 새 영상 - 첫 시청 기록 생성 (watchCount: 1)
         watchHistory[currentVideoId] = {
           videoId: currentVideoId,
           firstWatchedAt: new Date().toISOString(),
@@ -182,15 +182,21 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           duration: player?.getDuration() || 0,
         };
         
-        localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
-        
         // 새 영상이면 기본값 다시 적용 (YouTube가 가끔 초기화하는 경우 대비)
         setTimeout(() => {
           if (player && event.target) {
             applyDefaultSettings(event.target);
           }
         }, 1000);
+      } else {
+        // 기존 영상 - 재시청으로 횟수 증가 (watchCount++)
+        watchHistory[currentVideoId].watchCount = (watchHistory[currentVideoId].watchCount || 0) + 1;
+        watchHistory[currentVideoId].lastWatchedAt = new Date().toISOString();
+        watchHistory[currentVideoId].duration = player?.getDuration() || watchHistory[currentVideoId].duration || 0;
       }
+      
+      // 시청 기록 저장 (localStorage에 통합 저장)
+      localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
     }
   };
 

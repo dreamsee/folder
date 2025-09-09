@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import YouTubePlayer from "@/components/YouTubePlayer";
 import { Coordinates } from "@/components/TextOverlay";
 import NoteArea from "@/components/NoteArea";
+import SimpleNoteArea from "@/components/SimpleNoteArea";
 import VideoLoader from "@/components/VideoLoader";
 import Notification from "@/components/Notification";
 import { RecordingSession } from "@/components/RecordingMode";
@@ -53,6 +54,26 @@ const HomePage = () => {
 
   // 즐겨찾기 관련 상태
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+  
+  // 검색 팝업 상태
+  const [isSearchPopupOpen, setIsSearchPopupOpen] = useState(false);
+
+  // ESC 키로 팝업 닫기
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isSearchPopupOpen) {
+        setIsSearchPopupOpen(false);
+      }
+    };
+
+    if (isSearchPopupOpen) {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSearchPopupOpen]);
 
 
   // YouTubeIframeAPI 준비되면 호출되는 콜백
@@ -75,6 +96,25 @@ const HomePage = () => {
         ? { ...overlay, coordinates: newCoordinates }
         : overlay
     ));
+  };
+
+  // 오버레이 저장/로드 함수들
+  const saveOverlaysForVideo = (videoId: string, overlays: OverlayData[]) => {
+    if (!videoId) return;
+    const storageKey = `overlays_${videoId}`;
+    localStorage.setItem(storageKey, JSON.stringify(overlays));
+  };
+
+  const loadOverlaysForVideo = (videoId: string): OverlayData[] => {
+    if (!videoId) return [];
+    const storageKey = `overlays_${videoId}`;
+    try {
+      const saved = localStorage.getItem(storageKey);
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('오버레이 로드 실패:', error);
+      return [];
+    }
   };
 
   // 녹화 세션 관련 함수들
@@ -150,6 +190,31 @@ const HomePage = () => {
     localStorage.setItem('uiSettings', JSON.stringify(newSettings));
   };
 
+  // 영상 변경 시 오버레이 저장/로드
+  useEffect(() => {
+    if (currentVideoId) {
+      // 이전 영상의 오버레이를 저장
+      const prevVideoId = localStorage.getItem('lastVideoId');
+      if (prevVideoId && prevVideoId !== currentVideoId) {
+        saveOverlaysForVideo(prevVideoId, overlays);
+      }
+      
+      // 새 영상의 오버레이를 로드
+      const videoOverlays = loadOverlaysForVideo(currentVideoId);
+      setOverlays(videoOverlays);
+      
+      // 현재 영상 ID 저장
+      localStorage.setItem('lastVideoId', currentVideoId);
+    }
+  }, [currentVideoId]);
+
+  // 오버레이 업데이트 시 자동 저장
+  useEffect(() => {
+    if (currentVideoId && overlays.length >= 0) {
+      saveOverlaysForVideo(currentVideoId, overlays);
+    }
+  }, [overlays, currentVideoId]);
+
   // 재생 시간 추적
   useEffect(() => {
     if (!player || !isPlayerReady) return;
@@ -175,6 +240,8 @@ const HomePage = () => {
         magnifierSettings={magnifierSettings}
         onMagnifierSettingsChange={setMagnifierSettings}
         onFavoritesOpen={() => setIsFavoritesOpen(true)}
+        onSearchOpen={() => setIsSearchPopupOpen(true)}
+        showSearchIcon={!uiSettings.검색창.유지}
       />
       
       <div 
@@ -196,16 +263,43 @@ const HomePage = () => {
         </header>
       )}
 
-      <VideoLoader
-        player={player}
-        isPlayerReady={isPlayerReady}
-        setCurrentVideoId={setCurrentVideoId}
-        setCurrentVideoInfo={setCurrentVideoInfo}
-        showNotification={showNotification}
-        autoHide={!uiSettings.검색창.유지}
-      />
+      {/* 검색창 (유지 설정에 따라 표시) */}
+      {uiSettings.검색창.유지 && (
+        <VideoLoader
+          player={player}
+          isPlayerReady={isPlayerReady}
+          setCurrentVideoId={setCurrentVideoId}
+          setCurrentVideoInfo={setCurrentVideoInfo}
+          showNotification={showNotification}
+          autoHide={false}
+        />
+      )}
+      
+      {/* 검색 팝업 (유지 OFF일 때) */}
+      {!uiSettings.검색창.유지 && isSearchPopupOpen && (
+        <>
+          {/* 배경 오버레이 */}
+          <div 
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setIsSearchPopupOpen(false)}
+          />
+          {/* 팝업 검색창 */}
+          <div className="fixed top-14 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-3xl px-4">
+            <VideoLoader
+              player={player}
+              isPlayerReady={isPlayerReady}
+              setCurrentVideoId={setCurrentVideoId}
+              setCurrentVideoInfo={setCurrentVideoInfo}
+              showNotification={showNotification}
+              autoHide={false}
+              isPopup={true}
+              onClose={() => setIsSearchPopupOpen(false)}
+            />
+          </div>
+        </>
+      )}
 
-      <div className={`transition-all duration-300 ${isKeyboardVisible ? 'mb-2' : 'mb-4'}`}>
+      <div className="transition-all duration-300">
         <YouTubePlayer
           player={player}
           setPlayer={setPlayer}
@@ -223,6 +317,15 @@ const HomePage = () => {
         />
       </div>
 
+      {/* SimpleNoteArea - 참고용으로 보관 (주석 처리)
+      <SimpleNoteArea
+          player={player}
+          isPlayerReady={isPlayerReady}
+          showNotification={showNotification}
+      />
+      */}
+      
+      {/* 원래 NoteArea - 수정 완료하여 활성화 */}
       <NoteArea
           player={player}
           isPlayerReady={isPlayerReady}
@@ -274,7 +377,31 @@ const HomePage = () => {
         isOpen={isFavoritesOpen}
         onClose={() => setIsFavoritesOpen(false)}
         onVideoSelect={(videoId: string) => {
-          setCurrentVideoId(videoId);
+          // 즐겨찾기에서 영상 정보 가져오기
+          const favoritesData = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
+          const videoInfo = favoritesData[videoId];
+          
+          if (videoInfo) {
+            // 비디오 ID와 정보 설정
+            setCurrentVideoId(videoId);
+            setCurrentVideoInfo({
+              title: videoInfo.title,
+              channelName: videoInfo.channelTitle,
+              thumbnailUrl: videoInfo.thumbnail,
+            });
+            
+            // 플레이어가 준비된 경우 바로 로드
+            if (isPlayerReady && player) {
+              player.loadVideoById(videoId);
+              showNotification(`"${videoInfo.title}" 영상을 로드했습니다.`, "success");
+            } else {
+              showNotification(`"${videoInfo.title}" 영상을 준비하고 있습니다.`, "info");
+            }
+          } else {
+            // 즐겨찾기에서 정보를 찾을 수 없는 경우
+            setCurrentVideoId(videoId);
+            showNotification("영상을 로드했습니다.", "info");
+          }
         }}
       />
 

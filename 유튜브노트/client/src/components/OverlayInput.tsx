@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
-import { Plus, X, Edit2, Save, Type } from "lucide-react";
+import { Plus, X, Edit2, Save, Type, Clock } from "lucide-react";
 import { formatTime } from "@/lib/youtubeUtils";
 import { OverlayData, OverlayPosition, PositionMode, Coordinates } from "./TextOverlay";
 import CoordinateInput from "./CoordinateInput";
@@ -18,6 +18,8 @@ interface OverlayInputProps {
   showNotification: (message: string, type: "info" | "success" | "warning" | "error") => void;
   uiSettings?: UISettings;
   onSettingsChange?: (settings: UISettings) => void;
+  noteText?: string;  // 노트 텍스트 추가
+  currentVideoId?: string; // 현재 영상 ID 추가
 }
 
 const OverlayInput: React.FC<OverlayInputProps> = ({
@@ -28,6 +30,8 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   showNotification,
   uiSettings,
   onSettingsChange,
+  noteText = "",
+  currentVideoId = "",
 }) => {
   const [overlayText, setOverlayText] = useState("");
   const [positionMode] = useState<PositionMode>("coordinate"); // 항상 좌표 모드로 고정
@@ -40,6 +44,11 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   const [bgOpacity, setBgOpacity] = useState(0); // 0-100 퍼센트 (기본값 0 = 투명)
   const [padding, setPadding] = useState(10);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [startTime, setStartTime] = useState<number | null>(null);
+  const [endTime, setEndTime] = useState<number | null>(null);
+  const [showTimestampPicker, setShowTimestampPicker] = useState(false);
+  const [availableTimestamps, setAvailableTimestamps] = useState<Array<{text: string, start: number, end: number}>>([]);
+  const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
   // 투명도를 16진수로 변환하는 함수
   const opacityToHex = (opacity: number): string => {
@@ -61,6 +70,53 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     return bgColor + opacityToHex(bgOpacity);
   };
 
+  // 노트에서 타임스탬프 파싱
+  const parseTimestamps = () => {
+    const timestampRegex = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+    const timestamps = [];
+    let match;
+    
+    while ((match = timestampRegex.exec(noteText)) !== null) {
+      const startHours = parseInt(match[1]);
+      const startMinutes = parseInt(match[2]);
+      const startSeconds = parseFloat(match[3]);
+      const endHours = parseInt(match[4]);
+      const endMinutes = parseInt(match[5]);
+      const endSeconds = parseFloat(match[6]);
+      
+      const start = startHours * 3600 + startMinutes * 60 + startSeconds;
+      const end = endHours * 3600 + endMinutes * 60 + endSeconds;
+      
+      timestamps.push({
+        text: match[0],
+        start,
+        end
+      });
+    }
+    
+    return timestamps;
+  };
+
+  // 타임스탬프에서 시간 가져오기
+  const loadTimestampTimes = () => {
+    const timestamps = parseTimestamps();
+    if (timestamps.length === 0) {
+      showNotification("노트에 타임스탬프가 없습니다.", "warning");
+      return;
+    }
+    setAvailableTimestamps(timestamps);
+    setShowTimestampPicker(true);
+  };
+
+  // 타임스탬프 선택 처리
+  const selectTimestamp = (timestamp: {text: string, start: number, end: number}) => {
+    setStartTime(timestamp.start);
+    setEndTime(timestamp.end);
+    setDuration(Math.round(timestamp.end - timestamp.start));
+    setShowTimestampPicker(false);
+    showNotification(`타임스탬프 시간을 가져왔습니다: ${formatTime(timestamp.start)} - ${formatTime(timestamp.end)}`, "success");
+  };
+
 
   // 오버레이 추가
   const addOverlay = () => {
@@ -75,20 +131,24 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     }
 
     try {
-      const currentTime = player.getCurrentTime();
+      // 타임스탬프에서 가져온 시간이 있으면 사용, 없으면 현재 시간 사용
+      const overlayStartTime = startTime !== null ? startTime : player.getCurrentTime();
+      const overlayDuration = startTime !== null && endTime !== null ? endTime - startTime : duration;
+      
       const newOverlay: OverlayData = {
         id: editingId || Date.now().toString(),
         text: overlayText,
         positionMode,
         position: positionMode === "preset" ? position : undefined,
         coordinates: positionMode === "coordinate" ? coordinates : undefined,
-        startTime: currentTime,
-        duration,
+        startTime: overlayStartTime,
+        duration: overlayDuration,
         style: {
           fontSize,
           color: textColor,
           backgroundColor: getFinalBgColor(),
           padding,
+          textAlign,
         },
       };
 
@@ -105,6 +165,9 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
 
       // 입력 필드 초기화
       setOverlayText("");
+      setStartTime(null);
+      setEndTime(null);
+      setTextAlign('left');
     } catch (error) {
       console.error("오버레이 추가 중 오류:", error);
       showNotification("오버레이 추가 중 오류가 발생했습니다.", "error");
@@ -118,6 +181,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     setDuration(overlay.duration);
     setFontSize(overlay.style.fontSize);
     setTextColor(overlay.style.color);
+    setTextAlign(overlay.style.textAlign || 'left');
     
     // 배경 색상과 투명도 분리
     const bgColorValue = overlay.style.backgroundColor.length === 9 
@@ -151,6 +215,9 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     setCoordinates({ x: 50, y: 90, unit: "%" });
     setBgColor("#000000");
     setBgOpacity(80);
+    setStartTime(null);
+    setEndTime(null);
+    setTextAlign('left');
   };
 
 
@@ -158,9 +225,11 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   const getOverlayPositionDescription = (overlay: OverlayData): string => {
     if (overlay.coordinates) {
       const { x, y, unit } = overlay.coordinates;
-      return `좌표 (${x}${unit}, ${y}${unit})`;
+      const textAlign = overlay.style.textAlign || 'left';
+      const alignText = textAlign === 'left' ? '좌측' : textAlign === 'center' ? '중앙' : '우측';
+      return `좌표 (${x}${unit}, ${y}${unit}) • ${alignText}_정렬`;
     }
-    return "좌표 (50%, 90%)";
+    return "좌표 (50%, 90%) • 좌측_정렬";
   };
 
 
@@ -203,11 +272,11 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       </div>
 
       {/* 위치 설정 */}
-      {(!uiSettings || uiSettings.화면텍스트.좌표설정 || uiSettings.화면텍스트.빠른설정) && (
+      {(uiSettings?.화면텍스트?.좌표설정 !== false || uiSettings?.화면텍스트?.빠른설정 !== false) && (
         <div className="space-y-4">
           
           {/* 좌표설정이 켜져있으면 상세한 좌표 입력 표시 */}
-          {(!uiSettings || uiSettings.화면텍스트.좌표설정) && (
+          {uiSettings?.화면텍스트?.좌표설정 !== false && (
             <CoordinateInput
               coordinates={coordinates}
               onCoordinatesChange={setCoordinates}
@@ -215,27 +284,30 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
           )}
           
           {/* 빠른 설정이 켜져있으면 9개 그리드 표시 */}
-          {uiSettings?.화면텍스트.빠른설정 && (
+          {uiSettings?.화면텍스트?.빠른설정 !== false && (
             <div className="space-y-3">
               <div className="text-sm text-gray-600 text-center">
                 빠른 설정:
               </div>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { name: "좌상단", x: 10, y: 10 },
-                  { name: "상단중앙", x: 50, y: 10 },
-                  { name: "우상단", x: 90, y: 10 },
-                  { name: "좌측중앙", x: 10, y: 50 },
-                  { name: "정중앙", x: 50, y: 50 },
-                  { name: "우측중앙", x: 90, y: 50 },
-                  { name: "좌하단", x: 10, y: 90 },
-                  { name: "하단중앙", x: 50, y: 90 },
-                  { name: "우하단", x: 90, y: 90 },
+                  { name: "좌상단", x: 10, y: 10, align: 'left' as const },
+                  { name: "상단중앙", x: 50, y: 10, align: 'center' as const },
+                  { name: "우상단", x: 90, y: 10, align: 'right' as const },
+                  { name: "좌측중앙", x: 10, y: 50, align: 'left' as const },
+                  { name: "정중앙", x: 50, y: 50, align: 'center' as const },
+                  { name: "우측중앙", x: 90, y: 50, align: 'right' as const },
+                  { name: "좌하단", x: 10, y: 90, align: 'left' as const },
+                  { name: "하단중앙", x: 50, y: 90, align: 'center' as const },
+                  { name: "우하단", x: 90, y: 90, align: 'right' as const },
                 ].map((position, index) => (
                   <button
                     key={index}
                     type="button"
-                    onClick={() => setCoordinates({ x: position.x, y: position.y, unit: "%" })}
+                    onClick={() => {
+                      setCoordinates({ x: position.x, y: position.y, unit: "%" });
+                      setTextAlign(position.align);
+                    }}
                     className="px-2 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm border border-gray-300 hover:border-gray-400 transition-colors"
                   >
                     {position.name}
@@ -248,97 +320,103 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       )}
 
       {/* 지속 시간 - 스타일 설정에 포함 */}
-      {(!uiSettings || uiSettings.화면텍스트.스타일설정) && (
-        <>
+      {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.지속시간 !== false && (
+        <div>
+          <Label htmlFor="duration">지속 시간: {duration}초</Label>
+          <Slider
+            id="duration"
+            value={[duration]}
+            onValueChange={([value]) => setDuration(value)}
+            min={1}
+            max={30}
+            step={1}
+            className="mt-1"
+          />
+        </div>
+      )}
+
+      {/* 글자크기, 여백 설정 */}
+      {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.글자크기여백 !== false && (
+        <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="duration">지속 시간: {duration}초</Label>
+            <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
             <Slider
-              id="duration"
-              value={[duration]}
-              onValueChange={([value]) => setDuration(value)}
-              min={1}
-              max={30}
-              step={1}
+              id="font-size"
+              value={[fontSize]}
+              onValueChange={([value]) => setFontSize(value)}
+              min={12}
+              max={48}
+              step={2}
               className="mt-1"
             />
           </div>
-
-          {/* 스타일 설정 */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
-              <Slider
-                id="font-size"
-                value={[fontSize]}
-                onValueChange={([value]) => setFontSize(value)}
-                min={12}
-                max={48}
-                step={2}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="padding">여백: {padding}px</Label>
-              <Slider
-                id="padding"
-                value={[padding]}
-                onValueChange={([value]) => setPadding(value)}
-                min={4}
-                max={20}
-                step={2}
-                className="mt-1"
-              />
-            </div>
+          <div>
+            <Label htmlFor="padding">여백: {padding}px</Label>
+            <Slider
+              id="padding"
+              value={[padding]}
+              onValueChange={([value]) => setPadding(value)}
+              min={4}
+              max={20}
+              step={2}
+              className="mt-1"
+            />
           </div>
-        </>
+        </div>
       )}
 
       {/* 색상 설정 */}
-      {(!uiSettings || uiSettings.화면텍스트.스타일설정) && (
+      {uiSettings?.화면텍스트?.스타일설정 !== false && (
         <div className="space-y-4">
-        {/* 글자 색상 */}
-        <div>
-          <Label htmlFor="text-color">글자 색상</Label>
-          <div className="flex items-center gap-2 mt-1">
-            <Input
-              id="text-color"
-              type="color"
-              value={textColor}
-              onChange={(e) => setTextColor(e.target.value)}
-              className="w-16 h-8 p-1"
-            />
-            <Input
-              type="text"
-              value={textColor}
-              onChange={(e) => setTextColor(e.target.value)}
-              className="flex-1"
-              placeholder="#FFFFFF"
-            />
+        {/* 글자 색상과 배경 색상을 좌우로 배치 */}
+        {uiSettings?.화면텍스트?.색상설정 !== false && (
+        <div className="grid grid-cols-2 gap-3">
+          {/* 글자 색상 */}
+          <div>
+            <Label htmlFor="text-color" className="text-sm">글자 색상</Label>
+            <div className="flex items-center gap-1 mt-1">
+              <Input
+                id="text-color"
+                type="color"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="w-12 h-7 p-0.5"
+              />
+              <Input
+                type="text"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="flex-1 h-7 text-xs"
+                placeholder="#FFFFFF"
+              />
+            </div>
+          </div>
+          
+          {/* 배경 색상 */}
+          <div>
+            <Label htmlFor="bg-color" className="text-sm">배경 색상</Label>
+            <div className="flex items-center gap-1 mt-1">
+              <Input
+                id="bg-color"
+                type="color"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="w-12 h-7 p-0.5"
+              />
+              <Input
+                type="text"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="flex-1 h-7 text-xs"
+                placeholder="#000000"
+              />
+            </div>
           </div>
         </div>
-
-        {/* 배경 색상 */}
-        <div>
-          <Label htmlFor="bg-color">배경 색상</Label>
-          <div className="flex items-center gap-2 mt-1">
-            <Input
-              id="bg-color"
-              type="color"
-              value={bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
-              className="w-16 h-8 p-1"
-            />
-            <Input
-              type="text"
-              value={bgColor}
-              onChange={(e) => setBgColor(e.target.value)}
-              className="flex-1"
-              placeholder="#000000"
-            />
-          </div>
-        </div>
+        )}
 
         {/* 배경 투명도 */}
+        {uiSettings?.화면텍스트?.배경투명도 !== false && (
         <div>
           <Label htmlFor="bg-opacity">배경 투명도: {bgOpacity}%</Label>
           <Slider
@@ -355,33 +433,88 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
             <span>불투명</span>
           </div>
         </div>
+        )}
         </div>
       )}
 
       {/* 추가/수정 버튼 */}
-      <Button
-        onClick={addOverlay}
-        disabled={!isPlayerReady || !overlayText.trim()}
-        className="w-full"
-        variant={editingId ? "default" : "secondary"}
-      >
-        {editingId ? (
-          <>
-            <Save className="w-4 h-4 mr-2" />
-            수정 완료
-          </>
-        ) : (
-          <>
-            <Plus className="w-4 h-4 mr-2" />
-            오버레이 추가
-          </>
+      <div className="space-y-2">
+        {/* 타임스탬프에서 시간 가져오기 버튼 */}
+        {!editingId && (
+          <Button
+            onClick={loadTimestampTimes}
+            disabled={!isPlayerReady}
+            className="w-full"
+            variant="outline"
+          >
+            <Clock className="w-4 h-4 mr-2" />
+            타임스탬프에서 시간 가져오기
+            {startTime !== null && endTime !== null && (
+              <span className="ml-2 text-xs">
+                ({formatTime(startTime)} - {formatTime(endTime)})
+              </span>
+            )}
+          </Button>
         )}
-      </Button>
+        
+        <Button
+          onClick={addOverlay}
+          disabled={!isPlayerReady || !overlayText.trim()}
+          className="w-full"
+          variant={editingId ? "default" : "secondary"}
+        >
+          {editingId ? (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              수정 완료
+            </>
+          ) : (
+            <>
+              <Plus className="w-4 h-4 mr-2" />
+              오버레이 추가
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* 타임스탬프 선택 모달 */}
+      {showTimestampPicker && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 max-w-md w-full max-h-96 overflow-y-auto">
+            <h3 className="text-lg font-semibold mb-3">타임스탬프 선택</h3>
+            <div className="space-y-2">
+              {availableTimestamps.map((ts, index) => (
+                <button
+                  key={index}
+                  onClick={() => selectTimestamp(ts)}
+                  className="w-full text-left p-2 hover:bg-gray-100 rounded border border-gray-200"
+                >
+                  <div className="font-mono text-sm">{ts.text}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    {formatTime(ts.start)} - {formatTime(ts.end)} ({Math.round(ts.end - ts.start)}초)
+                  </div>
+                </button>
+              ))}
+            </div>
+            <Button
+              onClick={() => setShowTimestampPicker(false)}
+              className="w-full mt-3"
+              variant="outline"
+            >
+              취소
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* 오버레이 목록 */}
       {overlays.length > 0 && (
         <div className="mt-4 space-y-2">
-          <h4 className="text-sm font-medium text-gray-700">등록된 오버레이</h4>
+          <h4 className="text-sm font-medium text-gray-700">
+            등록된 오버레이 {currentVideoId && (
+              <span className="text-xs text-gray-500 font-normal">({currentVideoId})</span>
+            )}
+          </h4>
           <div className="max-h-40 overflow-y-auto space-y-2">
             {overlays.map((overlay) => (
               <div
