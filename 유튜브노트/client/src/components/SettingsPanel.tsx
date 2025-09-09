@@ -367,8 +367,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         // 프리셋 재적용 제거 - 현재 설정 유지 (이름과 토글 상태 저장)
                         setSelectedPreset(null);
                       }
-                    }} className="flex-1">
-                      설정 적용
+                    }} className="flex-1 bg-emerald-200 hover:bg-emerald-300 text-emerald-800">
+                      이름 적용
                     </Button>
                   </div>
                 </div>
@@ -556,9 +556,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div className="flex justify-between items-center">
                 <div className="flex flex-col">
-                  <span className="text-sm">검색창 유지</span>
+                  <span className="text-sm">{settings.검색창?.유지 ? "검색창 유지" : "팝업창 모드"}</span>
                   <span className="text-xs text-gray-500">
-                    {settings.검색창?.유지 ? "검색 후에도 계속 표시" : "검색 후 1초 뒤 자동 숨김"}
+                    {settings.검색창?.유지 ? "" : "상단에 검색 아이콘"}
                   </span>
                 </div>
                 <Switch

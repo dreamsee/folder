@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -42,6 +42,9 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [folderSelectorOpen, setFolderSelectorOpen] = useState(false);
   const [selectedVideoForFolder, setSelectedVideoForFolder] = useState<YoutubeVideo | null>(null);
+  
+  // 검색 입력란 ref
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 검색을 통한 영상 찾기
   const handleSearch = async (pageToken?: string) => {
@@ -298,6 +301,16 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     }
   }, [filterMode, searchResults, watchedSortOrder]);
   
+  // 팝업 모드일 때 자동으로 검색 입력란에 포커스
+  useEffect(() => {
+    if (isPopup && searchInputRef.current) {
+      // 약간의 딜레이를 두어 DOM이 완전히 렌더링된 후 포커스
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+    }
+  }, [isPopup]);
+  
   // 자동 숨김 모드에서의 표시/숨김 처리
   const shouldShow = !autoHide || isVisible || isHovering;
   
@@ -395,6 +408,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       {/* 검색 입력 */}
       <div className="flex gap-2 mb-3">
         <Input
+          ref={searchInputRef}
           type="text"
           placeholder="YouTube 영상 검색..."
           value={searchQuery}
