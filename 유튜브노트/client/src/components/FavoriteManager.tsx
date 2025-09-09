@@ -26,12 +26,16 @@ interface FavoriteManagerProps {
   isOpen: boolean;
   onClose: () => void;
   onVideoSelect: (videoId: string) => void;
+  currentVideoId?: string;
+  showNotification?: (message: string, type: "info" | "success" | "warning" | "error") => void;
 }
 
 const FavoriteManager: React.FC<FavoriteManagerProps> = ({
   isOpen,
   onClose,
-  onVideoSelect
+  onVideoSelect,
+  currentVideoId,
+  showNotification
 }) => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [favorites, setFavorites] = useState<FavoriteVideo[]>([]);
@@ -78,6 +82,41 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
       newSelected.add(videoId);
     }
     setSelectedVideos(newSelected);
+  };
+
+  // 현재 영상을 즐겨찾기에 추가
+  const addCurrentVideoToFavorites = async () => {
+    if (!currentVideoId) return;
+    
+    // 이미 즐겨찾기에 있는지 확인
+    const favoritesData = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
+    if (favoritesData[currentVideoId]) {
+      showNotification?.('이미 즐겨찾기에 추가된 영상입니다.', 'info');
+      return;
+    }
+
+    try {
+      // YouTube API로 영상 정보 가져오기
+      const response = await fetch(`/api/youtube/video-info?videoId=${currentVideoId}`);
+      const videoData = await response.json();
+      
+      const favoriteVideo: FavoriteVideo = {
+        videoId: currentVideoId,
+        title: videoData.title || '제목 없음',
+        channelTitle: videoData.channelTitle || '채널 없음',
+        thumbnail: videoData.thumbnail || '',
+        folderId: null,
+        addedAt: new Date().toISOString()
+      };
+
+      favoritesData[currentVideoId] = favoriteVideo;
+      localStorage.setItem('videoFavorites', JSON.stringify(favoritesData));
+      loadData();
+      showNotification?.('즐겨찾기에 추가되었습니다.', 'success');
+    } catch (error) {
+      console.error('Failed to add video to favorites:', error);
+      showNotification?.('즐겨찾기 추가에 실패했습니다.', 'error');
+    }
   };
 
   // 즐겨찾기에서 제거
@@ -173,15 +212,39 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
         </DialogHeader>
         
         {favorites.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            저장된 즐겨찾기가 없습니다.
+          <div className="text-center py-8">
+            <div className="text-gray-500 mb-4">
+              저장된 즐겨찾기가 없습니다.
+            </div>
+            {currentVideoId && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={addCurrentVideoToFavorites}
+                className="text-xs"
+              >
+                현재 영상 추가
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
             {/* 상단 버튼 */}
             <div className="flex justify-between items-center">
-              <div className="text-sm text-gray-600">
-                총 {favorites.length}개 영상
+              <div className="flex items-center gap-3">
+                <div className="text-sm text-gray-600">
+                  총 {favorites.length}개 영상
+                </div>
+                {currentVideoId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={addCurrentVideoToFavorites}
+                    className="text-xs"
+                  >
+                    현재 영상 추가
+                  </Button>
+                )}
               </div>
               <div className="flex gap-2">
                 {editMode && selectedVideos.size > 0 && (

@@ -330,6 +330,387 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // 관련 영상 API 엔드포인트
+  app.get("/api/youtube/related", async (req, res) => {
+    try {
+      const videoId = req.query.videoId as string;
+      const direction = req.query.direction as 'prev' | 'next';
+      
+      if (!videoId || !direction) {
+        return res.status(400).json({ message: "videoId와 direction이 필요합니다." });
+      }
+
+      if (!apiKey) {
+        // 목업 데이터 반환
+        return res.json({
+          videoId: `related_${direction}_${Date.now()}`,
+          title: `${direction === 'next' ? '다음' : '이전'} 관련영상 (목업)`
+        });
+      }
+
+      // 현재 영상 정보 가져오기
+      const videoInfoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+      const videoResponse = await fetch(videoInfoUrl);
+      const videoData = await videoResponse.json() as any;
+      
+      if (!videoData.items?.[0]) {
+        return res.status(404).json({ message: "영상을 찾을 수 없습니다." });
+      }
+
+      const currentVideo = videoData.items[0];
+      const channelId = currentVideo.snippet.channelId;
+      
+      // 관련 영상 검색 (같은 채널의 다른 영상들)
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=relevance&maxResults=10&key=${apiKey}`;
+      const searchResponse = await fetch(searchUrl);
+      const searchData = await searchResponse.json() as any;
+
+      if (!searchData.items || searchData.items.length === 0) {
+        return res.status(404).json({ message: "관련 영상을 찾을 수 없습니다." });
+      }
+
+      // 현재 영상 제외하고 첫 번째 영상 반환
+      const relatedVideo = searchData.items.find((item: any) => item.id.videoId !== videoId);
+      
+      if (!relatedVideo) {
+        return res.status(404).json({ message: "관련 영상을 찾을 수 없습니다." });
+      }
+
+      return res.json({
+        videoId: relatedVideo.id.videoId,
+        title: relatedVideo.snippet.title,
+        thumbnail: relatedVideo.snippet.thumbnails.medium.url,
+        channelTitle: relatedVideo.snippet.channelTitle
+      });
+    } catch (error) {
+      console.error("관련 영상 API 에러:", error);
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
+  // 같은 채널 영상 API 엔드포인트
+  app.get("/api/youtube/channel", async (req, res) => {
+    try {
+      const videoId = req.query.videoId as string;
+      const direction = req.query.direction as 'prev' | 'next';
+      
+      if (!videoId || !direction) {
+        return res.status(400).json({ message: "videoId와 direction이 필요합니다." });
+      }
+
+      if (!apiKey) {
+        // 목업 데이터 반환
+        return res.json({
+          videoId: `channel_${direction}_${Date.now()}`,
+          title: `${direction === 'next' ? '다음' : '이전'} 채널영상 (목업)`
+        });
+      }
+
+      // 현재 영상 정보 가져오기
+      const videoInfoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+      const videoResponse = await fetch(videoInfoUrl);
+      const videoData = await videoResponse.json() as any;
+      
+      if (!videoData.items?.[0]) {
+        return res.status(404).json({ message: "영상을 찾을 수 없습니다." });
+      }
+
+      const currentVideo = videoData.items[0];
+      const channelId = currentVideo.snippet.channelId;
+      
+      // 채널의 모든 영상 가져오기 (업로드 날짜 순)
+      const order = direction === 'next' ? 'date' : 'date'; // 실제로는 더 복잡한 로직 필요
+      const channelUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=${order}&maxResults=50&key=${apiKey}`;
+      const channelResponse = await fetch(channelUrl);
+      const channelData = await channelResponse.json() as any;
+
+      if (!channelData.items || channelData.items.length === 0) {
+        return res.status(404).json({ message: "채널 영상을 찾을 수 없습니다." });
+      }
+
+      // 현재 영상의 인덱스 찾기
+      const currentIndex = channelData.items.findIndex((item: any) => item.id.videoId === videoId);
+      let targetIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+      
+      if (targetIndex < 0 || targetIndex >= channelData.items.length) {
+        return res.status(404).json({ message: `${direction === 'next' ? '다음' : '이전'} 영상을 찾을 수 없습니다.` });
+      }
+
+      const targetVideo = channelData.items[targetIndex];
+      
+      return res.json({
+        videoId: targetVideo.id.videoId,
+        title: targetVideo.snippet.title,
+        thumbnail: targetVideo.snippet.thumbnails.medium.url,
+        channelTitle: targetVideo.snippet.channelTitle
+      });
+    } catch (error) {
+      console.error("채널 영상 API 에러:", error);
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
+  // 즐겨찾기 영상 API 엔드포인트
+  app.get("/api/favorites", async (req, res) => {
+    try {
+      const currentVideoId = req.query.currentVideoId as string;
+      const direction = req.query.direction as 'prev' | 'next';
+      
+      if (!currentVideoId || !direction) {
+        return res.status(400).json({ message: "currentVideoId와 direction이 필요합니다." });
+      }
+
+      // 실제로는 사용자별 즐겨찾기 목록을 데이터베이스에서 가져와야 함
+      // 현재는 목업 데이터로 구현
+      const mockFavorites = [
+        { videoId: "dQw4w9WgXcQ", title: "Rick Astley - Never Gonna Give You Up" },
+        { videoId: "3JZ_D3ELwOQ", title: "Sample Video 1" },
+        { videoId: "oHg5SJYRHA0", title: "Sample Video 2" },
+        currentVideoId,
+        { videoId: "ZZ5LpwO-An4", title: "Sample Video 3" },
+      ];
+
+      const currentIndex = mockFavorites.findIndex(item => 
+        typeof item === 'string' ? item === currentVideoId : item.videoId === currentVideoId
+      );
+
+      if (currentIndex === -1) {
+        return res.status(404).json({ message: "현재 영상이 즐겨찾기에 없습니다." });
+      }
+
+      const targetIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+      
+      if (targetIndex < 0 || targetIndex >= mockFavorites.length) {
+        return res.status(404).json({ message: `${direction === 'next' ? '다음' : '이전'} 즐겨찾기 영상을 찾을 수 없습니다.` });
+      }
+
+      const targetVideo = mockFavorites[targetIndex];
+      const videoId = typeof targetVideo === 'string' ? targetVideo : targetVideo.videoId;
+      
+      if (!apiKey) {
+        return res.json({
+          videoId,
+          title: `즐겨찾기 ${direction === 'next' ? '다음' : '이전'} 영상 (목업)`
+        });
+      }
+
+      // 실제 영상 정보 가져오기
+      const videoInfoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+      const videoResponse = await fetch(videoInfoUrl);
+      const videoData = await videoResponse.json() as any;
+      
+      if (!videoData.items?.[0]) {
+        return res.status(404).json({ message: "즐겨찾기 영상 정보를 가져올 수 없습니다." });
+      }
+
+      const video = videoData.items[0];
+      
+      return res.json({
+        videoId: video.id,
+        title: video.snippet.title,
+        thumbnail: video.snippet.thumbnails.medium.url,
+        channelTitle: video.snippet.channelTitle
+      });
+    } catch (error) {
+      console.error("즐겨찾기 영상 API 에러:", error);
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
+  // 영상 정보 조회 API (미리보기용)
+  app.get("/api/youtube/video-info", async (req, res) => {
+    try {
+      const videoId = req.query.videoId as string;
+      
+      if (!videoId) {
+        return res.status(400).json({ message: "videoId가 필요합니다." });
+      }
+
+      if (!apiKey) {
+        return res.json({
+          title: `영상 정보 (목업) - ${videoId}`,
+          thumbnail: `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+        });
+      }
+
+      const videoInfoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+      const response = await fetch(videoInfoUrl);
+      const data = await response.json() as any;
+      
+      if (!data.items?.[0]) {
+        return res.status(404).json({ message: "영상을 찾을 수 없습니다." });
+      }
+
+      const video = data.items[0];
+      
+      return res.json({
+        title: video.snippet.title,
+        thumbnail: video.snippet.thumbnails.medium.url
+      });
+    } catch (error) {
+      console.error("영상 정보 API 에러:", error);
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
+  // 관련 영상 목록 API (미리보기용)
+  app.get("/api/youtube/related-list", async (req, res) => {
+    try {
+      const videoId = req.query.videoId as string;
+      const count = parseInt(req.query.count as string) || 10;
+      
+      if (!videoId) {
+        return res.status(400).json({ message: "videoId가 필요합니다." });
+      }
+
+      if (!apiKey) {
+        // 목업 데이터 반환
+        const mockVideos = [];
+        for (let i = 0; i < count; i++) {
+          mockVideos.push({
+            videoId: `related_${i}_${Date.now()}`,
+            title: `관련영상 ${i + 1} (목업)`,
+            thumbnail: `https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg`,
+            channelTitle: `채널 ${i + 1}`
+          });
+        }
+        return res.json({ videos: mockVideos });
+      }
+
+      // 실제 관련 영상 가져오기
+      const videoInfoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+      const videoResponse = await fetch(videoInfoUrl);
+      const videoData = await videoResponse.json() as any;
+      
+      if (!videoData.items?.[0]) {
+        return res.status(404).json({ message: "영상을 찾을 수 없습니다." });
+      }
+
+      const currentVideo = videoData.items[0];
+      const channelId = currentVideo.snippet.channelId;
+      
+      const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=relevance&maxResults=${count}&key=${apiKey}`;
+      const searchResponse = await fetch(searchUrl);
+      const searchData = await searchResponse.json() as any;
+
+      const videos = searchData.items?.filter((item: any) => item.id.videoId !== videoId).map((item: any) => ({
+        videoId: item.id.videoId,
+        title: item.snippet.title,
+        thumbnail: item.snippet.thumbnails.medium.url,
+        channelTitle: item.snippet.channelTitle
+      })) || [];
+
+      return res.json({ videos: videos.slice(0, count) });
+    } catch (error) {
+      console.error("관련 영상 목록 API 에러:", error);
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
+  // 같은 채널 영상 목록 API (미리보기용)
+  app.get("/api/youtube/channel-list", async (req, res) => {
+    try {
+      const videoId = req.query.videoId as string;
+      const count = parseInt(req.query.count as string) || 10;
+      
+      if (!videoId) {
+        return res.status(400).json({ message: "videoId가 필요합니다." });
+      }
+
+      if (!apiKey) {
+        // 목업 데이터 반환
+        const mockVideos = [];
+        for (let i = 0; i < count; i++) {
+          mockVideos.push({
+            videoId: `channel_${i}_${Date.now()}`,
+            title: `채널영상 ${i + 1} (목업)`,
+            thumbnail: `https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg`,
+            channelTitle: `같은 채널`
+          });
+        }
+        return res.json({ videos: mockVideos });
+      }
+
+      // 실제 채널 영상 목록 가져오기
+      const videoInfoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`;
+      const videoResponse = await fetch(videoInfoUrl);
+      const videoData = await videoResponse.json() as any;
+      
+      if (!videoData.items?.[0]) {
+        return res.status(404).json({ message: "영상을 찾을 수 없습니다." });
+      }
+
+      const currentVideo = videoData.items[0];
+      const channelId = currentVideo.snippet.channelId;
+      
+      const channelUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&order=date&maxResults=${count + 5}&key=${apiKey}`;
+      const channelResponse = await fetch(channelUrl);
+      const channelData = await channelResponse.json() as any;
+
+      const videos = channelData.items?.filter((item: any) => item.id.videoId !== videoId).map((item: any) => ({
+        videoId: item.id.videoId,
+        title: item.snippet.title,
+        thumbnail: item.snippet.thumbnails.medium.url,
+        channelTitle: item.snippet.channelTitle
+      })) || [];
+
+      return res.json({ videos: videos.slice(0, count) });
+    } catch (error) {
+      console.error("채널 영상 목록 API 에러:", error);
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
+  // 즐겨찾기 영상 목록 API (미리보기용)
+  app.get("/api/favorites-list", async (req, res) => {
+    try {
+      const currentVideoId = req.query.currentVideoId as string;
+      const count = parseInt(req.query.count as string) || 10;
+      
+      if (!currentVideoId) {
+        return res.status(400).json({ message: "currentVideoId가 필요합니다." });
+      }
+
+      // 실제로는 사용자별 즐겨찾기 목록을 데이터베이스에서 가져와야 함
+      const mockFavorites = [
+        "dQw4w9WgXcQ", "3JZ_D3ELwOQ", "oHg5SJYRHA0", "ZZ5LpwO-An4",
+        "9bZkp7q19f0", "2vjPBrBU-TM", "kJQP7kiw5Fk", "L_jWHffIx5E",
+        "fJ9rUzIMcZQ", "QtXby3twMmI"
+      ];
+
+      const filteredFavorites = mockFavorites.filter(id => id !== currentVideoId).slice(0, count);
+      
+      if (!apiKey) {
+        // 목업 데이터 반환
+        const mockVideos = filteredFavorites.map((id, index) => ({
+          videoId: id,
+          title: `즐겨찾기 영상 ${index + 1} (목업)`,
+          thumbnail: `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
+          channelTitle: `즐겨찾기 채널 ${index + 1}`
+        }));
+        return res.json({ videos: mockVideos });
+      }
+
+      // 실제 영상 정보들 일괄 가져오기
+      const videoIds = filteredFavorites.join(',');
+      const videoInfoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoIds}&key=${apiKey}`;
+      const response = await fetch(videoInfoUrl);
+      const data = await response.json() as any;
+      
+      const videos = data.items?.map((video: any) => ({
+        videoId: video.id,
+        title: video.snippet.title,
+        thumbnail: video.snippet.thumbnails.medium.url,
+        channelTitle: video.snippet.channelTitle
+      })) || [];
+
+      return res.json({ videos });
+    } catch (error) {
+      console.error("즐겨찾기 목록 API 에러:", error);
+      return res.status(500).json({ message: "서버 오류가 발생했습니다." });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

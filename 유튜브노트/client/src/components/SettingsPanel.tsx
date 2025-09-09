@@ -582,7 +582,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm">커스텀 바</span>
-                  <span className="text-xs text-gray-500">타임스탬프 하이라이트가 포함된 진행바</span>
+                  <span className="text-xs text-gray-500">타임스탬프 하이라이트 표시</span>
                 </div>
                 <Switch
                   checked={settings.바설정?.커스텀바 ?? true}
@@ -595,7 +595,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm">챕터 바</span>
-                  <span className="text-xs text-gray-500">영상의 챕터별 구간을 표시하는 바</span>
+                  <span className="text-xs text-gray-500">영상의 챕터별 구간을 표시</span>
                 </div>
                 <Switch
                   checked={settings.바설정?.챕터바 ?? true}
@@ -611,7 +611,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           {/* 재생 컨트롤 설정 */}
           <div className="space-y-3">
             <div className="flex justify-between items-center pb-2">
-              <h3 className="text-sm font-medium">재생 컨트롤</h3>
+              <div className="flex flex-col">
+                <h3 className="text-sm font-medium">재생 컨트롤</h3>
+                <span className="text-xs text-gray-500">(영상 건너뛰기)</span>
+              </div>
               <Switch
                 checked={settings.재생컨트롤.전체표시}
                 onCheckedChange={(값) => 설정업데이트("재생컨트롤", "전체표시", 값)}

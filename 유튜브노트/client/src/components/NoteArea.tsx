@@ -3,12 +3,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTime } from "@/lib/youtubeUtils";
-import { Clock, InfoIcon, Type, FileText, Circle, Square } from "lucide-react";
+import { Clock, InfoIcon, Type, FileText, Circle, Square, Star } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { OverlayData } from "./TextOverlay";
 import OverlayInput from "./OverlayInput";
 import RecordingSessionList from "./RecordingSessionList";
 import TimestampEditModal from "./TimestampEditModal";
+import TimeSkipControls from "./TimeSkipControls";
 import { UISettings } from "./SettingsPanel";
 
 // 녹화 관련 인터페이스
@@ -89,6 +90,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
 
   // 녹화 상태
   const [녹화중, set녹화중] = useState(false);
+  
+  // 재생컨트롤 모드 상태
+  const [controlMode, setControlMode] = useState<'normal' | 'timeSkip'>('normal');
   const [현재세션, set현재세션] = useState<string | null>(null);
   
   // 현재 플레이어 상태 추적 (props에 없어서 직접 추적)
@@ -119,6 +123,52 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   
   // 노트 텍스트 상태 (localStorage 연동)
   const [noteText, setNoteText] = useState("");
+
+  // 즐겨찾기 상태
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [isFavorite, setIsFavorite] = useState(false);
+
+  // localStorage에서 즐겨찾기 목록 로드
+  useEffect(() => {
+    const savedFavorites = localStorage.getItem('youtube-favorites');
+    if (savedFavorites) {
+      try {
+        const favList = JSON.parse(savedFavorites);
+        setFavorites(favList);
+      } catch (error) {
+        console.error('즐겨찾기 목록 로드 실패:', error);
+      }
+    }
+  }, []);
+
+  // 현재 영상의 즐겨찾기 상태 확인
+  useEffect(() => {
+    if (currentVideoId) {
+      setIsFavorite(favorites.includes(currentVideoId));
+    }
+  }, [currentVideoId, favorites]);
+
+  // 즐겨찾기 추가/제거
+  const toggleFavorite = () => {
+    if (!currentVideoId) {
+      showNotification('영상 ID를 찾을 수 없습니다.', 'error');
+      return;
+    }
+
+    let newFavorites;
+    if (isFavorite) {
+      // 즐겨찾기에서 제거
+      newFavorites = favorites.filter(id => id !== currentVideoId);
+      showNotification('즐겨찾기에서 제거되었습니다.', 'info');
+    } else {
+      // 즐겨찾기에 추가
+      newFavorites = [...favorites, currentVideoId];
+      showNotification('즐겨찾기에 추가되었습니다.', 'success');
+    }
+
+    setFavorites(newFavorites);
+    localStorage.setItem('youtube-favorites', JSON.stringify(newFavorites));
+  };
 
   // localStorage에서 노트 불러오기 (YouTube ID 기반)
   useEffect(() => {
@@ -780,32 +830,40 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             {/* 메인 드래그 컨트롤 */}
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray-700">재생 컨트롤</p>
-                <div className="flex items-center space-x-1 text-sm text-gray-600 font-mono">
+                <div className="flex-1"></div>
+                <button
+                  onClick={() => setControlMode(controlMode === 'normal' ? 'timeSkip' : 'normal')}
+                  className="text-sm font-medium text-gray-700 hover:text-blue-600 cursor-pointer transition-colors"
+                >
+                  {controlMode === 'normal' ? '재생 컨트롤' : '영상 건너뛰기'}
+                </button>
+                <div className="flex-1 flex items-center justify-end space-x-1 text-sm text-gray-600 font-mono">
                   <span>{Math.round(volume || 100)}%</span>
                   <span>•</span>
                   <span>{(currentRate || 1.0).toFixed(2)}x</span>
                 </div>
               </div>
 
-              <div
-                ref={controlRef}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                className={`
-                  relative w-full h-16 bg-gradient-to-r from-blue-50 to-red-50 
-                  border-2 border-gray-200 rounded-lg cursor-pointer
-                  ${isDragging ? 'border-blue-400 bg-blue-100' : 'hover:border-gray-300'}
-                  ${!isPlayerReady ? 'opacity-50 cursor-not-allowed' : ''}
-                  select-none touch-none
-                `}
-                style={{
-                  background: isDragging 
-                    ? 'linear-gradient(to right, #dbeafe 0%, #fef3c7 50%, #fecaca 100%)'
-                    : 'linear-gradient(to right, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%)'
-                }}
-              >
+              {/* 일반 모드: 드래그 컨트롤 */}
+              {controlMode === 'normal' && (
+                <div
+                  ref={controlRef}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  className={`
+                    relative w-full h-16 bg-gradient-to-r from-blue-50 to-red-50 
+                    border-2 border-gray-200 rounded-lg cursor-pointer
+                    ${isDragging ? 'border-blue-400 bg-blue-100' : 'hover:border-gray-300'}
+                    ${!isPlayerReady ? 'opacity-50 cursor-not-allowed' : ''}
+                    select-none touch-none
+                  `}
+                  style={{
+                    background: isDragging 
+                      ? 'linear-gradient(to right, #dbeafe 0%, #fef3c7 50%, #fecaca 100%)'
+                      : 'linear-gradient(to right, #f8fafc 0%, #f1f5f9 50%, #f8fafc 100%)'
+                  }}
+                >
                 {/* 시각적 피드백 */}
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
@@ -832,7 +890,17 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                   className="absolute bottom-0 left-0 w-full bg-green-200 opacity-30 transition-all duration-150"
                   style={{ height: `${volume || 100}%` }}
                 />
-              </div>
+                </div>
+              )}
+
+              {/* 시간 건너뛰기 모드 */}
+              {controlMode === 'timeSkip' && (
+                <TimeSkipControls
+                  player={player}
+                  isPlayerReady={isPlayerReady}
+                  showNotification={showNotification}
+                />
+              )}
             </div>
 
             {/* 세부 컨트롤 바 */}

@@ -378,6 +378,8 @@ const HomePage = () => {
       <FavoriteManager
         isOpen={isFavoritesOpen}
         onClose={() => setIsFavoritesOpen(false)}
+        currentVideoId={currentVideoId}
+        showNotification={showNotification}
         onVideoSelect={(videoId: string) => {
           // 즐겨찾기에서 영상 정보 가져오기
           const favoritesData = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
