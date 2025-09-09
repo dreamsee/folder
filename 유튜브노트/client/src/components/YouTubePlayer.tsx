@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import TextOverlay, { OverlayData, Coordinates } from "./TextOverlay";
+import ChapterBar from "./ChapterBar";
+import { parseChapters, parseDuration, Chapter } from "@/utils/chapterParser";
 
 interface YouTubePlayerProps {
   player: any | null; // YT.Player 대신 any 사용
@@ -20,6 +22,10 @@ interface YouTubePlayerProps {
     zoom: number;
     size: number;
   };
+  바설정?: {
+    커스텀바: boolean;
+    챕터바: boolean;
+  };
 }
 
 const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
@@ -35,12 +41,15 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   onOverlayPositionChange,
   isLocked = false,
   magnifierSettings = { enabled: true, zoom: 2.0, size: 2 },
+  바설정 = { 커스텀바: true, 챕터바: true },
 }) => {
   const [availableRates, setAvailableRates] = useState<number[]>([]);
   const [currentRate, setCurrentRate] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [isLoadingChapters, setIsLoadingChapters] = useState(false);
   
   // 터치 홀드 확대 상태
   const [isTouchHolding, setIsTouchHolding] = useState(false);
@@ -238,6 +247,48 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     };
   }, [player]);
 
+  // 챕터 데이터 가져오기
+  const fetchChapters = async (videoId: string) => {
+    if (!videoId || !바설정?.챕터바) {
+      setChapters([]);
+      return;
+    }
+
+    setIsLoadingChapters(true);
+    try {
+      const response = await fetch(`/api/youtube/video-info/${videoId}`);
+      if (response.ok) {
+        const videoInfo = await response.json();
+        const videoDuration = typeof videoInfo.duration === 'string' 
+          ? parseDuration(videoInfo.duration) 
+          : duration; // 현재 플레이어의 duration 사용
+
+        const parsedChapters = parseChapters(videoInfo.description, videoDuration);
+        setChapters(parsedChapters);
+        
+        if (parsedChapters.length > 0) {
+          console.log(`${parsedChapters.length}개의 챕터를 찾았습니다.`);
+        }
+      } else {
+        console.error('영상 정보를 가져올 수 없습니다.');
+        setChapters([]);
+      }
+    } catch (error) {
+      console.error('챕터 로딩 에러:', error);
+      setChapters([]);
+    } finally {
+      setIsLoadingChapters(false);
+    }
+  };
+
+  // 챕터 클릭 핸들러
+  const handleChapterClick = (seconds: number) => {
+    if (player && isPlayerReady) {
+      player.seekTo(seconds, true);
+      player.playVideo();
+    }
+  };
+
   // 모바일 감지
   useEffect(() => {
     const checkMobile = () => {
@@ -314,6 +365,13 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       container.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [isMobile, isLocked, isTouchHolding]);
+
+  // 영상 변경 시 챕터 정보 가져오기
+  useEffect(() => {
+    if (currentVideoId && duration > 0) {
+      fetchChapters(currentVideoId);
+    }
+  }, [currentVideoId, duration, 바설정?.챕터바]);
 
   // 현재 시간과 영상 길이 업데이트 및 시청 진행률 저장
   useEffect(() => {
@@ -419,7 +477,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         </div>
       
       {/* 커스텀 진행바 (타임스탬프 하이라이트 포함) */}
-      {isPlayerReady && duration > 0 && (
+      {isPlayerReady && duration > 0 && 바설정?.커스텀바 && (
         <div className="mt-2 space-y-1">
           <div 
             className="relative w-full h-3 bg-gray-200 rounded-full cursor-pointer"
@@ -483,6 +541,17 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 챕터 바 */}
+      {isPlayerReady && duration > 0 && 바설정?.챕터바 && chapters.length > 0 && (
+        <div className="mt-2">
+          <ChapterBar
+            chapters={chapters}
+            currentTime={currentTime}
+            onChapterClick={handleChapterClick}
+          />
         </div>
       )}
       </div>

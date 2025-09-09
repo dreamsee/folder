@@ -22,6 +22,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
   console.log("API KEY 첫 10자리:", apiKey.substring(0, 10));
   console.log("====================");
 
+  // YouTube 영상 상세 정보 API 엔드포인트 (설명란 포함)
+  app.get("/api/youtube/video-info/:videoId", async (req, res) => {
+    try {
+      const videoId = req.params.videoId as string;
+      
+      console.log("영상 상세 정보 요청:", videoId);
+      console.log("API 키 존재 여부:", !!apiKey);
+
+      if (!videoId) {
+        return res.status(400).json({ message: "영상 ID가 필요합니다." });
+      }
+
+      if (!apiKey) {
+        console.error("YouTube API 키가 설정되지 않음 - 목업 데이터 반환");
+        // 목업 데이터 반환 (개발용)
+        return res.json({ 
+          videoId,
+          title: "목업 영상 제목",
+          description: "0:00 인트로\n2:30 메인 내용 설명\n8:15 결론 및 마무리\n10:00 엔딩",
+          duration: 600 // 10분
+        });
+      }
+
+      // YouTube API 호출 - 영상 상세 정보
+      const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`;
+      
+      console.log("API 호출 URL:", apiUrl.replace(apiKey, "***"));
+
+      const response = await fetch(apiUrl);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("YouTube API 에러 응답:", response.status, errorText);
+        
+        return res.status(response.status).json({
+          message: "YouTube API 오류가 발생했습니다.",
+          error: errorText
+        });
+      }
+
+      const data = await response.json() as any;
+      console.log("API 응답 데이터:", data);
+
+      if (!data.items || data.items.length === 0) {
+        return res.status(404).json({ message: "영상을 찾을 수 없습니다." });
+      }
+
+      const video = data.items[0];
+      const videoInfo = {
+        videoId: video.id,
+        title: video.snippet.title,
+        description: video.snippet.description || "",
+        duration: video.contentDetails.duration, // PT4M13S 형식
+        channelTitle: video.snippet.channelTitle
+      };
+
+      return res.json(videoInfo);
+    } catch (error) {
+      console.error("YouTube 영상 정보 에러:", error);
+      console.error("에러 스택:", error instanceof Error ? error.stack : error);
+      return res.status(500).json({ 
+        message: "서버 오류가 발생했습니다.",
+        error: error instanceof Error ? error.message : "Unknown error"
+      });
+    }
+  });
+
   // YouTube 검색 API 엔드포인트
   app.get("/api/youtube/search", async (req, res) => {
     try {

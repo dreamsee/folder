@@ -46,6 +46,7 @@ const HomePage = () => {
   const [uiSettings, setUiSettings] = useState<UISettings>({
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
     검색창: { 유지: true },
+    바설정: { 커스텀바: true, 챕터바: true },
     재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
@@ -314,6 +315,7 @@ const HomePage = () => {
           isLocked={isScreenLocked}
           magnifierSettings={magnifierSettings}
           setCurrentRate={setCurrentRate}
+          바설정={uiSettings.바설정}
         />
       </div>
 

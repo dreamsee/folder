@@ -18,6 +18,10 @@ export interface UISettings {
   검색창: {
     유지: boolean;
   };
+  바설정: {
+    커스텀바: boolean;
+    챕터바: boolean;
+  };
   재생컨트롤: {
     전체표시: boolean;
     볼륨: boolean;
@@ -193,6 +197,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const 기본설정: UISettings = {
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
     검색창: { 유지: true },
+    바설정: { 커스텀바: true, 챕터바: true },
     재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
@@ -266,6 +271,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         새설정 = {
           상단부: { 제목표시: true, 부제목표시: true, 부제목내용: settings.상단부?.부제목내용 || "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
           검색창: { 유지: true },
+          바설정: { 커스텀바: true, 챕터바: true },
           재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
           노트영역: { 표시: true },
           화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
@@ -564,6 +570,39 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <Switch
                   checked={settings.검색창?.유지 ?? true}
                   onCheckedChange={(값) => 설정업데이트("검색창", "유지", 값)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 바 설정 */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium pb-2">바 설정</h3>
+            <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-sm">커스텀 바</span>
+                  <span className="text-xs text-gray-500">타임스탬프 하이라이트가 포함된 진행바</span>
+                </div>
+                <Switch
+                  checked={settings.바설정?.커스텀바 ?? true}
+                  onCheckedChange={(값) => handleSettingChange("바설정", {
+                    ...settings.바설정,
+                    커스텀바: 값
+                  })}
+                />
+              </div>
+              <div className="flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="text-sm">챕터 바</span>
+                  <span className="text-xs text-gray-500">영상의 챕터별 구간을 표시하는 바</span>
+                </div>
+                <Switch
+                  checked={settings.바설정?.챕터바 ?? true}
+                  onCheckedChange={(값) => handleSettingChange("바설정", {
+                    ...settings.바설정,
+                    챕터바: 값
+                  })}
                 />
               </div>
             </div>
