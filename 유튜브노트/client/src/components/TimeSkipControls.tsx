@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Edit3, SkipForward, Settings } from "lucide-react";
+import { ChevronLeft, ChevronRight, Edit3, SkipForward, Settings, Play, Pause } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface TimeSkipControlsProps {
@@ -35,6 +35,7 @@ const TimeSkipControls: React.FC<TimeSkipControlsProps> = ({
   const [showPreview, setShowPreview] = useState(false); // 미리보기 패널 표시
   const [previewVideos, setPreviewVideos] = useState<any[]>([]); // 미리보기 영상 목록
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0); // 현재 미리보기 인덱스
+  const [isPlaying, setIsPlaying] = useState(false); // 재생 상태
 
   // localStorage에서 설정 불러오기
   useEffect(() => {
@@ -53,6 +54,45 @@ const TimeSkipControls: React.FC<TimeSkipControlsProps> = ({
   useEffect(() => {
     localStorage.setItem('timeSkipSettings', JSON.stringify(settings));
   }, [settings]);
+
+  // 플레이어 상태 추적
+  useEffect(() => {
+    if (player && isPlayerReady) {
+      const checkPlayerState = () => {
+        try {
+          const state = player.getPlayerState();
+          setIsPlaying(state === 1); // 1 = playing, 2 = paused
+        } catch (error) {
+          console.error('플레이어 상태 확인 실패:', error);
+        }
+      };
+
+      // 초기 상태 확인
+      checkPlayerState();
+
+      // 주기적으로 상태 확인
+      const interval = setInterval(checkPlayerState, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [player, isPlayerReady]);
+
+  // 일시정지/재생 토글
+  const togglePlayPause = () => {
+    if (!player || !isPlayerReady) return;
+    
+    try {
+      if (isPlaying) {
+        player.pauseVideo();
+        showNotification('일시정지', 'info');
+      } else {
+        player.playVideo();
+        showNotification('재생', 'info');
+      }
+    } catch (error) {
+      console.error('재생/일시정지 실패:', error);
+      showNotification('재생 제어에 실패했습니다', 'error');
+    }
+  };
 
   // 시간 건너뛰기 실행
   const handleTimeSkip = (seconds: number) => {
@@ -364,6 +404,21 @@ const TimeSkipControls: React.FC<TimeSkipControlsProps> = ({
               다음
               <ChevronRight className="w-3 h-3 ml-1" />
             </>
+          )}
+        </Button>
+
+        {/* 일시정지/재생 버튼 */}
+        <Button
+          onClick={togglePlayPause}
+          disabled={!isPlayerReady}
+          variant="outline"
+          size="sm"
+          className="flex-shrink-0 h-8 px-3"
+        >
+          {isPlaying ? (
+            <Pause className="w-3 h-3" />
+          ) : (
+            <Play className="w-3 h-3" />
           )}
         </Button>
 
