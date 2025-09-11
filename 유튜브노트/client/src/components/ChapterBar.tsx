@@ -17,6 +17,7 @@ const ChapterBar: React.FC<ChapterBarProps> = ({
 }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [chaptersPerPage, setChaptersPerPage] = useState(chapters.length); // 기본값: 전체 챕터 수
+  const [inputValue, setInputValue] = useState(chapters.length.toString()); // 입력 필드용 별도 상태
   const [pageWindowStart, setPageWindowStart] = useState(0); // 표시할 페이지 그룹의 시작 인덱스
   const [maxVisiblePages, setMaxVisiblePages] = useState(7); // 보일 수 있는 최대 페이지 수
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,6 +30,7 @@ const ChapterBar: React.FC<ChapterBarProps> = ({
   // 챕터 수가 변경되면 chaptersPerPage 기본값도 업데이트
   useEffect(() => {
     setChaptersPerPage(chapters.length);
+    setInputValue(chapters.length.toString());
   }, [chapters.length]);
 
   // 컨테이너 너비에 따라 보일 수 있는 최대 페이지 수 계산
@@ -254,12 +256,21 @@ const ChapterBar: React.FC<ChapterBarProps> = ({
             type="number"
             min="1"
             max={chapters.length}
-            value={chaptersPerPage}
+            value={inputValue}
             onChange={(e) => {
-              const 값 = parseInt(e.target.value) || chapters.length;
+              setInputValue(e.target.value); // 입력값 그대로 저장
+            }}
+            onBlur={(e) => {
+              const 값 = parseInt(e.target.value) || 1; // 빈 값이면 1로 처리
               const 제한값 = Math.min(Math.max(값, 1), chapters.length);
               setChaptersPerPage(제한값);
+              setInputValue(제한값.toString()); // 검증된 값으로 입력 필드 업데이트
               setCurrentPage(0); // 페이지 변경 시 첫 페이지로 이동
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.currentTarget.blur(); // Enter 키 시 blur 이벤트 발생
+              }
             }}
             className="w-12 px-1 py-0.5 text-sm text-center border border-gray-300 rounded"
           />

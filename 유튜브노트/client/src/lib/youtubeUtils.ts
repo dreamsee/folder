@@ -18,17 +18,18 @@ export function extractVideoId(url: string): string | null {
 }
 
 /**
- * 초를 HH:MM:SS 형식으로 변환
- * @param seconds 초
- * @returns HH:MM:SS 형식의 문자열
+ * 초를 HH:MM:SS.sss 형식으로 변환 (소수점 3자리까지)
+ * @param seconds 초 (소수점 포함)
+ * @returns HH:MM:SS.sss 형식의 문자열
  */
 export function formatTime(seconds: number): string {
-  seconds = Math.floor(seconds);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
+  const totalSeconds = Math.floor(seconds);
+  const milliseconds = Math.round((seconds - totalSeconds) * 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
 
-  return `${padZero(hours)}:${padZero(minutes)}:${padZero(secs)}`;
+  return `${padZero(hours)}:${padZero(minutes)}:${padZero(secs)}.${padThree(milliseconds)}`;
 }
 
 /**
@@ -38,6 +39,29 @@ export function formatTime(seconds: number): string {
  */
 function padZero(num: number): string {
   return num.toString().padStart(2, '0');
+}
+
+/**
+ * 3자리 숫자로 패딩하는 함수 (밀리초용)
+ * @param num 숫자
+ * @returns 3자리 문자열 (예: '005', '123')
+ */
+function padThree(num: number): string {
+  return num.toString().padStart(3, '0');
+}
+
+/**
+ * 초를 HH:MM:SS 형식으로 변환 (소수점 없이)
+ * @param seconds 초 (소수점 포함)
+ * @returns HH:MM:SS 형식의 문자열 (소수점 없음)
+ */
+export function formatTimeWithoutMilliseconds(seconds: number): string {
+  const totalSeconds = Math.floor(seconds);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const secs = totalSeconds % 60;
+
+  return `${padZero(hours)}:${padZero(minutes)}:${padZero(secs)}`;
 }
 
 /**

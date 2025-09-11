@@ -9,6 +9,7 @@ import { RecordingSession } from "@/components/RecordingMode";
 import SettingsPanel, { UISettings } from "@/components/SettingsPanel";
 import ScreenLock from "@/components/ScreenLock";
 import FavoriteManager from "@/components/FavoriteManager";
+import DebugLogPanel from "@/components/DebugLogPanel";
 // import { useToast } from "@/hooks/use-toast"; // 토스트 비활성화
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import { OverlayData, OverlayPosition } from "@/components/TextOverlay";
@@ -51,6 +52,7 @@ const HomePage = () => {
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
+    재생기본값: { defaultVolume: 100, defaultPlaybackRate: 1.0 },
   });
 
   // 즐겨찾기 관련 상태
@@ -58,6 +60,9 @@ const HomePage = () => {
   
   // 검색 팝업 상태
   const [isSearchPopupOpen, setIsSearchPopupOpen] = useState(false);
+
+  // 디버그 로그 패널 상태
+  const [isDebugLogOpen, setIsDebugLogOpen] = useState(false);
 
   // ESC 키로 팝업 닫기
   useEffect(() => {
@@ -316,6 +321,7 @@ const HomePage = () => {
           magnifierSettings={magnifierSettings}
           setCurrentRate={setCurrentRate}
           바설정={uiSettings.바설정}
+          currentTime={currentPlayTime}
         />
       </div>
 
@@ -407,6 +413,12 @@ const HomePage = () => {
             showNotification("영상을 로드했습니다.", "info");
           }
         }}
+      />
+
+      {/* 디버그 로그 패널 */}
+      <DebugLogPanel
+        isOpen={isDebugLogOpen}
+        onToggle={() => setIsDebugLogOpen(!isDebugLogOpen)}
       />
 
     </div>
