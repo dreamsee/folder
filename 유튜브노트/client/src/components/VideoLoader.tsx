@@ -57,7 +57,6 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     if (isInitialSearch) {
       setIsSearching(true);
       setSearchResults([]);
-      setFilteredResults([]);
       setNextPageToken(null);
     } else {
       setIsLoadingMore(true);
@@ -139,8 +138,6 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
 
   // 영상 선택해서 재생
   const handleVideoSelect = (video: YoutubeVideo) => {
-    console.log('[VideoLoader] 영상 선택:', video.videoId, video.title);
-    
     // 비디오 ID 먼저 설정 (플레이어 생성 트리거)
     setCurrentVideoId(video.videoId);
     setCurrentVideoInfo({
@@ -149,12 +146,11 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       thumbnailUrl: video.thumbnail,
     });
     
-    // 플레이어 준비 상태 확인만 하고, 실제 로드는 YouTubePlayer에서 처리
+    // 플레이어가 준비된 경우 바로 로드
     if (isPlayerReady && player) {
-      console.log('[VideoLoader] 플레이어 준비됨, 영상 변경됨');
+      player.loadVideoById(video.videoId);
       showNotification(`"${video.title}" 영상을 로드했습니다.`, "success");
     } else {
-      console.log('[VideoLoader] 플레이어 준비 안됨:', isPlayerReady, player);
       showNotification(`"${video.title}" 영상을 준비하고 있습니다.`, "info");
     }
     

@@ -26,7 +26,6 @@ interface YouTubePlayerProps {
     커스텀바: boolean;
     챕터바: boolean;
   };
-  currentTime?: number; // 현재 재생 시간 (HomePage에서 전달)
 }
 
 const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
@@ -43,7 +42,6 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   isLocked = false,
   magnifierSettings = { enabled: true, zoom: 2.0, size: 2 },
   바설정 = { 커스텀바: true, 챕터바: true },
-  currentTime: propCurrentTime = 0, // 외부에서 전달된 현재 시간
 }) => {
   const [availableRates, setAvailableRates] = useState<number[]>([]);
   const [currentRate, setCurrentRate] = useState(1);
@@ -121,20 +119,10 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
   }, [currentVideoId, player, setPlayer]);
 
-  // 영상 변경 시 세션 초기화 및 자동 로드/재생
+  // 영상 변경 시 세션 초기화
   useEffect(() => {
     setCurrentSessionId(null);
-    
-    // 플레이어가 준비되고 비디오 ID가 있으면 로드 및 재생
-    if (player && isPlayerReady && currentVideoId) {
-      console.log('[YouTubePlayer] currentVideoId 변경됨, 영상 로드 및 재생:', currentVideoId);
-      player.loadVideoById(currentVideoId);
-      // 로드 후 자동 재생 (시청 기록 업데이트를 위해)
-      setTimeout(() => {
-        player.playVideo();
-      }, 500);
-    }
-  }, [currentVideoId, player, isPlayerReady]);
+  }, [currentVideoId]);
 
   // 저장된 기본값 적용 함수
   const applyDefaultSettings = (player: any) => {
@@ -175,21 +163,26 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     // 저장된 기본값 적용
     applyDefaultSettings(event.target);
     
-    // 초기 로드는 useEffect에서 처리하므로 여기서는 하지 않음
-    console.log('[YouTubePlayer] onPlayerReady - 플레이어 준비 완료, currentVideoId:', currentVideoId);
+    // 비디오 ID가 있으면 즉시 로드
+    if (currentVideoId) {
+      try {
+        event.target.loadVideoById(currentVideoId);
+        showNotification("영상이 로드되었습니다.", "success");
+      } catch (error) {
+        console.error('비디오 로드 오류:', error);
+        showNotification("영상 로드 중 오류가 발생했습니다.", "error");
+      }
+    }
   };
 
   // 플레이어 상태 변경 이벤트 핸들러
   const onPlayerStateChange = (event: any) => {
-    console.log('[시청기록] 플레이어 상태 변경:', event.data, 'videoId:', currentVideoId);
     setPlayerState(event.data);
-    // 재생 상태 업데이트 (YT.PlayerState.PLAYING = 1)
-    setIsPlaying(event.data === 1);
+    // 재생 상태 업데이트
+    setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
     
     // 영상 재생 시작 시 시청 기록 관리 (단일 책임: 모든 시청 기록은 여기서만 관리)
-    // YT.PlayerState.PLAYING = 1
-    if (event.data === 1 && currentVideoId) {
-      console.log('[시청기록] 재생 시작 - 시청 기록 업데이트 시작');
+    if (event.data === window.YT.PlayerState.PLAYING && currentVideoId) {
       const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
       
       // 새로운 세션인지 확인 (영상 변경 또는 세션이 없는 경우)
@@ -230,7 +223,6 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       
       // 시청 기록 저장 (localStorage에 통합 저장)
       localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
-      console.log('[시청기록] 저장 완료:', currentVideoId, '시청 횟수:', watchHistory[currentVideoId].watchCount);
     }
   };
 

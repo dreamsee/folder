@@ -1,0 +1,597 @@
+/* 캐릭터 프로파일 시스템 스타일 */
+.캐릭터프로파일 {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+}
+
+/* 프로파일 선택기 */
+.프로파일선택기 {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.프로파일선택기 h2 {
+  margin-bottom: 20px;
+  color: #333;
+}
+
+.프로파일버튼그룹 {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.프로파일버튼그룹 button {
+  padding: 10px 20px;
+  border: 2px solid #ddd;
+  background: white;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 16px;
+}
+
+.프로파일버튼그룹 button:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
+.프로파일버튼그룹 button.활성 {
+  background: #4a90e2;
+  color: white;
+  border-color: #4a90e2;
+}
+
+/* 프로파일 컨테이너 */
+.프로파일컨테이너 {
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* 상세 프로파일 스타일 */
+.프로파일-상세 {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+}
+
+.캐릭터-헤더 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #eee;
+}
+
+.캐릭터-헤더 h2 {
+  margin: 0;
+  font-size: 28px;
+  color: #333;
+}
+
+.기본정보 {
+  display: flex;
+  gap: 15px;
+}
+
+.직업, .레벨 {
+  background: #f0f0f0;
+  padding: 5px 15px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+/* 체력/마나 바 */
+.체력마나바 {
+  margin-bottom: 30px;
+}
+
+.체력바, .마나바 {
+  height: 30px;
+  background: #e0e0e0;
+  border-radius: 15px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.체력바 .바-내용 {
+  background: linear-gradient(135deg, #ff6b6b, #ee5a6f);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  transition: width 0.3s ease;
+}
+
+.마나바 .바-내용 {
+  background: linear-gradient(135deg, #4ecdc4, #44a3aa);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  transition: width 0.3s ease;
+}
+
+/* 장비 섹션 */
+.장비섹션 {
+  margin-bottom: 30px;
+}
+
+.장비섹션 h3 {
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.장비목록 {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.장비아이템 {
+  background: #e8f4f8;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #b8e0ea;
+}
+
+/* 능력치 섹션 */
+.능력치섹션 {
+  margin-bottom: 30px;
+}
+
+.능력치섹션 h3 {
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.능력치그리드 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 15px;
+}
+
+.능력치항목 {
+  background: #f5f5f5;
+  padding: 15px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: transform 0.2s ease;
+}
+
+.능력치항목:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.능력치아이콘 {
+  font-size: 24px;
+}
+
+.능력치값 {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* 스킬 섹션 */
+.스킬섹션 h3 {
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.스킬정보 {
+  background: #fff5e6;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #ffd4a3;
+  margin-bottom: 15px;
+}
+
+.스킬정보 h4 {
+  margin: 0 0 10px 0;
+  color: #ff6b35;
+}
+
+.스킬정보 p {
+  margin: 0 0 10px 0;
+  line-height: 1.6;
+  color: #666;
+}
+
+.쿨다운 {
+  display: inline-block;
+  background: #ff6b35;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* 간단 프로파일 스타일 */
+.프로파일-간단 {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.간단-헤더 h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+}
+
+.간단-능력치 {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  font-size: 18px;
+}
+
+.간단-능력치 span {
+  background: #f0f0f0;
+  padding: 10px 20px;
+  border-radius: 8px;
+}
+
+/* RPG 스타일 프로파일 */
+.프로파일-rpg {
+  background: linear-gradient(135deg, #2c3e50, #34495e);
+  padding: 30px;
+  border-radius: 12px;
+  display: flex;
+  gap: 30px;
+  color: white;
+}
+
+.rpg-캐릭터이미지 {
+  flex: 0 0 150px;
+}
+
+.이미지플레이스홀더 {
+  width: 150px;
+  height: 150px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+}
+
+.rpg-정보 {
+  flex: 1;
+}
+
+.rpg-이름바 {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.rpg-이름바 .이름 {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.rpg-이름바 .레벨 {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 5px 15px;
+  border-radius: 20px;
+}
+
+.rpg-바 {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.hp바, .mp바 {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.hp바 label, .mp바 label {
+  width: 30px;
+  font-weight: bold;
+}
+
+.바 {
+  flex: 1;
+  height: 25px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.hp바 .바채움 {
+  background: linear-gradient(90deg, #e74c3c, #c0392b);
+  height: 100%;
+}
+
+.mp바 .바채움 {
+  background: linear-gradient(90deg, #3498db, #2980b9);
+  height: 100%;
+}
+
+.바텍스트 {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  line-height: 25px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* 카드형 프로파일 */
+.프로파일-카드 {
+  background: white;
+  border: 3px solid #333;
+  border-radius: 12px;
+  width: 300px;
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.카드-헤더 {
+  background: #333;
+  color: white;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.카드-레벨 {
+  width: 50px;
+  height: 50px;
+  background: #ffd700;
+  color: #333;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.카드-타이틀 h3 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.카드-타이틀 p {
+  margin: 5px 0 0 0;
+  opacity: 0.8;
+  font-size: 14px;
+}
+
+.카드-이미지 {
+  background: #f0f0f0;
+  padding: 40px;
+  text-align: center;
+}
+
+.카드-이미지 .이미지플레이스홀더 {
+  width: 100px;
+  height: 100px;
+  margin: 0 auto;
+  font-size: 50px;
+}
+
+.카드-능력치 {
+  padding: 20px;
+}
+
+.능력치행 {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.능력치행:last-child {
+  border-bottom: none;
+}
+
+.능력치행 span:last-child {
+  font-weight: bold;
+  color: #4a90e2;
+}
+
+/* 통계 프로파일 */
+.프로파일-통계 {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+}
+
+.프로파일-통계 h3 {
+  margin: 0 0 30px 0;
+  text-align: center;
+  color: #333;
+}
+
+.통계-차트 {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.통계항목 {
+  margin-bottom: 20px;
+}
+
+.통계항목 label {
+  display: block;
+  margin-bottom: 5px;
+  color: #666;
+  font-weight: 500;
+}
+
+.통계바 {
+  height: 30px;
+  background: #e0e0e0;
+  border-radius: 15px;
+  overflow: hidden;
+  position: relative;
+}
+
+.통계바채움 {
+  height: 100%;
+  background: linear-gradient(90deg, #4a90e2, #357abd);
+  transition: width 0.5s ease;
+}
+
+.통계바 span {
+  position: absolute;
+  right: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: bold;
+  color: #333;
+}
+
+/* 등급별 스타일 */
+.등급 {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.등급.일반 {
+  background: #9e9e9e;
+  color: white;
+}
+
+.등급.희귀 {
+  background: #2196f3;
+  color: white;
+}
+
+.등급.영웅 {
+  background: #9c27b0;
+  color: white;
+}
+
+.등급.전설 {
+  background: #ff9800;
+  color: white;
+}
+
+.등급태그 {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  margin-left: 10px;
+}
+
+.등급태그.일반 {
+  background: #9e9e9e;
+  color: white;
+}
+
+.등급태그.희귀 {
+  background: #2196f3;
+  color: white;
+}
+
+.등급태그.영웅 {
+  background: #9c27b0;
+  color: white;
+}
+
+.등급태그.전설 {
+  background: #ff9800;
+  color: white;
+}
+
+/* 카드 헤더 등급별 스타일 */
+.카드-헤더.일반 {
+  background: #757575;
+}
+
+.카드-헤더.희귀 {
+  background: #1976d2;
+}
+
+.카드-헤더.영웅 {
+  background: #7b1fa2;
+}
+
+.카드-헤더.전설 {
+  background: #f57c00;
+}
+
+/* 추가 섹션 스타일 */
+.추가능력치섹션,
+.특수능력섹션,
+.설명섹션 {
+  margin-top: 30px;
+}
+
+.추가능력치섹션 h3,
+.특수능력섹션 h3,
+.설명섹션 h3 {
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.능력치이름 {
+  font-size: 14px;
+  color: #666;
+  margin: 0 5px;
+}
+
+.특수능력목록 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.특수능력항목 {
+  background: #e3f2fd;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #90caf9;
+  color: #1976d2;
+}
+
+.설명섹션 p {
+  line-height: 1.8;
+  color: #666;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .프로파일-rpg {
+    flex-direction: column;
+  }
+  
+  .능력치그리드 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .간단-능력치 {
+    flex-direction: column;
+    align-items: center;
+  }
+}

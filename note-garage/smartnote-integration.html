@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>노트 정비소 ↔️ 스마트노트앱 연동</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .integration-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 800px;
+            padding: 40px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .integration-methods {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .method-card {
+            padding: 20px;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .method-card:hover {
+            border-color: #2196f3;
+            background: #f8f9ff;
+        }
+        
+        .method-card.active {
+            border-color: #2196f3;
+            background: #e3f2fd;
+        }
+        
+        .method-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+        
+        .method-desc {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .integration-form {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #2196f3;
+        }
+        
+        .connect-btn {
+            width: 100%;
+            padding: 12px 20px;
+            background: #2196f3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        
+        .connect-btn:hover {
+            background: #1976d2;
+        }
+        
+        .connect-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .status-message {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+        
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status-message.info {
+            background: #cce5ff;
+            color: #0066cc;
+            border: 1px solid #99ccff;
+        }
+        
+        .preview-section {
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            margin-top: 20px;
+        }
+        
+        .preview-header {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .file-list {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .file-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .file-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-name {
+            font-size: 14px;
+            color: #333;
+        }
+        
+        .file-action {
+            font-size: 12px;
+            color: #2196f3;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="integration-container">
+        <div class="header">
+            <h1>🔗 스마트노트앱 연동</h1>
+            <p>내 스마트노트앱의 HTML 파일들을 노트 정비소에서 직접 편집하세요</p>
+        </div>
+        
+        <div class="integration-methods">
+            <div class="method-card active" data-method="local">
+                <div class="method-title">🗂️ 로컬 폴더 연동</div>
+                <div class="method-desc">
+                    스마트노트앱의 HTML 파일이 있는 폴더를 직접 선택합니다.<br>
+                    <strong>가장 안전하고 빠른 방법</strong>
+                </div>
+            </div>
+            
+            <div class="method-card" data-method="github">
+                <div class="method-title">🐙 GitHub 연동</div>
+                <div class="method-desc">
+                    GitHub 저장소에 있는 스마트노트앱과 연동합니다.<br>
+                    <strong>자동 백업 및 버전 관리</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="integration-form">
+            <!-- 로컬 폴더 연동 -->
+            <div id="localMethod" class="method-content">
+                <div class="form-group">
+                    <label for="folderPath">스마트노트앱 폴더 경로</label>
+                    <input type="text" id="folderPath" placeholder="C:\Users\username\Desktop\smart-note-app" readonly>
+                    <button type="button" onclick="selectFolder()" style="margin-top: 5px; padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">📁 폴더 선택</button>
+                </div>
+                
+                <div class="form-group">
+                    <label for="editMode">편집 모드</label>
+                    <select id="editMode">
+                        <option value="safe">안전 모드 (백업 후 편집)</option>
+                        <option value="direct">직접 모드 (즉시 반영)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- GitHub 연동 -->
+            <div id="githubMethod" class="method-content" style="display: none;">
+                <div class="form-group">
+                    <label for="githubRepo">GitHub 저장소 URL</label>
+                    <input type="text" id="githubRepo" placeholder="https://github.com/username/smart-note-app">
+                </div>
+                
+                <div class="form-group">
+                    <label for="githubToken">Personal Access Token (선택)</label>
+                    <input type="password" id="githubToken" placeholder="비공개 저장소인 경우 필요">
+                </div>
+            </div>
+            
+            <button class="connect-btn" onclick="connectToSmartNote()">
+                🔗 연동하기
+            </button>
+            
+            <div class="status-message" id="statusMessage"></div>
+        </div>
+        
+        <div class="preview-section" id="previewSection">
+            <div class="preview-header">📋 편집 가능한 파일 목록</div>
+            <div class="file-list" id="fileList">
+                <div class="file-item">
+                    <span class="file-name">📄 demo.html</span>
+                    <a href="demo.html" target="_blank" class="file-action">편집하기</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentMethod = 'local';
+        let connectedPath = null;
+        
+        // 연동 방식 선택
+        document.querySelectorAll('.method-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.method-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                
+                currentMethod = card.dataset.method;
+                
+                // 해당 방식의 폼 표시
+                document.querySelectorAll('.method-content').forEach(content => {
+                    content.style.display = 'none';
+                });
+                document.getElementById(currentMethod + 'Method').style.display = 'block';
+            });
+        });
+        
+        // 폴더 선택 (File System Access API 사용)
+        async function selectFolder() {
+            try {
+                if ('showDirectoryPicker' in window) {
+                    const dirHandle = await window.showDirectoryPicker();
+                    document.getElementById('folderPath').value = dirHandle.name;
+                    
+                    // 폴더 내용 확인
+                    const htmlFiles = await findHtmlFiles(dirHandle);
+                    if (htmlFiles.length > 0) {
+                        showStatus('✅ 스마트노트앱 폴더를 찾았습니다!', 'success');
+                        connectedPath = dirHandle;
+                    } else {
+                        showStatus('⚠️ HTML 파일이 없는 폴더입니다', 'info');
+                    }
+                } else {
+                    // Fallback: 사용자가 직접 경로 입력
+                    document.getElementById('folderPath').readOnly = false;
+                    document.getElementById('folderPath').placeholder = '폴더 경로를 직접 입력하세요';
+                    showStatus('ℹ️ 폴더 경로를 직접 입력해주세요', 'info');
+                }
+            } catch (error) {
+                if (error.name !== 'AbortError') {
+                    showStatus('❌ 폴더 선택에 실패했습니다', 'error');
+                }
+            }
+        }
+        
+        // HTML 파일 찾기
+        async function findHtmlFiles(dirHandle) {
+            const htmlFiles = [];
+            
+            for await (const [name, fileHandle] of dirHandle.entries()) {
+                if (fileHandle.kind === 'file' && name.toLowerCase().endsWith('.html')) {
+                    htmlFiles.push({ name, handle: fileHandle });
+                }
+            }
+            
+            return htmlFiles;
+        }
+        
+        // 연동 실행
+        async function connectToSmartNote() {
+            const connectBtn = document.querySelector('.connect-btn');
+            connectBtn.disabled = true;
+            connectBtn.textContent = '🔄 연동 중...';
+            
+            try {
+                if (currentMethod === 'local') {
+                    await connectLocalFolder();
+                } else if (currentMethod === 'github') {
+                    await connectGithubRepo();
+                }
+            } catch (error) {
+                showStatus(`❌ 연동 실패: ${error.message}`, 'error');
+            } finally {
+                connectBtn.disabled = false;
+                connectBtn.textContent = '🔗 연동하기';
+            }
+        }
+        
+        // 로컬 폴더 연동
+        async function connectLocalFolder() {
+            if (!connectedPath) {
+                throw new Error('폴더를 먼저 선택해주세요');
+            }
+            
+            const htmlFiles = await findHtmlFiles(connectedPath);
+            
+            if (htmlFiles.length === 0) {
+                throw new Error('HTML 파일이 없습니다');
+            }
+            
+            // 파일 목록 표시
+            displayFileList(htmlFiles);
+            
+            showStatus(`✅ ${htmlFiles.length}개의 HTML 파일을 찾았습니다!`, 'success');
+            document.getElementById('previewSection').style.display = 'block';
+        }
+        
+        // GitHub 저장소 연동
+        async function connectGithubRepo() {
+            const repoUrl = document.getElementById('githubRepo').value.trim();
+            const token = document.getElementById('githubToken').value.trim();
+            
+            if (!repoUrl) {
+                throw new Error('GitHub 저장소 URL을 입력해주세요');
+            }
+            
+            // GitHub API를 통해 파일 목록 가져오기 (구현 필요)
+            showStatus('🚧 GitHub 연동은 개발 중입니다', 'info');
+        }
+        
+        // 파일 목록 표시
+        function displayFileList(files) {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+            
+            files.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                
+                fileItem.innerHTML = `
+                    <span class="file-name">📄 ${file.name}</span>
+                    <a href="#" class="file-action" onclick="editFile('${file.name}')">편집하기</a>
+                `;
+                
+                fileList.appendChild(fileItem);
+            });
+        }
+        
+        // 파일 편집하기
+        async function editFile(fileName) {
+            if (!connectedPath) return;
+            
+            try {
+                // 파일 읽기
+                const fileHandle = await connectedPath.getFileHandle(fileName);
+                const file = await fileHandle.getFile();
+                const content = await file.text();
+                
+                // 새 창에서 노트 정비소 열기 (파일 내용 전달)
+                const editUrl = '/demo.html?file=' + encodeURIComponent(fileName) + 
+                              '&source=smartnote&mode=safe';
+                
+                const newWindow = window.open(editUrl, '_blank', 'width=1200,height=800');
+                
+                // 파일 내용을 새 창으로 전달 (postMessage 사용)
+                newWindow.addEventListener('load', () => {
+                    newWindow.postMessage({
+                        type: 'load-file',
+                        fileName: fileName,
+                        content: content,
+                        source: 'smartnote'
+                    }, '*');
+                });
+                
+                showStatus(`✅ ${fileName}을(를) 편집기에서 열었습니다`, 'success');
+                
+            } catch (error) {
+                showStatus(`❌ 파일 열기 실패: ${error.message}`, 'error');
+            }
+        }
+        
+        // 상태 메시지 표시
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('statusMessage');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            statusEl.style.display = 'block';
+            
+            if (type !== 'error') {
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // 파일 저장 이벤트 수신 (다른 창에서)
+        window.addEventListener('message', async (event) => {
+            if (event.data.type === 'save-file' && event.data.source === 'smartnote') {
+                try {
+                    // 파일 저장
+                    const fileHandle = await connectedPath.getFileHandle(event.data.fileName);
+                    const writable = await fileHandle.createWritable();
+                    await writable.write(event.data.content);
+                    await writable.close();
+                    
+                    showStatus(`✅ ${event.data.fileName} 저장 완료!`, 'success');
+                } catch (error) {
+                    showStatus(`❌ 저장 실패: ${error.message}`, 'error');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
