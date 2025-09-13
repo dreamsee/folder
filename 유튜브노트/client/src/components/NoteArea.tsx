@@ -103,6 +103,89 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   const [이전볼륨, set이전볼륨] = useState(currentVolume);
   const [이전속도, set이전속도] = useState(currentPlaybackRate);
   const [이전시간, set이전시간] = useState(currentTime);
+  
+  // 사용자가 직접 설정한 볼륨/속도 값 추적 (타임스탬프 복원용)
+  const [userSettings, setUserSettings] = useState({
+    volume: 100,
+    speed: 1.0
+  });
+  
+  // 원본 사용자 설정을 보존하기 위한 ref (더블클릭 contamination 방지)
+  const originalUserSettingsRef = useRef<{volume: number, speed: number} | null>(null);
+
+  // 타임스탬프 자동 실행 관련 상태 변수들
+  const [activeTimestamp, setActiveTimestamp] = useState<any>(null);
+  const [originalSettings, setOriginalSettings] = useState<{volume: number, speed: number} | null>(null);
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // 중복 실행 방지 플래그들 (useRef로 지속 상태 유지)
+  const processingEntryRef = useRef(false);
+  const processingExitRef = useRef(false);
+  const autoJumpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTimeRef = useRef<number>(0);
+
+  // 타임스탬프 정규식 상수 (모든 타임스탬프 관련 함수에서 공통 사용)
+  const TIMESTAMP_REGEX = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+
+  // 타임스탬프 파싱 함수 (중앙화된 단일 함수)
+  const parseTimestamps = (text: string) => {
+    try {
+      const stamps: any[] = [];
+      const regex = new RegExp(TIMESTAMP_REGEX.source, 'g');
+      let match;
+      let index = 0;
+
+      while ((match = regex.exec(text)) !== null) {
+        const startTime = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
+        const endTime = parseInt(match[4]) * 3600 + parseInt(match[5]) * 60 + parseFloat(match[6]);
+        const volume = parseInt(match[7]);
+        const speed = parseFloat(match[8]);
+        const action = match[9] || null;
+
+        stamps.push({
+          startTime,
+          endTime,
+          volume,
+          speed,
+          action,
+          raw: match[0],
+          index: index++
+        });
+      }
+
+      return stamps.sort((a, b) => a.index - b.index);
+    } catch (error) {
+      console.error('parseTimestamps 오류:', error);
+      return [];
+    }
+  };
+
+  // 사용자 볼륨 변경 핸들러
+  const handleVolumeChange = (newVolume: number) => {
+    setUserSettings(prev => ({ ...prev, volume: newVolume }));
+    setVolume(newVolume);
+    setCurrentVolume(newVolume);
+    if (player && player.setVolume) player.setVolume(newVolume);
+  };
+
+  // 사용자 속도 변경 핸들러
+  const handleSpeedChange = (newSpeed: number) => {
+    // YouTube API에 설정
+    if (player && player.setPlaybackRate) {
+      player.setPlaybackRate(newSpeed);
+      
+      // YouTube API에서 실제 반올림된 값을 가져오기
+      setTimeout(() => {
+        const actualSpeed = player.getPlaybackRate();
+        
+        // UI와 상태를 실제 API 값으로 동기화
+        setPlaybackRate(actualSpeed);
+        setCurrentPlaybackRate(actualSpeed);
+        setCurrentRate(actualSpeed);
+        setUserSettings(prev => ({ ...prev, speed: actualSpeed }));
+      }, 50);
+    }
+  };
 
   // 드래그 컨트롤 상태
   const [isDragging, setIsDragging] = useState(false);
@@ -140,6 +223,381 @@ const NoteArea: React.FC<NoteAreaProps> = ({
       }
     }
   }, []);
+
+  // 수동 이동 감지 (모든 상태에서 체크)
+  useEffect(() => {
+    if (!isPlayerReady || !player) {
+      return;
+    }
+
+    const manualMoveInterval = setInterval(() => {
+      if (!player || !player.getCurrentTime) return;
+      
+      const currentTime = player.getCurrentTime();
+      const lastTime = lastTimeRef.current || currentTime;
+      const timeDiff = Math.abs(currentTime - lastTime);
+      
+      if (timeDiff > 2.0) {
+        console.log(`[수동이동] 감지: ${timeDiff.toFixed(1)}초 점프 (재생상태: ${playerState})`);
+        
+        // 자동점프 타이머 취소
+        if (autoJumpTimeoutRef.current) {
+          clearTimeout(autoJumpTimeoutRef.current);
+          autoJumpTimeoutRef.current = null;
+          console.log('[수동이동] 자동점프 타이머 취소됨!');
+        }
+        
+        // 처리 플래그 초기화 (새로운 진입/이탈 처리를 위해)
+        processingEntryRef.current = false;
+        processingExitRef.current = false;
+        
+        // 수동 이동 후 저장된 원래 설정 초기화
+        originalUserSettingsRef.current = null;
+        
+        // activeTimestamp는 유지 (이탈 감지를 위해)
+        console.log('[수동이동] activeTimestamp 유지하여 이탈 감지 가능하도록 함');
+      }
+      lastTimeRef.current = currentTime;
+    }, 500);
+
+    return () => clearInterval(manualMoveInterval);
+  }, [isPlayerReady, player, playerState]);
+
+  // 타임스탬프 자동 실행 감지 (재생 중에만)
+  useEffect(() => {
+    if (!isPlayerReady || !player || playerState !== 1) {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const checkTimestamps = () => {
+      if (!player || !player.getCurrentTime) return;
+
+      try {
+        const currentTime = player.getCurrentTime();
+        setCurrentTime(currentTime);
+
+        const timestamps = parseTimestamps(noteText);
+        if (timestamps.length === 0) return;
+
+        // 현재 시간이 타임스탬프 구간에 속하는지 확인 (± 0.01초 여유)
+        const currentStamp = timestamps.find(stamp => 
+          currentTime >= stamp.startTime - 0.01 && currentTime <= stamp.endTime + 0.01
+        );
+        
+        // 모든 타임스탬프 체크 상황 로그 (5초마다 한번씩)
+        if (Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime * 10) % 50 === 0) {
+          console.log(`[디버그] 현재 상황 - 시간: ${currentTime.toFixed(3)}, activeTimestamp: ${activeTimestamp ? `${activeTimestamp.startTime}-${activeTimestamp.endTime}` : '없음'}, currentStamp: ${currentStamp ? `${currentStamp.startTime}-${currentStamp.endTime}` : '없음'}`);
+          if (timestamps.length > 0) {
+            timestamps.forEach((stamp, i) => {
+              const inRange = currentTime >= stamp.startTime - 0.01 && currentTime <= stamp.endTime + 0.01;
+              console.log(`  타임스탬프${i}: ${stamp.startTime}-${stamp.endTime}, 범위안: ${inRange}`);
+            });
+          }
+        }
+        
+        // 디버깅: 이탈 조건 확인
+        if (activeTimestamp && !currentStamp) {
+          console.log(`[디버그] 이탈 조건 확인: activeTimestamp=${activeTimestamp ? '있음' : '없음'}, currentStamp=${currentStamp ? '있음' : '없음'}, processingExitRef=${processingExitRef.current}`);
+          console.log(`[디버그] 현재 시간: ${currentTime.toFixed(3)}, 활성 타임스탬프: ${activeTimestamp.startTime}-${activeTimestamp.endTime}`);
+        }
+
+        // 타임스탬프 진입 처리 (중복 방지)
+        // 조건: 1) 새 타임스탬프가 있고, 2) 현재 활성 타임스탬프와 완전히 다른 타임스탬프이고, 3) 진입 처리 중이 아님
+        const isDifferentTimestamp = !activeTimestamp || 
+          (activeTimestamp.startTime !== currentStamp?.startTime || 
+           activeTimestamp.endTime !== currentStamp?.endTime ||
+           activeTimestamp.volume !== currentStamp?.volume ||
+           activeTimestamp.speed !== currentStamp?.speed ||
+           activeTimestamp.action !== currentStamp?.action);
+
+        if (currentStamp && isDifferentTimestamp && !processingEntryRef.current) {
+          processingEntryRef.current = true;
+          console.log(`[타임스탬프] 구간 진입 감지:`, currentStamp);
+          
+          // 자동점프에서 원래 사용자 설정 저장
+          if (!originalUserSettingsRef.current) {
+            const currentPlayerVolume = player.getVolume ? player.getVolume() : currentVolume;
+            const currentPlayerSpeed = player.getPlaybackRate ? player.getPlaybackRate() : currentPlaybackRate;
+            
+            originalUserSettingsRef.current = {
+              volume: currentPlayerVolume,
+              speed: currentPlayerSpeed
+            };
+            console.log(`[자동점프] 원래 사용자 설정 저장:`, originalUserSettingsRef.current);
+          }
+          
+          // 현재 플레이어의 실제 값을 백업 (타임스탬프 진입 전 상태)
+          const currentPlayerVolume = player.getVolume ? player.getVolume() : currentVolume;
+          const currentPlayerSpeed = player.getPlaybackRate ? player.getPlaybackRate() : currentPlaybackRate;
+          
+          setOriginalSettings({
+            volume: currentPlayerVolume,
+            speed: currentPlayerSpeed
+          });
+          
+          console.log(`진입 전 상태 백업 - 볼륨: ${currentPlayerVolume}%, 속도: ${currentPlayerSpeed}x`);
+          
+          // 타임스탬프 설정 적용
+          if (player.setVolume) player.setVolume(currentStamp.volume);
+          if (player.setPlaybackRate) player.setPlaybackRate(currentStamp.speed);
+          
+          setActiveTimestamp(currentStamp);
+          
+          // UI 상태 동기화
+          setCurrentVolume(currentStamp.volume);
+          setCurrentPlaybackRate(currentStamp.speed);
+          setVolume(currentStamp.volume);
+          setPlaybackRate(currentStamp.speed);
+          setCurrentRate(currentStamp.speed);
+          
+          showNotification(`타임스탬프 적용: 볼륨 ${currentStamp.volume}%, 속도 ${currentStamp.speed}x`, 'info');
+          
+          // 타임스탬프 액션 처리
+          if (currentStamp.action) {
+            if (currentStamp.action.startsWith('|')) {
+              // 정지 기능 - 진입 즉시 실행
+              const pauseSeconds = parseInt(currentStamp.action.substring(1));
+              console.log(`자동 실행 정지 기능: ${pauseSeconds}초 정지`);
+              
+              setTimeout(() => {
+                player.pauseVideo();
+                showNotification(`${pauseSeconds}초간 정지`, 'warning');
+                
+                setTimeout(() => {
+                  console.log('정지 시간 종료 - 재생 재개 시도');
+                  try {
+                    player.playVideo();
+                    showNotification('재생 재개', 'success');
+                  } catch (error) {
+                    console.error('재생 재개 오류:', error);
+                  }
+                }, pauseSeconds * 1000);
+              }, 200);
+              
+            } else if (currentStamp.action === '->') {
+              // 자동 점프 설정 (재생 속도 고려)
+              const timeToEnd = currentStamp.endTime - currentTime;
+              const realTimeToEnd = (timeToEnd / currentStamp.speed) * 1000;
+              console.log(`[자동점프] 타이머 설정: ${timeToEnd.toFixed(4)}초 후 이동 (${realTimeToEnd.toFixed(1)}ms)`);
+              
+              // 기존 타이머 취소
+              if (autoJumpTimeoutRef.current) {
+                clearTimeout(autoJumpTimeoutRef.current);
+                console.log('[자동점프] 기존 타이머 취소');
+              }
+              
+              autoJumpTimeoutRef.current = setTimeout(() => {
+                console.log('[자동점프] 타이머 실행됨! 다음 타임스탬프 찾는 중...');
+                const timestamps = parseTimestamps(noteText);
+                const currentIndex = timestamps.findIndex(s => 
+                  s.startTime === currentStamp.startTime && 
+                  s.endTime === currentStamp.endTime &&
+                  s.volume === currentStamp.volume &&
+                  s.speed === currentStamp.speed
+                );
+                const nextStamp = timestamps[currentIndex + 1];
+                console.log(`[자동점프] 현재 타임스탬프 인덱스: ${currentIndex}, 다음 타임스탬프:`, nextStamp);
+                
+                if (nextStamp) {
+                  // 현재 타임스탬프 종료 처리 (다음 타임스탬프가 있을 때만)
+                  console.log('[자동점프] 현재 타임스탬프 종료 처리');
+                  setActiveTimestamp(null);
+                  setOriginalSettings(null);
+                  
+                  // 처리 플래그 리셋 (새로운 진입/이탈 처리를 위해)
+                  processingEntryRef.current = false;
+                  processingExitRef.current = false;
+                  console.log('[자동점프] 다음 타임스탬프로 이동:', nextStamp);
+                  
+                  // 현재 시간과 다음 타임스탬프 간의 거리 계산
+                  const jumpCurrentTime = player.getCurrentTime();
+                  const distance = Math.abs(nextStamp.startTime - jumpCurrentTime);
+                  
+                  // 10초 이내면 버퍼링 방지를 위해 재로드 안함
+                  const allowSeekAhead = distance > 10;
+                  console.log(`[자동점프] 거리: ${distance.toFixed(1)}초, 재로드: ${allowSeekAhead ? 'YES' : 'NO'}`);
+                  
+                  player.seekTo(nextStamp.startTime, allowSeekAhead);
+                  showNotification(`자동 점프: ${formatTime(nextStamp.startTime)}로 이동`, 'success');
+                  
+                  // 100ms 후 원래 사용자 설정으로 복원
+                  setTimeout(() => {
+                    if (originalUserSettingsRef.current) {
+                      console.log(`[자동점프] 원래 사용자 설정으로 복원:`, originalUserSettingsRef.current);
+                      if (player.setVolume) player.setVolume(originalUserSettingsRef.current.volume);
+                      if (player.setPlaybackRate) player.setPlaybackRate(originalUserSettingsRef.current.speed);
+                      
+                      setCurrentVolume(originalUserSettingsRef.current.volume);
+                      setCurrentPlaybackRate(originalUserSettingsRef.current.speed);
+                      setVolume(originalUserSettingsRef.current.volume);
+                      setPlaybackRate(originalUserSettingsRef.current.speed);
+                      setCurrentRate(originalUserSettingsRef.current.speed);
+                      setUserSettings({
+                        volume: originalUserSettingsRef.current.volume,
+                        speed: originalUserSettingsRef.current.speed
+                      });
+                      
+                      showNotification(`원래 설정 복원: 볼륨 ${originalUserSettingsRef.current.volume}%, 속도 ${originalUserSettingsRef.current.speed}x`, 'success');
+                    }
+                  }, 100);
+                } else {
+                  console.log('[자동점프] 마지막 타임스탬프 - 사용자 설정 복원');
+                  
+                  // 마지막 타임스탬프면 사용자 설정으로 복원
+                  if (player.setVolume) player.setVolume(userSettings.volume);
+                  if (player.setPlaybackRate) player.setPlaybackRate(userSettings.speed);
+                  
+                  setCurrentVolume(userSettings.volume);
+                  setCurrentPlaybackRate(userSettings.speed);
+                  setVolume(userSettings.volume);
+                  setPlaybackRate(userSettings.speed);
+                  setCurrentRate(userSettings.speed);
+                  
+                  showNotification(`설정 복원: 볼륨 ${userSettings.volume}%, 속도 ${userSettings.speed}x`, 'info');
+                }
+              }, realTimeToEnd);
+            }
+          }
+          
+          // 진입 처리 완료 후 플래그 리셋
+          setTimeout(() => {
+            processingEntryRef.current = false;
+          }, 100);
+          
+        } else if (!currentStamp && activeTimestamp && !processingExitRef.current) {
+          // 타임스탬프 구간 이탈 (중복 처리 방지)
+          processingExitRef.current = true;
+          console.log(`[이탈] 타임스탬프 구간 이탈 감지`);
+          console.log(`  이탈한 타임스탬프: ${activeTimestamp.startTime.toFixed(3)}-${activeTimestamp.endTime.toFixed(3)}`);
+          console.log(`  현재 시간: ${currentTime.toFixed(3)}`);
+          
+          // 백업된 원래 설정으로 복원
+          console.log('원래 설정으로 복원:', originalSettings);
+          if (originalSettings) {
+            if (player.setVolume) player.setVolume(originalSettings.volume);
+            if (player.setPlaybackRate) player.setPlaybackRate(originalSettings.speed);
+            
+            // 모든 볼륨/속도 상태 복원
+            setCurrentVolume(originalSettings.volume);
+            setCurrentPlaybackRate(originalSettings.speed);
+            setVolume(originalSettings.volume);
+            setPlaybackRate(originalSettings.speed);
+            setCurrentRate(originalSettings.speed);
+            
+            console.log(`UI 상태 복원 - 볼륨: ${originalSettings.volume}%, 속도: ${originalSettings.speed}x`);
+            showNotification(`타임스탬프 이탈 - 설정 복원: 볼륨 ${originalSettings.volume}%, 속도 ${originalSettings.speed}x`, 'info');
+            
+            // userSettings도 복원된 값으로 업데이트
+            setUserSettings({
+              volume: originalSettings.volume,
+              speed: originalSettings.speed
+            });
+          } else if (originalUserSettingsRef.current) {
+            console.log('originalUserSettingsRef로 복원:', originalUserSettingsRef.current);
+            if (player.setVolume) player.setVolume(originalUserSettingsRef.current.volume);
+            if (player.setPlaybackRate) player.setPlaybackRate(originalUserSettingsRef.current.speed);
+            
+            setCurrentVolume(originalUserSettingsRef.current.volume);
+            setCurrentPlaybackRate(originalUserSettingsRef.current.speed);
+            setVolume(originalUserSettingsRef.current.volume);
+            setPlaybackRate(originalUserSettingsRef.current.speed);
+            setCurrentRate(originalUserSettingsRef.current.speed);
+            
+            // userSettings도 원본 설정으로 복원
+            setUserSettings({
+              volume: originalUserSettingsRef.current.volume,
+              speed: originalUserSettingsRef.current.speed
+            });
+            
+            showNotification(`원본 사용자 설정 복원: 볼륨 ${originalUserSettingsRef.current.volume}%, 속도 ${originalUserSettingsRef.current.speed}x`, 'info');
+            
+            // 복원 후 백업 클리어
+            originalUserSettingsRef.current = null;
+          } else {
+            console.log('백업된 설정이 없음 - 현재 userSettings로 대체 복원');
+            if (player.setVolume) player.setVolume(userSettings.volume);
+            if (player.setPlaybackRate) player.setPlaybackRate(userSettings.speed);
+            
+            setCurrentVolume(userSettings.volume);
+            setCurrentPlaybackRate(userSettings.speed);
+            setVolume(userSettings.volume);
+            setPlaybackRate(userSettings.speed);
+            setCurrentRate(userSettings.speed);
+            
+            showNotification(`사용자 설정 복원: 볼륨 ${userSettings.volume}%, 속도 ${userSettings.speed}x`, 'info');
+          }
+          
+          setActiveTimestamp(null);
+          setOriginalSettings(null);
+          
+          // 다음 체크에서는 이탈 처리가 완료되었음을 인식하도록 지연
+          setTimeout(() => {
+            processingExitRef.current = false;
+          }, 100);
+        }
+      } catch (error) {
+        console.error('타임스탬프 감지 오류:', error);
+      }
+    };
+
+    checkIntervalRef.current = setInterval(checkTimestamps, 500);
+
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
+    };
+  }, [isPlayerReady, player, playerState, noteText, activeTimestamp, originalSettings, userSettings]);
+
+  // 노트 텍스트 변경 시 타임스탬프 파싱 및 커스텀바용 데이터 변환
+  useEffect(() => {
+    const timestamps = parseTimestamps(noteText);
+    
+    // YouTubePlayer 형식으로 변환: {timeInSeconds, duration, volume, playbackRate, timeFormatted}
+    const convertedTimestamps = timestamps.map(stamp => ({
+      timeInSeconds: stamp.startTime,
+      duration: stamp.endTime - stamp.startTime,
+      volume: stamp.volume,
+      playbackRate: stamp.speed,
+      timeFormatted: formatTime(stamp.startTime)
+    }));
+    
+    setTimestamps(convertedTimestamps);
+  }, [noteText, setTimestamps]);
+
+  // 영상 변경 시 재생 기본값 적용
+  useEffect(() => {
+    if (currentVideoId && player && isPlayerReady) {
+      const defaultVolume = uiSettings?.재생기본값?.defaultVolume || 100;
+      const defaultSpeed = uiSettings?.재생기본값?.defaultPlaybackRate || 1.0;
+      
+      console.log(`[영상변경] 기본값 적용: 볼륨 ${defaultVolume}%, 속도 ${defaultSpeed}x`);
+      
+      // 플레이어에 기본값 적용
+      if (player.setVolume) player.setVolume(defaultVolume);
+      if (player.setPlaybackRate) player.setPlaybackRate(defaultSpeed);
+      
+      // userSettings 초기화 (중요: 타임스탬프 복원 시 이 값이 사용됨)
+      setUserSettings({
+        volume: defaultVolume,
+        speed: defaultSpeed
+      });
+      
+      // UI 상태 동기화
+      setCurrentVolume(defaultVolume);
+      setCurrentPlaybackRate(defaultSpeed);
+      setVolume(defaultVolume);
+      setPlaybackRate(defaultSpeed);
+      setCurrentRate(defaultSpeed);
+      
+      showNotification(`새 영상 로드: 기본 설정 적용 (볼륨 ${defaultVolume}%, 속도 ${defaultSpeed}x)`, 'info');
+    }
+  }, [currentVideoId, player, isPlayerReady, uiSettings?.재생기본값]);
 
   // 현재 영상의 즐겨찾기 상태 확인
   useEffect(() => {
@@ -401,6 +859,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
     }
 
     try {
+      // 영상 일시정지
+      player.pauseVideo();
+      
       const 현재시간 = player.getCurrentTime();
       const timeFormatted = formatTime(현재시간);
       
@@ -687,7 +1148,19 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           const startTime = startHours * 3600 + startMinutes * 60 + startSeconds;
           const endTime = endHours * 3600 + endMinutes * 60 + endSeconds;
           
-          // 볼륨과 재생 속도 설정
+          // 원본 사용자 설정 백업 (더블클릭 이전 상태 보존)
+          if (!originalUserSettingsRef.current) {
+            const currentPlayerVolume = player.getVolume ? player.getVolume() : currentVolume;
+            const currentPlayerSpeed = player.getPlaybackRate ? player.getPlaybackRate() : currentPlaybackRate;
+            
+            originalUserSettingsRef.current = {
+              volume: currentPlayerVolume,
+              speed: currentPlayerSpeed
+            };
+            console.log(`[더블클릭] 원본 사용자 설정 백업:`, originalUserSettingsRef.current);
+          }
+          
+          // 볼륨과 재생 속도 설정 (하지만 userSettings는 오염시키지 않음)
           if (player.setVolume) {
             player.setVolume(timestampVolume);
           }
@@ -698,6 +1171,17 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           // 시작 위치로 이동하고 재생
           player.seekTo(startTime, true);
           player.playVideo();
+          
+          // activeTimestamp 설정 (자동 실행 중복 방지)
+          setActiveTimestamp({
+            startTime,
+            endTime,
+            volume,
+            speed: playbackRate,
+            action: actionMode,
+            raw: clickedTimestamp,
+            index: 0
+          });
           
           // 동작 모드에 따른 처리
           if (actionMode && actionMode.startsWith('|')) {
@@ -920,10 +1404,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                       value={volume}
                       onChange={(e) => {
                         const newVolume = Number(e.target.value);
-                        setVolume(newVolume);
-                        if (player) {
-                          player.setVolume(newVolume);
-                        }
+                        handleVolumeChange(newVolume);
                       }}
                       className="flex-1 h-3 min-w-[20px] max-w-[100px]"
                     />
@@ -946,11 +1427,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                       value={playbackRate}
                       onChange={(e) => {
                         const newRate = Number(e.target.value);
-                        setPlaybackRate(newRate);
-                        setCurrentRate(newRate);
-                        if (player) {
-                          player.setPlaybackRate(newRate);
-                        }
+                        handleSpeedChange(newRate);
                       }}
                       className="flex-1 h-2 min-w-[20px] max-w-[100px]"
                     />

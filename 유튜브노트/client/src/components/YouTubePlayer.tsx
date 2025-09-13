@@ -26,6 +26,7 @@ interface YouTubePlayerProps {
     커스텀바: boolean;
     챕터바: boolean;
   };
+  currentTime?: number; // 현재 재생 시간 (HomePage에서 전달)
 }
 
 const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
@@ -42,6 +43,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   isLocked = false,
   magnifierSettings = { enabled: true, zoom: 2.0, size: 2 },
   바설정 = { 커스텀바: true, 챕터바: true },
+  currentTime: propCurrentTime = 0, // 외부에서 전달된 현재 시간
 }) => {
   const [availableRates, setAvailableRates] = useState<number[]>([]);
   const [currentRate, setCurrentRate] = useState(1);
@@ -119,10 +121,20 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     }
   }, [currentVideoId, player, setPlayer]);
 
-  // 영상 변경 시 세션 초기화
+  // 영상 변경 시 세션 초기화 및 자동 로드/재생
   useEffect(() => {
     setCurrentSessionId(null);
-  }, [currentVideoId]);
+    
+    // 플레이어가 준비되고 비디오 ID가 있으면 로드 및 재생
+    if (player && isPlayerReady && currentVideoId) {
+      console.log('[YouTubePlayer] currentVideoId 변경됨, 영상 로드 및 재생:', currentVideoId);
+      player.loadVideoById(currentVideoId);
+      // 로드 후 자동 재생 (시청 기록 업데이트를 위해)
+      setTimeout(() => {
+        player.playVideo();
+      }, 500);
+    }
+  }, [currentVideoId, player, isPlayerReady]);
 
   // 저장된 기본값 적용 함수
   const applyDefaultSettings = (player: any) => {
@@ -163,66 +175,26 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     // 저장된 기본값 적용
     applyDefaultSettings(event.target);
     
-    // 비디오 ID가 있으면 즉시 로드
-    if (currentVideoId) {
-      try {
-        event.target.loadVideoById(currentVideoId);
-        showNotification("영상이 로드되었습니다.", "success");
-      } catch (error) {
-        console.error('비디오 로드 오류:', error);
-        showNotification("영상 로드 중 오류가 발생했습니다.", "error");
-      }
-    }
+    // 초기 로드는 useEffect에서 처리하므로 여기서는 하지 않음
+    console.log('[YouTubePlayer] onPlayerReady - 플레이어 준비 완료, currentVideoId:', currentVideoId);
   };
 
   // 플레이어 상태 변경 이벤트 핸들러
   const onPlayerStateChange = (event: any) => {
+    console.log('[시청기록] 플레이어 상태 변경:', event.data, 'videoId:', currentVideoId);
     setPlayerState(event.data);
-    // 재생 상태 업데이트
-    setIsPlaying(event.data === window.YT.PlayerState.PLAYING);
+    // 재생 상태 업데이트 (YT.PlayerState.PLAYING = 1)
+    setIsPlaying(event.data === 1);
     
     // 영상 재생 시작 시 시청 기록 관리 (단일 책임: 모든 시청 기록은 여기서만 관리)
-    if (event.data === window.YT.PlayerState.PLAYING && currentVideoId) {
-      const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
-      
-      // 새로운 세션인지 확인 (영상 변경 또는 세션이 없는 경우)
-      const videoSessionKey = `${currentVideoId}_session`;
-      const isNewSession = !currentSessionId || currentSessionId !== videoSessionKey;
-      
-      if (!watchHistory[currentVideoId]) {
-        // 새 영상 - 첫 시청 기록 생성 (watchCount: 1)
-        watchHistory[currentVideoId] = {
-          videoId: currentVideoId,
-          firstWatchedAt: new Date().toISOString(),
-          lastWatchedAt: new Date().toISOString(),
-          watchCount: 1,
-          totalWatchTime: 0,
-          lastPosition: 0,
-          duration: player?.getDuration() || 0,
-        };
-        
-        // 새 세션 ID 설정
-        setCurrentSessionId(videoSessionKey);
-        
-        // 새 영상이면 기본값 다시 적용 (YouTube가 가끔 초기화하는 경우 대비)
-        setTimeout(() => {
-          if (player && event.target) {
-            applyDefaultSettings(event.target);
-          }
-        }, 1000);
-      } else if (isNewSession) {
-        // 기존 영상이지만 새로운 세션 - 재시청으로 횟수 증가 (watchCount++)
-        watchHistory[currentVideoId].watchCount = (watchHistory[currentVideoId].watchCount || 0) + 1;
-        watchHistory[currentVideoId].lastWatchedAt = new Date().toISOString();
-        watchHistory[currentVideoId].duration = player?.getDuration() || watchHistory[currentVideoId].duration || 0;
-        
-        // 새 세션 ID 설정
-        setCurrentSessionId(videoSessionKey);
-      }
-      // else: 같은 세션 내에서의 재생 재개는 횟수를 증가시키지 않음
-      
-      // 시청 기록 저장 (localStorage에 통합 저장)
-      localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+    // YT.PlayerState.PLAYING = 1
+    if (event.data === 1 && currentVideoId) {
+      // 새 영상이면 기본값 다시 적용 (YouTube가 가끔 초기화하는 경우 대비)
+      setTimeout(() => {
+        if (player && event.target) {
+          applyDefaultSettings(event.target);
+        }
+      }, 1000);
     }
   };
 

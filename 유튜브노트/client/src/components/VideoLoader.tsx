@@ -57,6 +57,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     if (isInitialSearch) {
       setIsSearching(true);
       setSearchResults([]);
+      setFilteredResults([]);
       setNextPageToken(null);
     } else {
       setIsLoadingMore(true);
@@ -138,6 +139,8 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
 
   // 영상 선택해서 재생
   const handleVideoSelect = (video: YoutubeVideo) => {
+    console.log('[VideoLoader] 영상 선택:', video.videoId, video.title);
+    
     // 비디오 ID 먼저 설정 (플레이어 생성 트리거)
     setCurrentVideoId(video.videoId);
     setCurrentVideoInfo({
@@ -146,11 +149,12 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       thumbnailUrl: video.thumbnail,
     });
     
-    // 플레이어가 준비된 경우 바로 로드
+    // 플레이어 준비 상태 확인만 하고, 실제 로드는 YouTubePlayer에서 처리
     if (isPlayerReady && player) {
-      player.loadVideoById(video.videoId);
+      console.log('[VideoLoader] 플레이어 준비됨, 영상 변경됨');
       showNotification(`"${video.title}" 영상을 로드했습니다.`, "success");
     } else {
+      console.log('[VideoLoader] 플레이어 준비 안됨:', isPlayerReady, player);
       showNotification(`"${video.title}" 영상을 준비하고 있습니다.`, "info");
     }
     
@@ -292,6 +296,52 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   const isFavorite = (videoId: string) => {
     const favorites = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
     return !!favorites[videoId];
+  };
+  
+  // 영상 선택 시 처리 (시청 횟수 증가 포함)
+  const handleVideoSelect = (video: YoutubeVideo) => {
+    // 1. 시청 기록 업데이트 (여기가 핵심!)
+    const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+    
+    if (!watchHistory[video.videoId]) {
+      // 새 영상 - 첫 시청 기록 생성
+      watchHistory[video.videoId] = {
+        videoId: video.videoId,
+        firstWatchedAt: new Date().toISOString(),
+        lastWatchedAt: new Date().toISOString(),
+        watchCount: 1,
+        totalWatchTime: 0,
+        lastPosition: 0,
+        duration: 0,
+      };
+      console.log('[VideoLoader] 새 영상 첫 시청:', video.videoId);
+    } else {
+      // 기존 영상 - 시청 횟수 증가
+      watchHistory[video.videoId].watchCount = (watchHistory[video.videoId].watchCount || 0) + 1;
+      watchHistory[video.videoId].lastWatchedAt = new Date().toISOString();
+      console.log('[VideoLoader] 재시청:', video.videoId, '횟수:', watchHistory[video.videoId].watchCount);
+    }
+    
+    // 시청 기록 저장
+    localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+    
+    // 2. 영상 정보 설정
+    setCurrentVideoInfo({
+      title: video.title,
+      channelName: video.channelTitle,
+      thumbnailUrl: video.thumbnail,
+    });
+    
+    // 3. 영상 ID 설정 (YouTubePlayer에서 로드됨)
+    setCurrentVideoId(video.videoId);
+    
+    // 5. 팝업 모드면 닫기
+    if (isPopup && onClose) {
+      onClose();
+    }
+    
+    // 6. 검색 결과 재필터링 (시청 상태 반영)
+    applyFilter(searchResults, filterMode);
   };
   
   // 필터 모드 및 정렬 순서 변경 시 재필터링
