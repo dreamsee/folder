@@ -93,3 +93,11 @@ ehthumbs.db
 *~
 *.bak
 _backup/
+
+# Other projects - ignore except 유튜브노트
+smart-note-app/
+게임밸런스/
+주식최고_전략/
+2개노트비교/
+note-garage/
+note-garage-clean/
