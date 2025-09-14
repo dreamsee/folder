@@ -54,7 +54,6 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [hideYouTubeOverlay, setHideYouTubeOverlay] = useState(false);
   
   // 터치 홀드 확대 상태
   const [isTouchHolding, setIsTouchHolding] = useState(false);
@@ -66,7 +65,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   // 재생/일시정지 토글 함수
   const togglePlayPause = () => {
     if (!player || !isPlayerReady) return;
-    
+
     try {
       const playerState = player.getPlayerState();
       if (playerState === 1) { // 재생 중
@@ -78,6 +77,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       console.error('재생/일시정지 오류:', error);
     }
   };
+
 
   // 플레이어 초기화 - 강화된 안정성
   useEffect(() => {
@@ -130,11 +130,21 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     // 플레이어가 준비되고 비디오 ID가 있으면 로드 및 재생
     if (player && isPlayerReady && currentVideoId) {
       console.log('[YouTubePlayer] currentVideoId 변경됨, 영상 로드 및 재생:', currentVideoId);
-      player.loadVideoById(currentVideoId);
-      // 로드 후 자동 재생 (시청 기록 업데이트를 위해)
-      setTimeout(() => {
-        player.playVideo();
-      }, 500);
+      try {
+        // 플레이어 DOM 요소 존재 여부 확인
+        const playerElement = document.getElementById('player');
+        if (playerElement && player.loadVideoById) {
+          player.loadVideoById(currentVideoId);
+          // 로드 후 자동 재생 (시청 기록 업데이트를 위해)
+          setTimeout(() => {
+            if (player && player.playVideo) {
+              player.playVideo();
+            }
+          }, 500);
+        }
+      } catch (error) {
+        console.error('[YouTubePlayer] 영상 로드 오류:', error);
+      }
     }
   }, [currentVideoId, player, isPlayerReady]);
 
@@ -189,18 +199,6 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     setIsPlaying(event.data === 1);
     setIsPaused(event.data === 2);
 
-    // 정지 시 YouTube 오버레이 숨김 설정 확인
-    if (event.data === 2) {
-      const uiSettings = localStorage.getItem('uiSettings');
-      if (uiSettings) {
-        const settings = JSON.parse(uiSettings);
-        if (settings.화면텍스트?.정지시YouTube숨김) {
-          setHideYouTubeOverlay(true);
-        }
-      }
-    } else {
-      setHideYouTubeOverlay(false);
-    }
     
     // 영상 재생 시작 시 시청 기록 관리 (단일 책임: 모든 시청 기록은 여기서만 관리)
     // YT.PlayerState.PLAYING = 1
@@ -468,22 +466,6 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             isPlaying={isPlaying}
             onOverlayPositionChange={onOverlayPositionChange}
           />
-          {/* 정지 시 YouTube UI 숨김 오버레이 */}
-          {hideYouTubeOverlay && isPaused && (
-            <div
-              className="absolute inset-0 z-25"
-              style={{
-                backgroundColor: 'transparent',
-                pointerEvents: 'auto'
-              }}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                // 클릭 시 재생/정지 토글
-                togglePlayPause();
-              }}
-            />
-          )}
           {/* 영상 잠금 오버레이 */}
           {isLocked && (
             <div 

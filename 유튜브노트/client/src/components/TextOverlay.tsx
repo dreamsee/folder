@@ -158,8 +158,9 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
     };
   };
 
-  // 오버레이가 없으면 렌더링하지 않음
-  if (activeOverlays.length === 0) {
+  // 오버레이가 없거나 정지 상태일 때는 렌더링하지 않음
+  // 중요: 정지시에는 오버레이 표시 안함 (사용자 요청)
+  if (activeOverlays.length === 0 || !isPlaying) {
     return null;
   }
 

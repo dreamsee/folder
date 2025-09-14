@@ -116,7 +116,6 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   // 타임스탬프 자동 실행 관련 상태 변수들
   const [activeTimestamp, setActiveTimestamp] = useState<any>(null);
   const [originalSettings, setOriginalSettings] = useState<{volume: number, speed: number} | null>(null);
-  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   // 타임스탬프 우선순위 관리 (마지막 활성화된 타임스탬프의 인덱스)
   const [lastActiveIndex, setLastActiveIndex] = useState<number>(-1);
@@ -126,6 +125,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   const processingExitRef = useRef(false);
   const autoJumpTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTimeRef = useRef<number>(0);
+  const ignoreManualMoveRef = useRef(false); // 더블클릭 후 수동이동 감지 무시용
 
   // 타임스탬프 정규식 상수 (모든 타임스탬프 관련 함수에서 공통 사용)
   const TIMESTAMP_REGEX = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
@@ -213,6 +213,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
 
+  // requestAnimationFrame을 사용한 고정밀 추적 시스템 (500ms -> ~16ms)
+  const trackingRef = useRef<number | null>(null);
+
   // localStorage에서 즐겨찾기 목록 로드
   useEffect(() => {
     const savedFavorites = localStorage.getItem('youtube-favorites');
@@ -226,100 +229,99 @@ const NoteArea: React.FC<NoteAreaProps> = ({
     }
   }, []);
 
-  // 수동 이동 감지 (모든 상태에서 체크)
-  useEffect(() => {
-    if (!isPlayerReady || !player) {
+  // 수동 이동 감지 함수
+  const detectManualMove = useCallback((currentTime: number) => {
+    // 더블클릭 직후에는 수동이동 감지 무시
+    // 중요: 더블클릭 seekTo가 수동이동으로 오인되는 것을 방지
+    if (ignoreManualMoveRef.current) {
       return;
     }
 
-    const manualMoveInterval = setInterval(() => {
-      if (!player || !player.getCurrentTime) return;
-      
-      const currentTime = player.getCurrentTime();
-      const lastTime = lastTimeRef.current || currentTime;
-      const timeDiff = Math.abs(currentTime - lastTime);
-      
-      if (timeDiff > 2.0) {
-        console.log(`[수동이동] 감지: ${timeDiff.toFixed(1)}초 점프 (재생상태: ${playerState})`);
-        
-        // 수동이동 시 가장 가까운 타임스탬프 찾기
-        const timestamps = parseTimestamps(noteText);
-        if (timestamps.length > 0) {
-          let closestIndex = -1;
-          let closestDistance = Infinity;
-          
-          for (let i = 0; i < timestamps.length; i++) {
-            const stamp = timestamps[i];
-            // 시작시간까지의 거리 계산
-            const distance = Math.abs(currentTime - stamp.startTime);
-            if (distance < closestDistance) {
-              closestDistance = distance;
-              closestIndex = i;
-            }
+    const lastTime = lastTimeRef.current || currentTime;
+    const timeDiff = Math.abs(currentTime - lastTime);
+
+    if (timeDiff > 2.0) {
+      console.log(`[수동이동] 감지: ${timeDiff.toFixed(1)}초 점프 (재생상태: ${playerState})`);
+
+      // 수동이동 시 가장 가까운 타임스탬프 찾기
+      const timestamps = parseTimestamps(noteText);
+      if (timestamps.length > 0) {
+        let closestIndex = -1;
+        let closestDistance = Infinity;
+
+        for (let i = 0; i < timestamps.length; i++) {
+          const stamp = timestamps[i];
+          // 시작시간까지의 거리 계산
+          const distance = Math.abs(currentTime - stamp.startTime);
+          if (distance < closestDistance) {
+            closestDistance = distance;
+            closestIndex = i;
           }
-          
-          // 가장 가까운 타임스탬프의 이전 인덱스를 설정 (해당 타임스탬프부터 활성화 가능하도록)
-          const newActiveIndex = Math.max(-1, closestIndex - 1);
-          setLastActiveIndex(newActiveIndex);
-          console.log(`[수동이동] 우선순위 재설정: ${newActiveIndex} (가장 가까운 타임스탬프: ${closestIndex})`);
         }
-        
-        // 자동점프 타이머 취소
-        if (autoJumpTimeoutRef.current) {
-          clearTimeout(autoJumpTimeoutRef.current);
-          autoJumpTimeoutRef.current = null;
-          console.log('[수동이동] 자동점프 타이머 취소됨!');
-        }
-        
-        // 처리 플래그 초기화 (새로운 진입/이탈 처리를 위해)
-        processingEntryRef.current = false;
-        processingExitRef.current = false;
-        
-        // 수동 이동 후 저장된 원래 설정 초기화
-        originalUserSettingsRef.current = null;
-        
-        // activeTimestamp는 유지 (이탈 감지를 위해)
-        console.log('[수동이동] activeTimestamp 유지하여 이탈 감지 가능하도록 함');
-      }
-      lastTimeRef.current = currentTime;
-    }, 500);
 
-    return () => clearInterval(manualMoveInterval);
-  }, [isPlayerReady, player, playerState]);
-
-  // 타임스탬프 자동 실행 감지 (재생 중에만)
-  useEffect(() => {
-    if (!isPlayerReady || !player || playerState !== 1) {
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-        checkIntervalRef.current = null;
+        // 가장 가까운 타임스탬프의 이전 인덱스를 설정 (해당 타임스탬프부터 활성화 가능하도록)
+        const newActiveIndex = Math.max(-1, closestIndex - 1);
+        setLastActiveIndex(newActiveIndex);
+        console.log(`[수동이동] 우선순위 재설정: ${newActiveIndex} (가장 가까운 타임스탬프: ${closestIndex})`);
       }
-      return;
+
+      // 자동점프 타이머 취소
+      if (autoJumpTimeoutRef.current) {
+        clearTimeout(autoJumpTimeoutRef.current);
+        autoJumpTimeoutRef.current = null;
+        console.log('[수동이동] 자동점프 타이머 취소됨!');
+      }
+
+      // 처리 플래그 초기화 (새로운 진입/이탈 처리를 위해)
+      processingEntryRef.current = false;
+      processingExitRef.current = false;
+
+      // 수동 이동 후 저장된 원래 설정 초기화
+      originalUserSettingsRef.current = null;
+
+      console.log('[수동이동] 타임스탬프 상태 초기화 완료');
     }
+    lastTimeRef.current = currentTime;
+  }, [playerState, noteText]);
 
-    const checkTimestamps = () => {
-      if (!player || !player.getCurrentTime) return;
+  // 통합 타임스탬프 처리 함수 (고정밀)
+  const processTimestamps = useCallback((currentTime: number) => {
+    try {
+      // 수동 이동 감지 먼저 실행
+      detectManualMove(currentTime);
 
-      try {
-        const currentTime = player.getCurrentTime();
-        setCurrentTime(currentTime);
+      // 현재 시간 업데이트
+      setCurrentTime(currentTime);
 
-        const timestamps = parseTimestamps(noteText);
-        if (timestamps.length === 0) return;
+      const timestamps = parseTimestamps(noteText);
+      if (timestamps.length === 0) return;
 
-        // 우선순위 기반 타임스탬프 찾기
-        // 1. lastActiveIndex 이후의 타임스탬프들만 검사
-        // 2. 현재 시간에 속하는 타임스탬프 중 가장 빠른 인덱스 선택
+        // 타임스탬프 찾기 (현재 activeTimestamp가 있으면 우선순위 무시하고 모든 타임스탬프 체크)
         let currentStamp = null;
         let candidateIndex = -1;
-        
-        for (let i = lastActiveIndex + 1; i < timestamps.length; i++) {
-          const stamp = timestamps[i];
-          // 소수점 3자리 정밀도에 맞는 감지 오차 (1ms = 0.001초)
-          if (currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001) {
-            currentStamp = stamp;
-            candidateIndex = i;
-            break; // 첫 번째 매치되는 것(가장 앞선 순서)을 사용
+
+        if (activeTimestamp) {
+          // 현재 activeTimestamp가 있을 때: 모든 타임스탬프 체크 (우선순위 무시)
+          // 중요: 타임스탬프 진입 후 lastActiveIndex 업데이트로 인해 현재 타임스탬프를 못 찾는 문제 방지
+          for (let i = 0; i < timestamps.length; i++) {
+            const stamp = timestamps[i];
+            if (currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001) {
+              currentStamp = stamp;
+              candidateIndex = i;
+              break;
+            }
+          }
+        } else {
+          // activeTimestamp가 없을 때: 우선순위 기반 검색
+          // lastActiveIndex 이후의 타임스탬프들만 검사하여 순차 실행 보장
+          for (let i = lastActiveIndex + 1; i < timestamps.length; i++) {
+            const stamp = timestamps[i];
+            // 소수점 3자리 정밀도에 맞는 감지 오차 (1ms = 0.001초)
+            if (currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001) {
+              currentStamp = stamp;
+              candidateIndex = i;
+              break; // 첫 번째 매치되는 것(가장 앞선 순서)을 사용
+            }
           }
         }
         
@@ -401,14 +403,14 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               const pauseSeconds = parseInt(currentStamp.action.substring(1));
               console.log(`[정지액션] 자동 실행 정지 기능 (영상시간: ${currentTime.toFixed(3)}초): ${pauseSeconds}초 정지`);
               
-              // 진입 즉시 정지 (200ms 딩레이 제거)
+              // 기존 방식: 실제 정지
               player.pauseVideo();
               showNotification(`${pauseSeconds}초간 정지`, 'warning');
 
               // 지정된 시간 후 재생 재개
               setTimeout(() => {
                 const resumeTime = player.getCurrentTime ? player.getCurrentTime() : 0;
-                console.log(`[정지액션] 정지 시간 종료 - 재생 재개 시도 (영상시간: ${resumeTime.toFixed(3)}초)`);
+                console.log(`[정지액션] 정지 시간 종료 - 재생 재개 (영상시간: ${resumeTime.toFixed(3)}초)`);
                 try {
                   player.playVideo();
                   showNotification('재생 재개', 'success');
@@ -509,13 +511,16 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           
         } else if (!currentStamp && activeTimestamp && !processingExitRef.current) {
           // 타임스탬프 구간 이탈 (중복 처리 방지)
+          // 이탈 조건: 현재 위치가 타임스탬프 구간 밖이고 activeTimestamp가 있을 때
+          // 중요: 이 로직은 더블클릭 종료시간 이동시에도 실행되어 재생 기본값으로 복원함
           processingExitRef.current = true;
           console.log(`[이탈] 타임스탬프 구간 이탈 감지 (영상시간: ${currentTime.toFixed(3)}초)`);
           console.log(`  이탈한 타임스탬프: ${activeTimestamp.startTime.toFixed(3)}-${activeTimestamp.endTime.toFixed(3)}`);
           console.log(`  현재 시간: ${currentTime.toFixed(3)}`);
-          
+
           // 우측 패널의 재생 기본값으로 복원 (originalSettings 무시)
           // 타임스탬프 이탈 시에는 항상 재생 기본값으로 복원하여 일관성 유지
+          // 절대 변경 금지: 이것을 변경하면 타임스탬프 종료시 설정이 남아있게 됨
           console.log('재생 기본값으로 복원 (우측 패널 설정) - originalSettings 무시');
 
           // 우측 패널 설정에서 재생 기본값 가져오기
@@ -579,20 +584,50 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             processingExitRef.current = false;
           }, 100);
         }
+    } catch (error) {
+      console.error('타임스탬프 감지 오류:', error);
+    }
+  }, [isPlayerReady, player, playerState, noteText, activeTimestamp, originalSettings, userSettings, detectManualMove]);
+
+  // requestAnimationFrame 기반 고정밀 추적 시스템
+  useEffect(() => {
+    if (!isPlayerReady || !player || playerState !== 1) {
+      // 재생 중이 아니면 추적 중단
+      if (trackingRef.current) {
+        cancelAnimationFrame(trackingRef.current);
+        trackingRef.current = null;
+      }
+      return;
+    }
+
+    // requestAnimationFrame으로 고정밀 추적 시작
+    const startTracking = () => {
+      try {
+        const currentTime = player.getCurrentTime();
+        if (currentTime !== undefined && currentTime !== null) {
+          processTimestamps(currentTime);
+        }
       } catch (error) {
-        console.error('타임스탬프 감지 오류:', error);
+        console.error('requestAnimationFrame 추적 오류:', error);
+      }
+
+      // 재생 중이면 계속 추적
+      if (player && playerState === 1) {
+        trackingRef.current = requestAnimationFrame(startTracking);
       }
     };
 
-    checkIntervalRef.current = setInterval(checkTimestamps, 500);
+    // 추적 시작
+    trackingRef.current = requestAnimationFrame(startTracking);
 
+    // cleanup
     return () => {
-      if (checkIntervalRef.current) {
-        clearInterval(checkIntervalRef.current);
-        checkIntervalRef.current = null;
+      if (trackingRef.current) {
+        cancelAnimationFrame(trackingRef.current);
+        trackingRef.current = null;
       }
     };
-  }, [isPlayerReady, player, playerState, noteText, activeTimestamp, originalSettings, userSettings]);
+  }, [isPlayerReady, player, playerState, processTimestamps]);
 
   // 노트 텍스트 변경 시 타임스탬프 파싱 및 커스텀바용 데이터 변환
   useEffect(() => {
@@ -1190,6 +1225,11 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           
           // 더블클릭시 진입 처리 플래그 설정 (자동 감지와 중복 방지)
           processingEntryRef.current = true;
+          processingExitRef.current = true; // 이탈 감지도 일시 차단
+
+          // 더블클릭 후 수동이동 감지 무시 플래그 설정
+          // 절대 변경 금지: 이게 없으면 seekTo가 수동이동으로 감지되어 우선순위가 리셋됨
+          ignoreManualMoveRef.current = true;
 
           // 원본 사용자 설정 백업 (더블클릭 이전 상태 보존)
           if (!originalUserSettingsRef.current) {
@@ -1215,6 +1255,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           console.log(`[더블클릭] 진입 전 상태 백업 - 볼륨: ${currentPlayerVolume}%, 속도: ${currentPlayerSpeed}x`);
 
           // 타임스탬프 설정 즉시 적용
+          // 중요: 더블클릭시 타임스탬프 설정을 즉시 적용해야 함
+          // 절대 변경 금지: 이 부분을 제거하면 더블클릭시 설정이 적용되지 않음
           if (player.setVolume) {
             player.setVolume(timestampVolume);
           }
@@ -1223,6 +1265,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           }
 
           // UI 상태도 즉시 동기화
+          // 이것도 중요: UI와 플레이어 상태를 일치시켜야 함
           setCurrentVolume(timestampVolume);
           setCurrentPlaybackRate(timestampSpeed);
           setVolume(timestampVolume);
@@ -1264,17 +1307,24 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           console.log(`[더블클릭] activeTimestamp 설정 - ${isEndTimeClick ? '종료' : '시작'}시간 클릭`);
 
           // 더블클릭한 타임스탬프 인덱스로 우선순위 설정
-          setLastActiveIndex(clickedIndex);
-          console.log(`[더블클릭] 우선순위 설정: ${clickedIndex}`);
+          // 중요: clickedIndex - 1로 설정해야 자동 감지 로직에서 clickedIndex를 체크함
+          // 자동 감지는 lastActiveIndex + 1부터 체크하므로
+          // 절대 변경 금지: clickedIndex로 설정하면 자동 감지가 못 찾아서 이탈 로직 실행됨
+          setLastActiveIndex(clickedIndex - 1);
+          console.log(`[더블클릭] 우선순위 설정: ${clickedIndex - 1} (타임스탬프 인덱스: ${clickedIndex})`);
 
           // 타임스탬프 설정 안정성 알림
           showNotification(`타임스탬프 적용: 볼륨 ${timestampVolume}%, 속도 ${timestampSpeed}x`, 'success');
 
-          // 처리 플래그 해제 (100ms 후 - 자동 감지와의 간섭 방지)
+          // 처리 플래그 해제 (1초 후 - 자동 감지와의 간섭 방지)
+          // 중요: 더블클릭 후 seekTo가 완료되고 영상이 안정화될 때까지 충분한 시간 필요
+          // 절대 변경 금지: 500ms도 짧아서 seekTo 버퍼링 중에 이탈 감지가 발생함
           setTimeout(() => {
             processingEntryRef.current = false;
-            console.log(`[더블클릭] 처리 플래그 해제 - 자동 감지 재개`);
-          }, 100);
+            processingExitRef.current = false; // 이탈 감지 재활성화
+            ignoreManualMoveRef.current = false; // 수동이동 감지 재활성화
+            console.log(`[더블클릭] 처리 플래그 해제 - 자동 감지, 이탈 감지 및 수동이동 감지 재개`);
+          }, 1000);
 
           // 종료시간 클릭의 경우에만 자동 이탈 처리
           if (isEndTimeClick) {
@@ -1287,14 +1337,21 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             // 정지 기능: |3 = 3초간 정지 후 계속 재생
             const pauseSeconds = parseInt(actionMode.substring(1));
             if (!isNaN(pauseSeconds)) {
-              // 더블클릭 시 즉시 정지 (딜레이 제거)
+              console.log(`[더블클릭] 정지 액션 실행: ${pauseSeconds}초간 정지`);
+
+              // 기존 방식: 실제 정지
               player.pauseVideo();
-              showNotification(`${pauseSeconds}초간 정지 - 이후 자동 재생`, "warning");
+              showNotification(`${pauseSeconds}초간 정지`, 'warning');
 
               // 지정된 시간 후 재생 재개
               setTimeout(() => {
-                player.playVideo();
-                showNotification(`${pauseSeconds}초 정지 후 재생 재개`, "success");
+                console.log(`[더블클릭] 정지 시간 종료 - 재생 재개`);
+                try {
+                  player.playVideo();
+                  showNotification('재생 재개', 'success');
+                } catch (error) {
+                  console.error('재생 재개 오류:', error);
+                }
               }, pauseSeconds * 1000);
             }
           } else if (actionMode === '->') {
