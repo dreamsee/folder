@@ -118,6 +118,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   const [originalSettings, setOriginalSettings] = useState<{volume: number, speed: number} | null>(null);
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
+  // 타임스탬프 우선순위 관리 (마지막 활성화된 타임스탬프의 인덱스)
+  const [lastActiveIndex, setLastActiveIndex] = useState<number>(-1);
+  
   // 중복 실행 방지 플래그들 (useRef로 지속 상태 유지)
   const processingEntryRef = useRef(false);
   const processingExitRef = useRef(false);
@@ -169,21 +172,20 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   };
 
   // 사용자 속도 변경 핸들러
+  // YouTube API는 재생 속도를 0.05 단위로 반올림하므로 미리 반올림 처리
   const handleSpeedChange = (newSpeed: number) => {
-    // YouTube API에 설정
+    // 0.05 단위로 반올림 (YouTube API 동작과 일치)
+    const roundedSpeed = Math.round(newSpeed / 0.05) * 0.05;
+
+    // 즉시 UI 업데이트 (반올림된 값으로)
+    setPlaybackRate(roundedSpeed);
+    setCurrentPlaybackRate(roundedSpeed);
+    setCurrentRate(roundedSpeed);
+    setUserSettings(prev => ({ ...prev, speed: roundedSpeed }));
+
+    // YouTube API에 반올림된 값 설정
     if (player && player.setPlaybackRate) {
-      player.setPlaybackRate(newSpeed);
-      
-      // YouTube API에서 실제 반올림된 값을 가져오기
-      setTimeout(() => {
-        const actualSpeed = player.getPlaybackRate();
-        
-        // UI와 상태를 실제 API 값으로 동기화
-        setPlaybackRate(actualSpeed);
-        setCurrentPlaybackRate(actualSpeed);
-        setCurrentRate(actualSpeed);
-        setUserSettings(prev => ({ ...prev, speed: actualSpeed }));
-      }, 50);
+      player.setPlaybackRate(roundedSpeed);
     }
   };
 
@@ -240,6 +242,28 @@ const NoteArea: React.FC<NoteAreaProps> = ({
       if (timeDiff > 2.0) {
         console.log(`[수동이동] 감지: ${timeDiff.toFixed(1)}초 점프 (재생상태: ${playerState})`);
         
+        // 수동이동 시 가장 가까운 타임스탬프 찾기
+        const timestamps = parseTimestamps(noteText);
+        if (timestamps.length > 0) {
+          let closestIndex = -1;
+          let closestDistance = Infinity;
+          
+          for (let i = 0; i < timestamps.length; i++) {
+            const stamp = timestamps[i];
+            // 시작시간까지의 거리 계산
+            const distance = Math.abs(currentTime - stamp.startTime);
+            if (distance < closestDistance) {
+              closestDistance = distance;
+              closestIndex = i;
+            }
+          }
+          
+          // 가장 가까운 타임스탬프의 이전 인덱스를 설정 (해당 타임스탬프부터 활성화 가능하도록)
+          const newActiveIndex = Math.max(-1, closestIndex - 1);
+          setLastActiveIndex(newActiveIndex);
+          console.log(`[수동이동] 우선순위 재설정: ${newActiveIndex} (가장 가까운 타임스탬프: ${closestIndex})`);
+        }
+        
         // 자동점프 타이머 취소
         if (autoJumpTimeoutRef.current) {
           clearTimeout(autoJumpTimeoutRef.current);
@@ -283,17 +307,28 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         const timestamps = parseTimestamps(noteText);
         if (timestamps.length === 0) return;
 
-        // 현재 시간이 타임스탬프 구간에 속하는지 확인 (± 0.01초 여유)
-        const currentStamp = timestamps.find(stamp => 
-          currentTime >= stamp.startTime - 0.01 && currentTime <= stamp.endTime + 0.01
-        );
+        // 우선순위 기반 타임스탬프 찾기
+        // 1. lastActiveIndex 이후의 타임스탬프들만 검사
+        // 2. 현재 시간에 속하는 타임스탬프 중 가장 빠른 인덱스 선택
+        let currentStamp = null;
+        let candidateIndex = -1;
+        
+        for (let i = lastActiveIndex + 1; i < timestamps.length; i++) {
+          const stamp = timestamps[i];
+          // 소수점 3자리 정밀도에 맞는 감지 오차 (1ms = 0.001초)
+          if (currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001) {
+            currentStamp = stamp;
+            candidateIndex = i;
+            break; // 첫 번째 매치되는 것(가장 앞선 순서)을 사용
+          }
+        }
         
         // 모든 타임스탬프 체크 상황 로그 (5초마다 한번씩)
         if (Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime * 10) % 50 === 0) {
           console.log(`[디버그] 현재 상황 - 시간: ${currentTime.toFixed(3)}, activeTimestamp: ${activeTimestamp ? `${activeTimestamp.startTime}-${activeTimestamp.endTime}` : '없음'}, currentStamp: ${currentStamp ? `${currentStamp.startTime}-${currentStamp.endTime}` : '없음'}`);
           if (timestamps.length > 0) {
             timestamps.forEach((stamp, i) => {
-              const inRange = currentTime >= stamp.startTime - 0.01 && currentTime <= stamp.endTime + 0.01;
+              const inRange = currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001;
               console.log(`  타임스탬프${i}: ${stamp.startTime}-${stamp.endTime}, 범위안: ${inRange}`);
             });
           }
@@ -316,7 +351,10 @@ const NoteArea: React.FC<NoteAreaProps> = ({
 
         if (currentStamp && isDifferentTimestamp && !processingEntryRef.current) {
           processingEntryRef.current = true;
-          console.log(`[타임스탬프] 구간 진입 감지:`, currentStamp);
+          console.log(`[타임스탬프] 구간 진입 감지 (영상시간: ${currentTime.toFixed(3)}초, 인덱스: ${candidateIndex}):`, currentStamp);
+          
+          // 활성 타임스탬프 인덱스 업데이트
+          setLastActiveIndex(candidateIndex);
           
           // 자동점프에서 원래 사용자 설정 저장
           if (!originalUserSettingsRef.current) {
@@ -361,22 +399,23 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             if (currentStamp.action.startsWith('|')) {
               // 정지 기능 - 진입 즉시 실행
               const pauseSeconds = parseInt(currentStamp.action.substring(1));
-              console.log(`자동 실행 정지 기능: ${pauseSeconds}초 정지`);
+              console.log(`[정지액션] 자동 실행 정지 기능 (영상시간: ${currentTime.toFixed(3)}초): ${pauseSeconds}초 정지`);
               
+              // 진입 즉시 정지 (200ms 딩레이 제거)
+              player.pauseVideo();
+              showNotification(`${pauseSeconds}초간 정지`, 'warning');
+
+              // 지정된 시간 후 재생 재개
               setTimeout(() => {
-                player.pauseVideo();
-                showNotification(`${pauseSeconds}초간 정지`, 'warning');
-                
-                setTimeout(() => {
-                  console.log('정지 시간 종료 - 재생 재개 시도');
-                  try {
-                    player.playVideo();
-                    showNotification('재생 재개', 'success');
-                  } catch (error) {
-                    console.error('재생 재개 오류:', error);
-                  }
-                }, pauseSeconds * 1000);
-              }, 200);
+                const resumeTime = player.getCurrentTime ? player.getCurrentTime() : 0;
+                console.log(`[정지액션] 정지 시간 종료 - 재생 재개 시도 (영상시간: ${resumeTime.toFixed(3)}초)`);
+                try {
+                  player.playVideo();
+                  showNotification('재생 재개', 'success');
+                } catch (error) {
+                  console.error('재생 재개 오류:', error);
+                }
+              }, pauseSeconds * 1000);
               
             } else if (currentStamp.action === '->') {
               // 자동 점프 설정 (재생 속도 고려)
@@ -471,64 +510,65 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         } else if (!currentStamp && activeTimestamp && !processingExitRef.current) {
           // 타임스탬프 구간 이탈 (중복 처리 방지)
           processingExitRef.current = true;
-          console.log(`[이탈] 타임스탬프 구간 이탈 감지`);
+          console.log(`[이탈] 타임스탬프 구간 이탈 감지 (영상시간: ${currentTime.toFixed(3)}초)`);
           console.log(`  이탈한 타임스탬프: ${activeTimestamp.startTime.toFixed(3)}-${activeTimestamp.endTime.toFixed(3)}`);
           console.log(`  현재 시간: ${currentTime.toFixed(3)}`);
           
-          // 백업된 원래 설정으로 복원
-          console.log('원래 설정으로 복원:', originalSettings);
-          if (originalSettings) {
-            if (player.setVolume) player.setVolume(originalSettings.volume);
-            if (player.setPlaybackRate) player.setPlaybackRate(originalSettings.speed);
-            
-            // 모든 볼륨/속도 상태 복원
-            setCurrentVolume(originalSettings.volume);
-            setCurrentPlaybackRate(originalSettings.speed);
-            setVolume(originalSettings.volume);
-            setPlaybackRate(originalSettings.speed);
-            setCurrentRate(originalSettings.speed);
-            
-            console.log(`UI 상태 복원 - 볼륨: ${originalSettings.volume}%, 속도: ${originalSettings.speed}x`);
-            showNotification(`타임스탬프 이탈 - 설정 복원: 볼륨 ${originalSettings.volume}%, 속도 ${originalSettings.speed}x`, 'info');
-            
-            // userSettings도 복원된 값으로 업데이트
+          // 우측 패널의 재생 기본값으로 복원 (originalSettings 무시)
+          // 타임스탬프 이탈 시에는 항상 재생 기본값으로 복원하여 일관성 유지
+          console.log('재생 기본값으로 복원 (우측 패널 설정) - originalSettings 무시');
+
+          // 우측 패널 설정에서 재생 기본값 가져오기
+          const defaultVolume = uiSettings?.재생기본값?.defaultVolume ?? 100;
+          const defaultSpeed = uiSettings?.재생기본값?.defaultPlaybackRate ?? 1.0;
+
+          if (player.setVolume) player.setVolume(defaultVolume);
+          if (player.setPlaybackRate) player.setPlaybackRate(defaultSpeed);
+
+          setCurrentVolume(defaultVolume);
+          setCurrentPlaybackRate(defaultSpeed);
+          setVolume(defaultVolume);
+          setPlaybackRate(defaultSpeed);
+          setCurrentRate(defaultSpeed);
+
+          // userSettings도 재생 기본값으로 업데이트
+          setUserSettings({
+            volume: defaultVolume,
+            speed: defaultSpeed
+          });
+
+          console.log(`재생 기본값 복원 - 볼륨: ${defaultVolume}%, 속도: ${defaultSpeed}x`);
+          showNotification(`재생 기본값으로 복원: 볼륨 ${defaultVolume}%, 속도 ${defaultSpeed}x`, 'info');
+
+          // 기존 로직 제거: originalSettings를 더 이상 참조하지 않음
+          if (false) {
+            // 우측 패널의 재생 기본값으로 복원
+            // 더블클릭으로 진입한 경우 originalUserSettingsRef가 있지만 무시하고 재생 기본값 사용
+            console.log('재생 기본값으로 복원 (우측 패널 설정)');
+
+            // 우측 패널 설정에서 재생 기본값 가져오기
+            const defaultVolume = uiSettings?.재생기본값?.defaultVolume ?? 100;
+            const defaultSpeed = uiSettings?.재생기본값?.defaultPlaybackRate ?? 1.0;
+
+            if (player.setVolume) player.setVolume(defaultVolume);
+            if (player.setPlaybackRate) player.setPlaybackRate(defaultSpeed);
+
+            setCurrentVolume(defaultVolume);
+            setCurrentPlaybackRate(defaultSpeed);
+            setVolume(defaultVolume);
+            setPlaybackRate(defaultSpeed);
+            setCurrentRate(defaultSpeed);
+
+            // userSettings도 재생 기본값으로 업데이트
             setUserSettings({
-              volume: originalSettings.volume,
-              speed: originalSettings.speed
+              volume: defaultVolume,
+              speed: defaultSpeed
             });
-          } else if (originalUserSettingsRef.current) {
-            console.log('originalUserSettingsRef로 복원:', originalUserSettingsRef.current);
-            if (player.setVolume) player.setVolume(originalUserSettingsRef.current.volume);
-            if (player.setPlaybackRate) player.setPlaybackRate(originalUserSettingsRef.current.speed);
-            
-            setCurrentVolume(originalUserSettingsRef.current.volume);
-            setCurrentPlaybackRate(originalUserSettingsRef.current.speed);
-            setVolume(originalUserSettingsRef.current.volume);
-            setPlaybackRate(originalUserSettingsRef.current.speed);
-            setCurrentRate(originalUserSettingsRef.current.speed);
-            
-            // userSettings도 원본 설정으로 복원
-            setUserSettings({
-              volume: originalUserSettingsRef.current.volume,
-              speed: originalUserSettingsRef.current.speed
-            });
-            
-            showNotification(`원본 사용자 설정 복원: 볼륨 ${originalUserSettingsRef.current.volume}%, 속도 ${originalUserSettingsRef.current.speed}x`, 'info');
-            
-            // 복원 후 백업 클리어
+
+            showNotification(`재생 기본값으로 복원: 볼륨 ${defaultVolume}%, 속도 ${defaultSpeed}x`, 'info');
+
+            // 백업 클리어 (다음 타임스탬프를 위해)
             originalUserSettingsRef.current = null;
-          } else {
-            console.log('백업된 설정이 없음 - 현재 userSettings로 대체 복원');
-            if (player.setVolume) player.setVolume(userSettings.volume);
-            if (player.setPlaybackRate) player.setPlaybackRate(userSettings.speed);
-            
-            setCurrentVolume(userSettings.volume);
-            setCurrentPlaybackRate(userSettings.speed);
-            setVolume(userSettings.volume);
-            setPlaybackRate(userSettings.speed);
-            setCurrentRate(userSettings.speed);
-            
-            showNotification(`사용자 설정 복원: 볼륨 ${userSettings.volume}%, 속도 ${userSettings.speed}x`, 'info');
           }
           
           setActiveTimestamp(null);
@@ -1148,50 +1188,109 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           const startTime = startHours * 3600 + startMinutes * 60 + startSeconds;
           const endTime = endHours * 3600 + endMinutes * 60 + endSeconds;
           
+          // 더블클릭시 진입 처리 플래그 설정 (자동 감지와 중복 방지)
+          processingEntryRef.current = true;
+
           // 원본 사용자 설정 백업 (더블클릭 이전 상태 보존)
           if (!originalUserSettingsRef.current) {
             const currentPlayerVolume = player.getVolume ? player.getVolume() : currentVolume;
             const currentPlayerSpeed = player.getPlaybackRate ? player.getPlaybackRate() : currentPlaybackRate;
-            
+
             originalUserSettingsRef.current = {
               volume: currentPlayerVolume,
               speed: currentPlayerSpeed
             };
             console.log(`[더블클릭] 원본 사용자 설정 백업:`, originalUserSettingsRef.current);
           }
-          
-          // 볼륨과 재생 속도 설정 (하지만 userSettings는 오염시키지 않음)
+
+          // originalSettings 백업 (이탈시 복원용)
+          const currentPlayerVolume = player.getVolume ? player.getVolume() : currentVolume;
+          const currentPlayerSpeed = player.getPlaybackRate ? player.getPlaybackRate() : currentPlaybackRate;
+
+          setOriginalSettings({
+            volume: currentPlayerVolume,
+            speed: currentPlayerSpeed
+          });
+
+          console.log(`[더블클릭] 진입 전 상태 백업 - 볼륨: ${currentPlayerVolume}%, 속도: ${currentPlayerSpeed}x`);
+
+          // 타임스탬프 설정 즉시 적용
           if (player.setVolume) {
             player.setVolume(timestampVolume);
           }
           if (player.setPlaybackRate) {
             player.setPlaybackRate(timestampSpeed);
           }
+
+          // UI 상태도 즉시 동기화
+          setCurrentVolume(timestampVolume);
+          setCurrentPlaybackRate(timestampSpeed);
+          setVolume(timestampVolume);
+          setPlaybackRate(timestampSpeed);
+          setCurrentRate(timestampSpeed);
           
-          // 시작 위치로 이동하고 재생
-          player.seekTo(startTime, true);
+          // 클릭 위치에 따라 시작시간/종료시간 결정
+          const timestampStart = clickedMatch.index;
+          const dashPos = clickedTimestamp.indexOf('-');
+          const isEndTimeClick = clickPosition > (timestampStart + dashPos);
+          const targetTime = isEndTimeClick ? endTime : startTime;
+
+          console.log(`[더블클릭] ${isEndTimeClick ? '종료' : '시작'}시간 클릭 - ${targetTime.toFixed(3)}초로 이동`);
+
+          // 목표 위치로 이동하고 재생
+          player.seekTo(targetTime, true);
           player.playVideo();
-          
-          // activeTimestamp 설정 (자동 실행 중복 방지)
+
+          // 더블클릭한 타임스탬프의 인덱스 찾기
+          const timestamps = parseTimestamps(noteText);
+          let clickedIndex = -1;
+          for (let i = 0; i < timestamps.length; i++) {
+            if (timestamps[i].raw === clickedTimestamp) {
+              clickedIndex = i;
+              break;
+            }
+          }
+
+          // 더블클릭 시 항상 activeTimestamp 설정 (중복 실행 방지)
           setActiveTimestamp({
             startTime,
             endTime,
-            volume,
-            speed: playbackRate,
+            volume: timestampVolume,
+            speed: timestampSpeed, // 타임스탬프 텍스트의 속도 사용
             action: actionMode,
             raw: clickedTimestamp,
-            index: 0
+            index: clickedIndex
           });
+          console.log(`[더블클릭] activeTimestamp 설정 - ${isEndTimeClick ? '종료' : '시작'}시간 클릭`);
+
+          // 더블클릭한 타임스탬프 인덱스로 우선순위 설정
+          setLastActiveIndex(clickedIndex);
+          console.log(`[더블클릭] 우선순위 설정: ${clickedIndex}`);
+
+          // 타임스탬프 설정 안정성 알림
+          showNotification(`타임스탬프 적용: 볼륨 ${timestampVolume}%, 속도 ${timestampSpeed}x`, 'success');
+
+          // 처리 플래그 해제 (100ms 후 - 자동 감지와의 간섭 방지)
+          setTimeout(() => {
+            processingEntryRef.current = false;
+            console.log(`[더블클릭] 처리 플래그 해제 - 자동 감지 재개`);
+          }, 100);
+
+          // 종료시간 클릭의 경우에만 자동 이탈 처리
+          if (isEndTimeClick) {
+            console.log(`[더블클릭] 종료시간 클릭 - 자동 이탈 로직 의존`);
+            // 종료시간 클릭은 별도 타이머 없이 자동 감지 루프의 이탈 로직에 의존
+          }
           
-          // 동작 모드에 따른 처리
+          // 동작 모드에 따른 처리 (더블클릭 즉시 실행)
           if (actionMode && actionMode.startsWith('|')) {
-            // 정지 기능: |3 = 3초간 정지 후 계속 재생 (SimpleNoteArea에서 검증된 로직)
+            // 정지 기능: |3 = 3초간 정지 후 계속 재생
             const pauseSeconds = parseInt(actionMode.substring(1));
             if (!isNaN(pauseSeconds)) {
-              // 즉시 정지
+              // 더블클릭 시 즉시 정지 (딜레이 제거)
               player.pauseVideo();
               showNotification(`${pauseSeconds}초간 정지 - 이후 자동 재생`, "warning");
-              
+
               // 지정된 시간 후 재생 재개
               setTimeout(() => {
                 player.playVideo();
@@ -1423,7 +1522,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                       type="range"
                       min="0.25"
                       max="2.0"
-                      step="0.01"
+                      step="0.05"  // 0.05 단위로 변경 (YouTube API와 일치)
                       value={playbackRate}
                       onChange={(e) => {
                         const newRate = Number(e.target.value);

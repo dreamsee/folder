@@ -137,41 +137,6 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     }
   };
 
-  // 영상 선택해서 재생
-  const handleVideoSelect = (video: YoutubeVideo) => {
-    console.log('[VideoLoader] 영상 선택:', video.videoId, video.title);
-    
-    // 비디오 ID 먼저 설정 (플레이어 생성 트리거)
-    setCurrentVideoId(video.videoId);
-    setCurrentVideoInfo({
-      title: video.title,
-      channelName: video.channelTitle,
-      thumbnailUrl: video.thumbnail,
-    });
-    
-    // 플레이어 준비 상태 확인만 하고, 실제 로드는 YouTubePlayer에서 처리
-    if (isPlayerReady && player) {
-      console.log('[VideoLoader] 플레이어 준비됨, 영상 변경됨');
-      showNotification(`"${video.title}" 영상을 로드했습니다.`, "success");
-    } else {
-      console.log('[VideoLoader] 플레이어 준비 안됨:', isPlayerReady, player);
-      showNotification(`"${video.title}" 영상을 준비하고 있습니다.`, "info");
-    }
-    
-    // 검색 결과 자동 닫기
-    setSearchResults([]);
-    setFilteredResults([]);
-    
-    // 자동 숨김 모드에서는 검색 후 숨김
-    if (autoHide) {
-      setTimeout(() => setIsVisible(false), 1000);
-    }
-    
-    // 팝업 모드에서는 영상 선택 후 즉시 닫기
-    if (isPopup && onClose) {
-      onClose();
-    }
-  };
 
   // 안본 영상이 15개 미만일 때 자동으로 더 로드
   const autoLoadForUnwatchedVideos = async (videos: YoutubeVideo[]) => {
@@ -300,6 +265,8 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   
   // 영상 선택 시 처리 (시청 횟수 증가 포함)
   const handleVideoSelect = (video: YoutubeVideo) => {
+    console.log('[VideoLoader] 영상 선택:', video.videoId, video.title);
+    
     // 1. 시청 기록 업데이트 (여기가 핵심!)
     const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
     
@@ -335,12 +302,21 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     // 3. 영상 ID 설정 (YouTubePlayer에서 로드됨)
     setCurrentVideoId(video.videoId);
     
-    // 5. 팝업 모드면 닫기
+    // 4. 검색 결과 자동 닫기
+    setSearchResults([]);
+    setFilteredResults([]);
+    
+    // 5. 자동 숨김 모드에서는 검색 후 숨김
+    if (autoHide) {
+      setTimeout(() => setIsVisible(false), 1000);
+    }
+    
+    // 6. 팝업 모드면 닫기
     if (isPopup && onClose) {
       onClose();
     }
     
-    // 6. 검색 결과 재필터링 (시청 상태 반영)
+    // 7. 검색 결과 재필터링 (시청 상태 반영)
     applyFilter(searchResults, filterMode);
   };
   

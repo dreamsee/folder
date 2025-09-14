@@ -53,6 +53,8 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const [duration, setDuration] = useState(0);
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [hideYouTubeOverlay, setHideYouTubeOverlay] = useState(false);
   
   // 터치 홀드 확대 상태
   const [isTouchHolding, setIsTouchHolding] = useState(false);
@@ -183,8 +185,22 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const onPlayerStateChange = (event: any) => {
     console.log('[시청기록] 플레이어 상태 변경:', event.data, 'videoId:', currentVideoId);
     setPlayerState(event.data);
-    // 재생 상태 업데이트 (YT.PlayerState.PLAYING = 1)
+    // 재생 상태 업데이트 (YT.PlayerState.PLAYING = 1, PAUSED = 2)
     setIsPlaying(event.data === 1);
+    setIsPaused(event.data === 2);
+
+    // 정지 시 YouTube 오버레이 숨김 설정 확인
+    if (event.data === 2) {
+      const uiSettings = localStorage.getItem('uiSettings');
+      if (uiSettings) {
+        const settings = JSON.parse(uiSettings);
+        if (settings.화면텍스트?.정지시YouTube숨김) {
+          setHideYouTubeOverlay(true);
+        }
+      }
+    } else {
+      setHideYouTubeOverlay(false);
+    }
     
     // 영상 재생 시작 시 시청 기록 관리 (단일 책임: 모든 시청 기록은 여기서만 관리)
     // YT.PlayerState.PLAYING = 1
@@ -446,12 +462,28 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             </div>
           </div>
           {/* 텍스트 오버레이 */}
-          <TextOverlay 
-            overlays={overlays} 
-            currentTime={currentTime} 
+          <TextOverlay
+            overlays={overlays}
+            currentTime={currentTime}
             isPlaying={isPlaying}
             onOverlayPositionChange={onOverlayPositionChange}
           />
+          {/* 정지 시 YouTube UI 숨김 오버레이 */}
+          {hideYouTubeOverlay && isPaused && (
+            <div
+              className="absolute inset-0 z-25"
+              style={{
+                backgroundColor: 'transparent',
+                pointerEvents: 'auto'
+              }}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                // 클릭 시 재생/정지 토글
+                togglePlayPause();
+              }}
+            />
+          )}
           {/* 영상 잠금 오버레이 */}
           {isLocked && (
             <div 

@@ -429,6 +429,144 @@ originalSettings 변경 시 영향받는 것들:
 - client/src/components/VideoLoader.tsx: 검색 결과 시청 횟수 증가 로직
 - client/src/components/FavoriteManager.tsx: 즐겨찾기 시청 횟수 증가 로직  
 - client/src/components/YouTubePlayer.tsx: 재생 이벤트 시청 횟수 로직 제거
+
+타임스탬프 더블클릭 기능 개선 작업 (2025-09-13):
+
+1. 기존 문제:
+   - |3 정지 타임스탬프에서 중복 정지 발생 (더블클릭 즉시 + 자동감지로 또 한번)
+   - 종료시간 더블클릭 시 시작시간으로만 이동
+   - 타임스탬프 구간 내에서 더블클릭 시 정지 액션이 작동하지 않음
+   - 정지 타이밍이 부정확 (이동 후 1초 뒤에 정지)
+
+2. 문제 원인:
+   - 더블클릭에서 setActiveTimestamp의 speed 값과 자동감지 파싱의 speed 값 불일치
+   - 더블클릭에서는 speed: playbackRate, 자동감지에서는 speed: 1 으로 달라서 
+   - isDifferentTimestamp가 true가 되어 같은 타임스탬프를 다른 것으로 인식
+   - 더블클릭 시 액션이 자동 감지에 의존해서 타이밍 지연
+
+3. 해결 내용:
+   a) NoteArea.tsx 더블클릭 처리 로직:
+      - 클릭 위치 감지로 시작시간/종료시간 구분 이동
+      - setActiveTimestamp에서 타임스탬프 텍스트의 정확한 speed 값 사용
+      - 정지 액션을 더블클릭 즉시 실행 (200ms 딜레이)
+      - 로그에 영상 시간 추가로 디버깅 개선
+
+4. 결과:
+   - 종료시간 더블클릭 시 종료시간으로 정확히 이동
+   - |3 정지 액션 중복 실행 완전 차단
+   - 더블클릭 즉시 정지 실행으로 타이밍 정확성 개선
+   - 타임스탬프 구간 내외 관계없이 더블클릭으로 정지 작동
+
+관련 파일:
+- client/src/components/NoteArea.tsx: 타임스탬프 더블클릭 처리 로직 개선
+- client/src/components/VideoLoader.tsx: handleVideoSelect 중복 함수 정리
+
+타임스탬프 우선순위 시스템 구현 (2025-09-13):
+
+1. 기존 문제:
+   - 수동이동 시 시간 순서대로 타임스탬프가 활성화됨
+   - 예: 2:7초 이동 → 2번째 타임스탬프(2:10~2:15) 작동 → 2:29초에 1번째 타임스탬프(2:29~2:34)도 작동
+   - 텍스트 순서와 무관하게 시간 기준으로만 활성화되는 문제
+
+2. 요구사항:
+   - 수동이동 시 가장 가까운 타임스탬프를 우선 선택
+   - 선택된 타임스탬프의 후순위(텍스트에서 뒤에 나오는) 타임스탬프만 활성화
+   - 이전 순서의 타임스탬프는 무시
+
+3. 구현 내용:
+   a) lastActiveIndex 상태 추가:
+      - 마지막으로 활성화된 타임스탬프의 인덱스 추적
+      - 초기값: -1 (모든 타임스탬프 활성화 가능)
+
+   b) 우선순위 기반 타임스탬프 검색:
+      - lastActiveIndex + 1 이후의 타임스탬프만 검사
+      - 시간 범위에 속하는 타임스탬프 중 가장 빠른 인덱스 선택
+
+   c) 수동이동 시 우선순위 재설정:
+      - 가장 가까운 타임스탬프 찾기 (시작시간 기준 거리 계산)
+      - 해당 타임스탬프의 이전 인덱스로 lastActiveIndex 설정
+      - 가장 가까운 타임스탬프부터 활성화 가능하도록 처리
+
+   d) 더블클릭 시 우선순위 설정:
+      - 클릭한 타임스탬프의 인덱스 찾기
+      - lastActiveIndex를 해당 인덱스로 설정
+
+4. 동작 예시:
+   [00:02:29.401-00:02:34.401, 100%, 1.10x] (인덱스 0)
+   [00:02:10.330-00:02:15.633, 65%, 1.00x, |3] (인덱스 1)
+   
+   - 2:07초 수동이동 → 가장 가까운: 인덱스 1(2:10) → lastActiveIndex = 0
+   - 2:10초 도달 → 인덱스 1 활성화 → lastActiveIndex = 1
+   - 2:29초 도달 → 인덱스 0은 이전 순서이므로 무시됨
+
+5. 결과:
+   - 타임스탬프가 텍스트 순서대로만 활성화
+   - 수동이동 시 가장 가까운 타임스탬프부터 시작
+   - 이전 순서 타임스탬프 건너뛰기 방지
+
+관련 파일:
+- client/src/components/NoteArea.tsx:
+  * lastActiveIndex 상태 추가
+  * 우선순위 기반 타임스탬프 검색 로직
+  * 수동이동/더블클릭 시 우선순위 재설정
+
+타임스탬프 종료시간 더블클릭 기능 수정 (2025-09-14):
+
+1. 기존 문제:
+   - 종료시간 더블클릭 시 타임스탬프 설정값(볼륨/속도) 유지됨
+   - 재생 기본값으로 복원되지 않음
+   - activeTimestamp가 설정되어 이탈 로직 작동하지 않음
+
+2. 문제 원인:
+   - 더블클릭으로 종료시간 이동 시 activeTimestamp가 설정됨
+   - 이미 타임스탬프 구간 밖에 있어서 currentStamp가 null
+   - 이탈 조건(!currentStamp && activeTimestamp)이지만 이미 구간 밖이라 감지 안됨
+
+3. 해결 방법:
+   - 종료시간 클릭 시 activeTimestamp를 설정하지 않도록 수정
+   - 시작시간 클릭 시에만 activeTimestamp 설정 (중복 실행 방지용)
+   - 종료시간 클릭 시 자동으로 이탈 로직이 작동하여 기본값 복원
+
+4. 수정 내용 (NoteArea.tsx 1232-1249번 줄):
+   - isEndTimeClick 변수로 클릭 위치 판별
+   - if (!isEndTimeClick) 조건으로 시작시간만 activeTimestamp 설정
+   - 종료시간 클릭 시 activeTimestamp 미설정, 자동 이탈 대기
+
+5. 결과:
+   - 종료시간 더블클릭 시 재생 기본값으로 자동 복원
+   - 타임스탬프 설정이 유지되지 않고 정상 복원
+   - 재생컨트롤 UI도 함께 복원됨
+
+관련 파일:
+- client/src/components/NoteArea.tsx: handleTimestampClick 함수 수정
+
+YouTube 일시정지 시 오버레이 숨김 기능 (2025-09-14):
+
+1. 구현 내용:
+   - 일시정지 시 YouTube의 제목, 관련 영상 등 UI 숨김
+   - 텍스트 오버레이만 깨끗하게 표시
+   - 설정 패널에서 토글로 on/off 가능
+
+2. 수정 파일:
+   a) YouTubePlayer.tsx:
+      - isPaused, hideYouTubeOverlay 상태 추가
+      - onPlayerStateChange에서 정지 감지 및 설정 확인
+      - 투명 오버레이 레이어로 YouTube UI 가림
+      - 클릭 시 재생/정지 토글 동작
+
+   b) SettingsPanel.tsx:
+      - UISettings 인터페이스에 정지시YouTube숨김 속성 추가
+      - 화면텍스트 섹션에 "정지 시 YouTube UI 숨김" 토글 추가
+
+3. 동작 방식:
+   - 설정에서 토글 켜면 localStorage에 저장
+   - 영상 일시정지(playerState === 2) 시 설정 확인
+   - hideYouTubeOverlay true면 투명 오버레이 표시
+   - 오버레이 클릭 시 togglePlayPause() 실행
+
+관련 파일:
+- client/src/components/YouTubePlayer.tsx: 오버레이 로직 구현
+- client/src/components/SettingsPanel.tsx: 설정 토글 추가
 ====================
 
 1. 함수 길이 제한:
