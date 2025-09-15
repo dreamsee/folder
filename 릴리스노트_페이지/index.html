@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>July 2025 Release Notes</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 상단 영역 -->
+    <header class="hero-section">
+        <div class="container">
+            <h1 class="main-title">July 2025 (version 1.103)</h1>
+            <p class="release-date">Release date: August 7, 2025</p>
+            
+            <div class="summary-box collapsible">
+                <div class="collapsible-content">
+                    <p>Welcome to the July 2025 release of Visual Studio Code. There are many updates in this version that we hope you'll like, some of the key highlights include:</p>
+                    <ul>
+                        <li><strong>MCP</strong> - Revamped tool picker experience</li>
+                        <li><strong>Chat</strong> - Use GPT-5 in VS Code</li>
+                        <li><strong>Productivity</strong> - Check out multiple branches simultaneously with Git worktrees</li>
+                    </ul>
+                    <div class="expanded-content">
+                        <p>Enable more than 128 tools per agent request with our new batching system. This update also includes improved performance metrics, better error handling, and enhanced UI responsiveness.</p>
+                        <p>Restore to a previous good state with chat checkpoints. Manage coding agent sessions in a dedicated view. All these features are designed to improve your development workflow.</p>
+                    </div>
+                </div>
+                <button class="toggle-button">Show more</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <div class="main-container">
+        <!-- 좌측 사이드바 -->
+        <nav class="sidebar">
+            <ul class="nav-list">
+                <li class="nav-item active" data-target="mcp">MCP</li>
+                <li class="nav-item" data-target="chat">Chat</li>
+                <li class="nav-item" data-target="productivity">Productivity</li>
+                <li class="nav-item" data-target="editor">Editor Experience</li>
+                <li class="nav-item" data-target="notebooks">Notebooks</li>
+                <li class="nav-item" data-target="source">Source Control</li>
+                <li class="nav-item" data-target="terminal">Terminal</li>
+                <li class="nav-item" data-target="languages">Languages</li>
+                <li class="nav-item" data-target="contributions">Contributions to extensions</li>
+                <li class="nav-item" data-target="apis">Extension Authoring</li>
+                <li class="nav-item" data-target="proposed">Proposed APIs</li>
+                <li class="nav-item" data-target="engineering">Engineering</li>
+                <li class="nav-item" data-target="notable">Notable fixes</li>
+                <li class="nav-item" data-target="thanks">Thank you</li>
+            </ul>
+        </nav>
+
+        <!-- 우측 콘텐츠 영역 -->
+        <main class="content-area">
+            <!-- MCP 섹션 -->
+            <section id="mcp" class="content-section">
+                <h2>MCP</h2>
+                <div class="feature-card mcp">
+                    <h3>Revamped tool picker experience</h3>
+                    <p>We've totally revamped the tool picker this iteration and adopted a new component called Quick Tree to display all the tools.</p>
+                    <button class="show-more-btn">Show more</button>
+                    <div class="more-content">
+                        <p>The new tool picker provides better search capabilities, hierarchical organization, and improved performance when dealing with hundreds of tools.</p>
+                        <div class="code-block">
+                            <pre><code>// Example tool configuration
+{
+  "tools": {
+    "enabled": true,
+    "picker": {
+      "style": "tree",
+      "search": "fuzzy"
+    }
+  }
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="feature-card mcp">
+                    <h3>Enable more than 128 tools per agent request</h3>
+                    <p>Previously, agents were limited to 128 tools per request. We've now implemented a batching system that allows unlimited tools.</p>
+                    <button class="show-more-btn">Show more</button>
+                </div>
+            </section>
+
+            <!-- Chat 섹션 -->
+            <section id="chat" class="content-section">
+                <h2>Chat</h2>
+                <div class="feature-card chat">
+                    <h3>GPT-5 availability</h3>
+                    <p>Starting today, GPT-5 is rolling out to all paid GitHub Copilot plans. GPT-5 is OpenAI's most capable model yet, bringing new advances in reasoning, coding, and chat.</p>
+                    <button class="show-more-btn">Show more</button>
+                    <div class="more-content">
+                        <p>Learn more about the GPT-5 model availability in the GitHub Changelog.</p>
+                        <p>Open the Chat view and choose GPT-5 from the model picker to start using it for your chat conversations in VS Code.</p>
+                    </div>
+                </div>
+
+                <div class="feature-card chat">
+                    <h3>Chat checkpoints</h3>
+                    <p><strong>Setting:</strong> <code>chat.checkpoints.enabled</code></p>
+                    <p>We've introduced checkpoints that enable you to restore different states of your chat conversations. You can easily revert edits and go back to previous points in your conversation history.</p>
+                    <div class="code-block">
+                        <pre><code>// Enable chat checkpoints
+"chat.checkpoints.enabled": true</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Productivity 섹션 -->
+            <section id="productivity" class="content-section">
+                <h2>Productivity</h2>
+                <div class="feature-card productivity">
+                    <h3>Check out multiple branches simultaneously with Git worktrees</h3>
+                    <p>Git worktrees allow you to have multiple branches checked out at the same time in different folders, making it easier to work on multiple features or bug fixes simultaneously.</p>
+                    <button class="show-more-btn">Show more</button>
+                    <div class="more-content">
+                        <ul>
+                            <li>Create new worktrees from the Source Control view</li>
+                            <li>Switch between worktrees quickly</li>
+                            <li>Manage all your worktrees from a single VS Code window</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="feature-card productivity">
+                    <h3>Manage coding agent sessions in a dedicated view</h3>
+                    <p>A new dedicated view for managing your coding agent sessions provides better organization and control over your AI-assisted development workflow.</p>
+                    <button class="show-more-btn">Show more</button>
+                </div>
+            </section>
+
+            <!-- 추가 섹션들 -->
+            <section id="editor" class="content-section">
+                <h2>Editor Experience</h2>
+                <div class="feature-card">
+                    <h3>Enhanced IntelliSense</h3>
+                    <p>Improved code completion with better context awareness and faster response times.</p>
+                </div>
+            </section>
+
+            <section id="notebooks" class="content-section">
+                <h2>Notebooks</h2>
+                <div class="feature-card">
+                    <h3>Jupyter Notebook improvements</h3>
+                    <p>Better cell execution, improved variable explorer, and enhanced data visualization support.</p>
+                </div>
+            </section>
+
+            <section id="source" class="content-section">
+                <h2>Source Control</h2>
+                <div class="feature-card">
+                    <h3>Git integration enhancements</h3>
+                    <p>Improved merge conflict resolution, better branch management, and faster operations.</p>
+                </div>
+            </section>
+
+            <section id="terminal" class="content-section">
+                <h2>Terminal</h2>
+                <div class="feature-card">
+                    <h3>Terminal profiles</h3>
+                    <p>Create and manage custom terminal profiles for different development environments.</p>
+                </div>
+            </section>
+
+            <section id="languages" class="content-section">
+                <h2>Languages</h2>
+                <div class="feature-card">
+                    <h3>TypeScript 5.5 support</h3>
+                    <p>Full support for the latest TypeScript features and improvements.</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

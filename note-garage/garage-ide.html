@@ -538,17 +538,26 @@
             // 요청 기록
             tokenProtection.recordRequest(message);
             
-            // 실제 AI 처리 (디자인 관련만)
-            setTimeout(() => {
-                const responses = [
-                    '네, 디자인을 변경해드리겠습니다! 🎨',
-                    '좋은 아이디어네요! 미리보기에서 결과를 확인하세요 ✨',
-                    '스타일이 적용되었습니다. 어떠신가요? 🚀',
-                    '더 디자인 수정이 필요하시면 말씀해주세요! 💡'
-                ];
-                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                addMessage('ai', randomResponse);
-            }, 1000);
+            // 실제 Claude AI 처리 (서버 API 호출)
+            fetch('http://localhost:3001/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addMessage('ai', data.response);
+                } else {
+                    addMessage('ai', `❌ 오류: ${data.error}`);
+                }
+            })
+            .catch(error => {
+                console.error('API 호출 오류:', error);
+                addMessage('ai', '⚠️ 서버 연결에 실패했습니다. 서버가 실행 중인지 확인해주세요.');
+            });
         }
         
         // 메시지 추가

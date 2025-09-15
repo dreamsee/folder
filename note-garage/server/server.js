@@ -1,7 +1,13 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const Anthropic = require('@anthropic-ai/sdk');
 require('dotenv').config();
+
+// Claude API 클라이언트 초기화
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -30,41 +36,63 @@ app.get('/', (req, res) => {
   });
 });
 
-// 간단한 채팅 API (Claude API 없이 데모용)
-app.post('/api/chat', (req, res) => {
-  const { message } = req.body;
-  
-  if (!message) {
-    return res.status(400).json({ error: '메시지가 필요합니다.' });
-  }
+// Claude API를 통한 실제 AI 채팅
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { message } = req.body;
+    
+    if (!message) {
+      return res.status(400).json({ error: '메시지가 필요합니다.' });
+    }
 
-  // 간단한 응답 로직
-  let response = '';
-  const lowerMessage = message.toLowerCase();
-  
-  if (lowerMessage.includes('색') || lowerMessage.includes('color')) {
-    response = '🎨 색상을 변경하겠습니다! 코드를 확인해보세요.';
-  } else if (lowerMessage.includes('크기') || lowerMessage.includes('size')) {
-    response = '📏 크기를 조정하겠습니다! 미리보기를 확인해보세요.';
-  } else if (lowerMessage.includes('버튼') || lowerMessage.includes('button')) {
-    response = '🔘 버튼 스타일을 수정하겠습니다!';
-  } else {
-    const responses = [
-      '네, 디자인을 변경해드리겠습니다! 🎨',
-      '좋은 아이디어네요! 미리보기에서 결과를 확인하세요 ✨',
-      '스타일이 적용되었습니다. 어떠신가요? 🚀',
-      '더 디자인 수정이 필요하시면 말씀해주세요! 💡'
-    ];
-    response = responses[Math.floor(Math.random() * responses.length)];
-  }
+    // 디자인 전용 AI 시스템 프롬프트
+    const systemPrompt = `당신은 웹페이지 디자인 전용 AI 어시스턴트입니다. 다음 규칙을 엄격히 따르세요:
 
-  setTimeout(() => {
+1. **디자인 관련 질문만** 답변합니다 (HTML, CSS, 색상, 레이아웃, 스타일링)
+2. **비디자인 질문**은 정중히 거절: "🎨 저는 디자인 전용 AI입니다. 웹페이지 스타일링에 대해 질문해주세요!"
+3. **응답 형식**: 친근하고 간결하게, 이모지 포함
+4. **코드 제안**: 구체적인 CSS 코드나 HTML 수정 방법 제공
+5. **안전성**: 보안, 서버, 데이터베이스 관련 질문은 절대 답변하지 않음
+
+사용자 요청을 분석하여 디자인 관련이면 도움을 주고, 아니면 정중히 거절하세요.`;
+
+    // Claude API 호출
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 1000,
+      temperature: 0.7,
+      system: systemPrompt,
+      messages: [
+        {
+          role: 'user',
+          content: message
+        }
+      ]
+    });
+
+    const aiResponse = response.content[0].text;
+
     res.json({
       success: true,
-      response: response,
+      response: aiResponse,
+      timestamp: new Date().toISOString(),
+      model: 'claude-3-5-sonnet-20241022'
+    });
+
+  } catch (error) {
+    console.error('Claude API 오류:', error);
+    
+    // API 오류 시 폴백 응답
+    const fallbackResponse = error.status === 401 
+      ? '🔑 API 키가 유효하지 않습니다. 서버 설정을 확인해주세요.'
+      : '⚠️ 일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+    
+    res.status(500).json({
+      success: false,
+      error: fallbackResponse,
       timestamp: new Date().toISOString()
     });
-  }, 500);
+  }
 });
 
 // 파일 관리 API

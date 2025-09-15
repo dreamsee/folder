@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.5D 다각도 렌더링 시스템</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 30px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2em;
+        }
+
+        .render-container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .canvas-wrapper {
+            flex: 1;
+            min-width: 400px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+        }
+
+        #renderCanvas {
+            width: 100%;
+            height: 400px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            cursor: grab;
+        }
+
+        #renderCanvas:active {
+            cursor: grabbing;
+        }
+
+        .controls {
+            flex: 0 0 300px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="range"] {
+            flex: 1;
+            height: 6px;
+            background: #ddd;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #667eea;
+            cursor: pointer;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            background: #5a67d8;
+        }
+
+        .value-display {
+            min-width: 50px;
+            text-align: center;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .layer-list {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            margin-bottom: 5px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: move;
+        }
+
+        .layer-item:hover {
+            background: #e9ecef;
+        }
+
+        .layer-visibility {
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+        }
+
+        .stats {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: #0f0;
+            font-family: monospace;
+            font-size: 11px;
+            padding: 8px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            margin-top: 10px;
+            transition: all 0.3s;
+        }
+
+        .drop-zone.drag-over {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            color: #667eea;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 2.5D 다각도 렌더링 시스템</h1>
+        
+        <div class="render-container">
+            <div class="canvas-wrapper">
+                <canvas id="renderCanvas"></canvas>
+                <div class="stats" id="stats">
+                    FPS: <span id="fps">0</span><br>
+                    Angle: <span id="currentAngle">0</span>°<br>
+                    Layers: <span id="layerCount">0</span><br>
+                    Draw Calls: <span id="drawCalls">0</span>
+                </div>
+                <div class="loading" id="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <div>로딩 중...</div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label>회전 각도</label>
+                    <div class="slider-container">
+                        <input type="range" id="angleSlider" min="0" max="360" value="0" step="1">
+                        <span class="value-display" id="angleValue">0°</span>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>보간 품질</label>
+                    <div class="slider-container">
+                        <input type="range" id="qualitySlider" min="0" max="1" value="0.5" step="0.1">
+                        <span class="value-display" id="qualityValue">0.5</span>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>렌더링 모드</label>
+                    <div class="button-group">
+                        <button id="modeWireframe">와이어프레임</button>
+                        <button id="modeTextured">텍스처</button>
+                        <button id="modeCombined">혼합</button>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>애니메이션</label>
+                    <div class="button-group">
+                        <button id="animPlay">재생</button>
+                        <button id="animPause">일시정지</button>
+                        <button id="animReset">리셋</button>
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>레이어 관리</label>
+                    <div class="layer-list" id="layerList">
+                        <!-- 동적으로 생성됨 -->
+                    </div>
+                </div>
+                
+                <div class="control-group">
+                    <label>파츠 업로드</label>
+                    <div class="button-group">
+                        <button id="addToCurrentView">현재 각도에 추가</button>
+                        <button id="addToAllViews">모든 각도에 추가</button>
+                    </div>
+                    <div class="drop-zone" id="dropZone">
+                        이미지를 드래그하여 추가<br>
+                        <small>현재 각도: <span id="currentViewAngle">0°</span></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

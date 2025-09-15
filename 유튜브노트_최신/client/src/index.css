@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 화면 잠금 상태 스타일 */
+.screen-locked {
+  /* 모바일에서 핀치 줌 활성화 */
+  touch-action: pinch-zoom pan;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.screen-unlocked {
+  /* 일반 상태에서는 기본 터치 동작 */
+  touch-action: auto;
+}
+
+/* 돋보기 효과 */
+.magnifier-lens {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(0px);
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* 스크롤바 완전 숨기기 + 뷰포트 너비 고정 */
+  html {
+    overflow-y: auto; /* 필요시에만 스크롤바 */
+    overflow-x: hidden; /* 가로 스크롤 완전 차단 */
+  }
+  
+  body {
+    margin-right: calc(-1 * (100vw - 100%)); /* 스크롤바 너비만큼 우측 여백 보정 */
+  }
+  
+  /* 스크롤바 완전 숨기기 (WebKit 브라우저) */
+  ::-webkit-scrollbar {
+    display: none; /* 스크롤바 완전 제거 */
+  }
+  
+  /* Firefox용 스크롤바 숨기기 */
+  html {
+    scrollbar-width: none; /* Firefox에서 스크롤바 완전 제거 */
+  }
+  
+  /* 모바일 터치 최적화 */
+  .touch-manipulation {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* 버튼 탭 하이라이트 제거 */
+  button, a, input, textarea, select {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* 모바일 클릭 딜레이 방지 */
+  button {
+    touch-action: manipulation;
+  }
+}

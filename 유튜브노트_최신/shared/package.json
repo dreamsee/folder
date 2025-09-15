@@ -1,0 +1,9 @@
+{
+  "name": "shared",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "simple-schema.js",
+  "dependencies": {
+    "zod": "^4.0.5"
+  }
+}

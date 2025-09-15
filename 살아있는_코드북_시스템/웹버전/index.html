@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>살아있는 코드북 시스템 - Interactive Web Version</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">
+                    <i class="fas fa-cube"></i>
+                    살아있는 코드북
+                </h1>
+            </div>
+            <div class="header-center">
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="searchInput" placeholder="코드, 함수, 설명 검색...">
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-primary" id="loadProjectBtn">
+                    <i class="fas fa-folder-open"></i>
+                    프로젝트 로드
+                </button>
+                <button class="btn btn-secondary" id="blueprintBtn">
+                    <i class="fas fa-project-diagram"></i>
+                    블루프린트
+                </button>
+                <button class="btn btn-secondary" id="kanbanBtn">
+                    <i class="fas fa-columns"></i>
+                    칸반보드
+                </button>
+                <div class="toggle-container">
+                    <label class="toggle">
+                        <input type="checkbox" id="debugModeToggle">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="toggle-label">디버그</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3>코드 카드 목록</h3>
+                    <span class="card-count" id="cardCount">0개</span>
+                </div>
+                <div class="card-list" id="cardList">
+                    <!-- Cards will be dynamically inserted here -->
+                </div>
+            </aside>
+
+            <!-- Content Area -->
+            <section class="content-area">
+                <div class="card-display" id="cardDisplay">
+                    <div class="welcome-message">
+                        <div class="welcome-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <h2>코드카드를 선택하세요</h2>
+                        <p>왼쪽 목록에서 카드를 클릭하면 상세 내용을 볼 수 있습니다.</p>
+                        <button class="btn btn-primary" id="welcomeLoadBtn">
+                            <i class="fas fa-rocket"></i>
+                            샘플 프로젝트 시작하기
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Debug Panel (hidden by default) -->
+                <div class="debug-panel" id="debugPanel" style="display: none;">
+                    <div class="debug-tabs">
+                        <button class="debug-tab active" data-tab="info">
+                            <i class="fas fa-info-circle"></i>
+                            디버그 정보
+                        </button>
+                        <button class="debug-tab" data-tab="performance">
+                            <i class="fas fa-tachometer-alt"></i>
+                            성능 정보
+                        </button>
+                        <button class="debug-tab" data-tab="results">
+                            <i class="fas fa-play-circle"></i>
+                            실행 결과
+                        </button>
+                    </div>
+                    <div class="debug-content">
+                        <div class="debug-pane active" id="debugInfo">
+                            <pre id="debugInfoContent">디버그 정보가 여기 표시됩니다.</pre>
+                        </div>
+                        <div class="debug-pane" id="debugPerformance">
+                            <pre id="debugPerfContent">성능 정보가 여기 표시됩니다.</pre>
+                        </div>
+                        <div class="debug-pane" id="debugResults">
+                            <pre id="debugResultsContent">실행 결과가 여기 표시됩니다.</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Modal for Blueprint View -->
+        <div class="modal" id="blueprintModal">
+            <div class="modal-content modal-large">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-project-diagram"></i>
+                        코드 연결 블루프린트
+                    </h3>
+                    <button class="modal-close" id="closeBlueprintModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <canvas id="blueprintCanvas" width="800" height="600"></canvas>
+                    <div class="blueprint-controls">
+                        <button class="btn btn-sm" id="resetLayoutBtn">
+                            <i class="fas fa-redo"></i>
+                            레이아웃 리셋
+                        </button>
+                        <button class="btn btn-sm" id="centerViewBtn">
+                            <i class="fas fa-crosshairs"></i>
+                            중앙 정렬
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal for Kanban Board -->
+        <div class="modal" id="kanbanModal">
+            <div class="modal-content modal-fullscreen">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-columns"></i>
+                        칸반 스타일 작업 관리
+                    </h3>
+                    <button class="modal-close" id="closeKanbanModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="kanban-board" id="kanbanBoard">
+                        <div class="kanban-column" data-status="todo">
+                            <div class="column-header">
+                                <span class="column-title">할 일</span>
+                                <span class="column-count">0</span>
+                            </div>
+                            <div class="column-content" id="todoColumn"></div>
+                        </div>
+                        <div class="kanban-column" data-status="in-progress">
+                            <div class="column-header">
+                                <span class="column-title">진행 중</span>
+                                <span class="column-count">0</span>
+                            </div>
+                            <div class="column-content" id="inProgressColumn"></div>
+                        </div>
+                        <div class="kanban-column" data-status="review">
+                            <div class="column-header">
+                                <span class="column-title">검토 중</span>
+                                <span class="column-count">0</span>
+                            </div>
+                            <div class="column-content" id="reviewColumn"></div>
+                        </div>
+                        <div class="kanban-column" data-status="done">
+                            <div class="column-header">
+                                <span class="column-title">완료</span>
+                                <span class="column-count">0</span>
+                            </div>
+                            <div class="column-content" id="doneColumn"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Floating Action Button -->
+        <div class="fab-container">
+            <button class="fab" id="addCardFab">
+                <i class="fas fa-plus"></i>
+            </button>
+            <div class="fab-menu">
+                <button class="fab-item" id="runCodeFab">
+                    <i class="fas fa-play"></i>
+                    <span>코드 실행</span>
+                </button>
+                <button class="fab-item" id="exportFab">
+                    <i class="fas fa-download"></i>
+                    <span>내보내기</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container" id="toastContainer"></div>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>처리 중...</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <script src="blueprint.js"></script>
+    <script src="kanban.js"></script>
+</body>
+</html>

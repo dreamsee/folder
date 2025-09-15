@@ -1,0 +1,993 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📦 코드 블록 뷰어 - 접었다 펼치기</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 좌측 파일 트리 */
+        .sidebar {
+            width: 300px;
+            background: #252526;
+            border-right: 1px solid #3c3c3c;
+            overflow-y: auto;
+            resize: horizontal;
+        }
+
+        .upload-area {
+            padding: 20px;
+            border-bottom: 1px solid #3c3c3c;
+            text-align: center;
+        }
+
+        .upload-zone {
+            border: 2px dashed #007acc;
+            border-radius: 8px;
+            padding: 40px 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            background: #2d2d30;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            background: #094771;
+            border-color: #4fc3f7;
+        }
+
+        .upload-buttons {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .upload-btn {
+            padding: 8px 16px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .upload-btn:hover {
+            background: #007acc;
+        }
+
+        .file-tree {
+            padding: 10px;
+        }
+
+        .tree-item {
+            padding: 4px 8px;
+            cursor: pointer;
+            border-radius: 3px;
+            margin: 2px 0;
+            user-select: none;
+        }
+
+        .tree-item:hover {
+            background: #2a2d2e;
+        }
+
+        .tree-item.active {
+            background: #094771;
+            color: #fff;
+        }
+
+        .tree-item.folder {
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+
+        .tree-item.file {
+            padding-left: 20px;
+            color: #d4d4d4;
+        }
+
+        .tree-item.file::before {
+            content: "📄 ";
+            margin-right: 5px;
+        }
+
+        .tree-item.folder::before {
+            content: "📁 ";
+            margin-right: 5px;
+        }
+
+        .tree-item.folder.expanded::before {
+            content: "📂 ";
+        }
+
+        /* 우측 코드 뷰어 */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            background: #2d2d30;
+            padding: 10px 20px;
+            border-bottom: 1px solid #3c3c3c;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .file-info {
+            flex: 1;
+            font-size: 14px;
+            color: #cccccc;
+        }
+
+        .toolbar-btn {
+            padding: 6px 12px;
+            background: #0e639c;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .toolbar-btn:hover {
+            background: #007acc;
+        }
+
+        .code-viewer {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #1e1e1e;
+        }
+
+        /* 코드 블록 스타일 */
+        .code-block {
+            margin-bottom: 10px;
+            border: 1px solid #3c3c3c;
+            border-radius: 6px;
+            background: #2d2d30;
+        }
+
+        .block-header {
+            background: #383838;
+            padding: 8px 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-radius: 6px 6px 0 0;
+            user-select: none;
+        }
+
+        .block-header:hover {
+            background: #404040;
+        }
+
+        .block-title {
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+
+        .block-info {
+            font-size: 12px;
+            color: #999;
+        }
+
+        .block-toggle {
+            color: #fff;
+            font-size: 14px;
+            transition: transform 0.2s ease;
+        }
+
+        .block-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .block-content {
+            padding: 15px;
+            background: #1e1e1e;
+            border-radius: 0 0 6px 6px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .block-content.collapsed {
+            height: 0;
+            padding: 0 15px;
+        }
+
+        .block-preview {
+            color: #999;
+            font-size: 12px;
+            padding: 8px 12px;
+            background: #2d2d30;
+            margin: 0;
+            display: none;
+        }
+
+        .code-block.collapsed .block-preview {
+            display: block;
+        }
+
+        pre {
+            margin: 0;
+            padding: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            line-height: 1.4;
+            color: #d4d4d4;
+        }
+
+        /* 문법 하이라이팅 */
+        .keyword { color: #569cd6; font-weight: bold; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; font-style: italic; }
+        .number { color: #b5cea8; }
+        .function { color: #dcdcaa; }
+        .class { color: #4ec9b0; }
+        .variable { color: #9cdcfe; }
+        .operator { color: #d4d4d4; }
+        .bracket { color: #ffd700; }
+
+        /* 로딩 및 상태 */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state h3 {
+            margin-bottom: 10px;
+            color: #4fc3f7;
+        }
+
+        /* 스크롤바 스타일 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #2d2d30;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: 200px;
+                resize: none;
+            }
+            
+            .container {
+                flex-direction: column;
+            }
+            
+            .upload-zone {
+                padding: 20px 10px;
+            }
+            
+            .upload-buttons {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 좌측 파일 트리 -->
+        <div class="sidebar">
+            <div class="upload-area">
+                <div class="upload-zone" id="uploadZone">
+                    <div style="font-size: 24px; margin-bottom: 10px;">📁</div>
+                    <div>파일이나 폴더를 여기에 끌어놓으세요</div>
+                    <div style="font-size: 12px; margin-top: 5px; color: #999;">
+                        또는 아래 버튼을 클릭하세요
+                    </div>
+                </div>
+                <div class="upload-buttons">
+                    <button class="upload-btn" onclick="selectFiles()">📄 파일 선택</button>
+                    <button class="upload-btn" onclick="selectFolder()">📁 폴더 선택</button>
+                    <button class="upload-btn" onclick="clearAll()">🗑️ 초기화</button>
+                </div>
+            </div>
+            <div class="file-tree" id="fileTree">
+                <div class="empty-state">
+                    <h3>파일을 업로드하세요</h3>
+                    <p>지원 언어: JavaScript, TypeScript, Python, CSS, HTML, JSON</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 우측 코드 뷰어 -->
+        <div class="main-content">
+            <div class="toolbar">
+                <div class="file-info" id="fileInfo">파일을 선택해주세요</div>
+                <button class="toolbar-btn" onclick="expandAll()">모두 펼치기</button>
+                <button class="toolbar-btn" onclick="collapseAll()">모두 접기</button>
+                <button class="toolbar-btn" onclick="exportBlocks()">블록 내보내기</button>
+            </div>
+            <div class="code-viewer" id="codeViewer">
+                <div class="empty-state">
+                    <h3>🚀 코드 블록 뷰어</h3>
+                    <p>좌측에서 파일을 선택하면 코드가 블록별로 표시됩니다.</p>
+                    <br>
+                    <p>✨ <strong>기능:</strong></p>
+                    <p>• 함수, 클래스별로 블록 구분</p>
+                    <p>• 블록 접기/펼치기</p>
+                    <p>• 코드 하이라이팅</p>
+                    <p>• 드래그 앤 드롭 지원</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 숨겨진 input 요소들 -->
+    <input type="file" id="fileInput" multiple accept=".js,.jsx,.ts,.tsx,.py,.css,.html,.json,.vue,.php,.java,.cs,.cpp,.c" style="display: none;">
+    <input type="file" id="folderInput" webkitdirectory style="display: none;">
+
+    <script>
+        let fileData = new Map(); // 파일 데이터 저장
+        let currentFile = null;   // 현재 선택된 파일
+
+        // 드래그 앤 드롭 설정
+        const uploadZone = document.getElementById('uploadZone');
+        
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.add('dragover');
+            });
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.remove('dragover');
+            });
+        });
+
+        uploadZone.addEventListener('drop', handleDrop);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(Array.from(files));
+        }
+
+        // 파일 선택 함수들
+        function selectFiles() {
+            document.getElementById('fileInput').click();
+        }
+
+        function selectFolder() {
+            document.getElementById('folderInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            handleFiles(Array.from(e.target.files));
+        });
+
+        document.getElementById('folderInput').addEventListener('change', function(e) {
+            handleFiles(Array.from(e.target.files));
+        });
+
+        // 파일 처리
+        async function handleFiles(files) {
+            const supportedExts = ['.js', '.jsx', '.ts', '.tsx', '.py', '.css', '.html', '.json', '.vue', '.php', '.java', '.cs', '.cpp', '.c'];
+            const validFiles = files.filter(file => {
+                const ext = '.' + file.name.split('.').pop().toLowerCase();
+                return supportedExts.includes(ext);
+            });
+
+            if (validFiles.length === 0) {
+                alert('지원되는 파일이 없습니다.\n지원 형식: ' + supportedExts.join(', '));
+                return;
+            }
+
+            document.getElementById('fileTree').innerHTML = '<div class="loading">파일을 읽는 중...</div>';
+
+            for (const file of validFiles) {
+                try {
+                    const content = await readFileContent(file);
+                    const filePath = file.webkitRelativePath || file.name;
+                    fileData.set(filePath, {
+                        name: file.name,
+                        path: filePath,
+                        content: content,
+                        size: file.size,
+                        lastModified: file.lastModified
+                    });
+                } catch (error) {
+                    console.error('파일 읽기 실패:', file.name, error);
+                }
+            }
+
+            renderFileTree();
+        }
+
+        function readFileContent(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = reject;
+                reader.readAsText(file, 'UTF-8');
+            });
+        }
+
+        // 파일 트리 렌더링
+        function renderFileTree() {
+            const fileTree = document.getElementById('fileTree');
+            const files = Array.from(fileData.keys()).sort();
+            
+            if (files.length === 0) {
+                fileTree.innerHTML = '<div class="empty-state"><h3>파일을 업로드하세요</h3></div>';
+                return;
+            }
+
+            const tree = buildFileTree(files);
+            fileTree.innerHTML = renderTreeHTML(tree);
+        }
+
+        function buildFileTree(filePaths) {
+            const tree = {};
+            
+            filePaths.forEach(path => {
+                const parts = path.split('/');
+                let current = tree;
+                
+                parts.forEach((part, index) => {
+                    if (!current[part]) {
+                        current[part] = index === parts.length - 1 ? { 
+                            type: 'file', 
+                            path: path 
+                        } : { 
+                            type: 'folder', 
+                            children: {} 
+                        };
+                    }
+                    if (current[part].children) {
+                        current = current[part].children;
+                    }
+                });
+            });
+
+            return tree;
+        }
+
+        function renderTreeHTML(tree, level = 0) {
+            let html = '';
+            
+            Object.entries(tree).forEach(([name, node]) => {
+                if (node.type === 'file') {
+                    const file = fileData.get(node.path);
+                    const size = formatFileSize(file.size);
+                    html += `<div class="tree-item file" onclick="selectFile('${node.path}')" title="${node.path} (${size})">${name}</div>`;
+                } else {
+                    html += `<div class="tree-item folder" onclick="toggleFolder(this)">${name}</div>`;
+                    html += `<div style="margin-left: 20px;">${renderTreeHTML(node.children, level + 1)}</div>`;
+                }
+            });
+
+            return html;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function toggleFolder(element) {
+            element.classList.toggle('expanded');
+            const next = element.nextElementSibling;
+            if (next) {
+                next.style.display = next.style.display === 'none' ? 'block' : 'none';
+            }
+        }
+
+        // 파일 선택
+        function selectFile(filePath) {
+            // 이전 선택 해제
+            document.querySelectorAll('.tree-item.active').forEach(item => {
+                item.classList.remove('active');
+            });
+
+            // 새 선택 표시
+            const fileItem = document.querySelector(`[onclick="selectFile('${filePath}')"]`);
+            if (fileItem) {
+                fileItem.classList.add('active');
+            }
+
+            currentFile = filePath;
+            const file = fileData.get(filePath);
+            
+            if (file) {
+                document.getElementById('fileInfo').textContent = 
+                    `${file.name} (${formatFileSize(file.size)}) - ${countLines(file.content)} 줄`;
+                renderCodeBlocks(file.content, file.name);
+            }
+        }
+
+        function countLines(content) {
+            return content.split('\n').length;
+        }
+
+        // 코드 블록 파싱 및 렌더링
+        function renderCodeBlocks(content, filename) {
+            const codeViewer = document.getElementById('codeViewer');
+            const ext = '.' + filename.split('.').pop().toLowerCase();
+            const blocks = parseCodeBlocks(content, ext);
+
+            if (blocks.length === 0) {
+                codeViewer.innerHTML = '<div class="empty-state"><h3>코드 블록을 찾을 수 없습니다</h3><p>전체 코드를 표시합니다.</p></div>';
+                return;
+            }
+
+            let html = '';
+            blocks.forEach((block, index) => {
+                const previewLine = block.content.split('\n')[0].trim().substring(0, 80) + '...';
+                
+                html += `
+                <div class="code-block" id="block-${index}">
+                    <div class="block-header" onclick="toggleBlock(${index})">
+                        <div>
+                            <div class="block-title">${escapeHtml(block.title)}</div>
+                            <div class="block-info">${block.startLine}-${block.endLine}줄 (${block.endLine - block.startLine + 1}줄)</div>
+                        </div>
+                        <div class="block-toggle">▼</div>
+                    </div>
+                    <div class="block-preview">${escapeHtml(previewLine)}</div>
+                    <div class="block-content">
+                        <pre><code>${highlightCode(block.content, ext)}</code></pre>
+                    </div>
+                </div>
+                `;
+            });
+
+            codeViewer.innerHTML = html;
+        }
+
+        function parseCodeBlocks(content, fileExt) {
+            const lines = content.split('\n');
+            const blocks = [];
+
+            if (fileExt === '.js' || fileExt === '.jsx' || fileExt === '.ts' || fileExt === '.tsx') {
+                return parseJavaScriptBlocks(lines);
+            } else if (fileExt === '.py') {
+                return parsePythonBlocks(lines);
+            } else if (fileExt === '.css') {
+                return parseCSSBlocks(lines);
+            } else if (fileExt === '.json') {
+                return parseJSONBlocks(lines);
+            } else {
+                // 기타 파일들은 단순하게 함수별로 파싱
+                return parseGenericBlocks(lines);
+            }
+        }
+
+        function parseJavaScriptBlocks(lines) {
+            const blocks = [];
+            let i = 0;
+            
+            while (i < lines.length) {
+                const line = lines[i].trim();
+                
+                // 함수 검색
+                if (line.match(/^(function\s+\w+|const\s+\w+\s*=\s*(?:async\s*)?\(|class\s+\w+|export\s+(?:default\s+)?(?:function|class)\s+\w+)/)) {
+                    const block = extractBlock(lines, i, line);
+                    if (block) {
+                        blocks.push(block);
+                        i = block.endLine;
+                    }
+                } else if (line.match(/^\w+\s*:\s*(?:async\s*)?\(|^\w+\s*\(/)) {
+                    // 객체 메서드나 함수 호출
+                    const block = extractBlock(lines, i, line);
+                    if (block) {
+                        blocks.push(block);
+                        i = block.endLine;
+                    }
+                }
+                i++;
+            }
+            
+            return blocks;
+        }
+
+        function parsePythonBlocks(lines) {
+            const blocks = [];
+            let i = 0;
+            
+            while (i < lines.length) {
+                const line = lines[i].trim();
+                
+                // 함수나 클래스 검색
+                if (line.match(/^(def\s+\w+|class\s+\w+)/)) {
+                    const block = extractPythonBlock(lines, i, line);
+                    if (block) {
+                        blocks.push(block);
+                        i = block.endLine;
+                    }
+                }
+                i++;
+            }
+            
+            return blocks;
+        }
+
+        function parseCSSBlocks(lines) {
+            const blocks = [];
+            let i = 0;
+            
+            while (i < lines.length) {
+                const line = lines[i].trim();
+                
+                // CSS 선택자 검색
+                if (line.match(/^[.#]?[\w-]+.*\{/) || line.match(/^@\w+/)) {
+                    const block = extractCSSBlock(lines, i, line);
+                    if (block) {
+                        blocks.push(block);
+                        i = block.endLine;
+                    }
+                }
+                i++;
+            }
+            
+            return blocks;
+        }
+
+        function parseJSONBlocks(lines) {
+            const blocks = [];
+            let i = 0;
+            let depth = 0;
+            
+            while (i < lines.length) {
+                const line = lines[i].trim();
+                
+                if (line.includes('{') || line.includes('[')) {
+                    const startLine = i + 1;
+                    const startContent = line;
+                    let content = line + '\n';
+                    depth = (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+                    depth += (line.match(/\[/g) || []).length - (line.match(/\]/g) || []).length;
+                    i++;
+                    
+                    while (i < lines.length && depth > 0) {
+                        const currentLine = lines[i];
+                        content += currentLine + '\n';
+                        depth += (currentLine.match(/\{/g) || []).length - (currentLine.match(/\}/g) || []).length;
+                        depth += (currentLine.match(/\[/g) || []).length - (currentLine.match(/\]/g) || []).length;
+                        i++;
+                    }
+                    
+                    if (content.trim()) {
+                        blocks.push({
+                            title: `JSON 블록 (${startContent.length > 30 ? startContent.substring(0, 30) + '...' : startContent})`,
+                            content: content.trim(),
+                            startLine: startLine,
+                            endLine: i
+                        });
+                    }
+                } else {
+                    i++;
+                }
+            }
+            
+            return blocks;
+        }
+
+        function parseGenericBlocks(lines) {
+            const blocks = [];
+            let i = 0;
+            
+            while (i < lines.length) {
+                const line = lines[i].trim();
+                
+                // 간단한 함수나 메서드 패턴 검색
+                if (line.match(/^\w+.*\{/) && !line.includes(';')) {
+                    const block = extractBlock(lines, i, line);
+                    if (block) {
+                        blocks.push(block);
+                        i = block.endLine;
+                    }
+                }
+                i++;
+            }
+            
+            return blocks;
+        }
+
+        function extractBlock(lines, startIndex, startLine) {
+            let braceCount = 0;
+            let content = '';
+            let i = startIndex;
+            let foundOpenBrace = false;
+            
+            while (i < lines.length) {
+                const line = lines[i];
+                content += line + '\n';
+                
+                const openBraces = (line.match(/\{/g) || []).length;
+                const closeBraces = (line.match(/\}/g) || []).length;
+                
+                braceCount += openBraces - closeBraces;
+                
+                if (openBraces > 0) foundOpenBrace = true;
+                
+                if (foundOpenBrace && braceCount === 0) {
+                    return {
+                        title: extractTitle(startLine),
+                        content: content.trim(),
+                        startLine: startIndex + 1,
+                        endLine: i + 1
+                    };
+                }
+                
+                i++;
+            }
+            
+            return null;
+        }
+
+        function extractPythonBlock(lines, startIndex, startLine) {
+            let content = lines[startIndex] + '\n';
+            let i = startIndex + 1;
+            let baseIndent = lines[startIndex].search(/\S/);
+            
+            while (i < lines.length) {
+                const line = lines[i];
+                const lineIndent = line.search(/\S/);
+                
+                if (line.trim() === '') {
+                    content += line + '\n';
+                    i++;
+                    continue;
+                }
+                
+                if (lineIndent <= baseIndent && line.trim() !== '') {
+                    break;
+                }
+                
+                content += line + '\n';
+                i++;
+            }
+            
+            return {
+                title: extractTitle(startLine),
+                content: content.trim(),
+                startLine: startIndex + 1,
+                endLine: i
+            };
+        }
+
+        function extractCSSBlock(lines, startIndex, startLine) {
+            let braceCount = 0;
+            let content = '';
+            let i = startIndex;
+            
+            while (i < lines.length) {
+                const line = lines[i];
+                content += line + '\n';
+                
+                braceCount += (line.match(/\{/g) || []).length;
+                braceCount -= (line.match(/\}/g) || []).length;
+                
+                if (braceCount === 0 && content.includes('{')) {
+                    return {
+                        title: extractTitle(startLine),
+                        content: content.trim(),
+                        startLine: startIndex + 1,
+                        endLine: i + 1
+                    };
+                }
+                
+                i++;
+            }
+            
+            return null;
+        }
+
+        function extractTitle(line) {
+            // 함수명이나 클래스명 추출
+            const patterns = [
+                /function\s+(\w+)/,
+                /const\s+(\w+)\s*=/,
+                /class\s+(\w+)/,
+                /def\s+(\w+)/,
+                /(\w+)\s*:\s*\(/,
+                /^([.#]?[\w-]+)/
+            ];
+            
+            for (const pattern of patterns) {
+                const match = line.match(pattern);
+                if (match) {
+                    return match[1];
+                }
+            }
+            
+            return line.length > 50 ? line.substring(0, 50) + '...' : line;
+        }
+
+        // 블록 토글
+        function toggleBlock(index) {
+            const block = document.getElementById(`block-${index}`);
+            const content = block.querySelector('.block-content');
+            const toggle = block.querySelector('.block-toggle');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+                block.classList.remove('collapsed');
+            } else {
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
+                block.classList.add('collapsed');
+            }
+        }
+
+        // 모든 블록 제어
+        function expandAll() {
+            document.querySelectorAll('.block-content').forEach(content => {
+                content.classList.remove('collapsed');
+            });
+            document.querySelectorAll('.block-toggle').forEach(toggle => {
+                toggle.classList.remove('collapsed');
+            });
+            document.querySelectorAll('.code-block').forEach(block => {
+                block.classList.remove('collapsed');
+            });
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('.block-content').forEach(content => {
+                content.classList.add('collapsed');
+            });
+            document.querySelectorAll('.block-toggle').forEach(toggle => {
+                toggle.classList.add('collapsed');
+            });
+            document.querySelectorAll('.code-block').forEach(block => {
+                block.classList.add('collapsed');
+            });
+        }
+
+        // 블록 내보내기
+        function exportBlocks() {
+            if (!currentFile) {
+                alert('먼저 파일을 선택해주세요.');
+                return;
+            }
+
+            const file = fileData.get(currentFile);
+            const blocks = parseCodeBlocks(file.content, '.' + file.name.split('.').pop().toLowerCase());
+            
+            const exportData = {
+                filename: file.name,
+                blocks: blocks.map(block => ({
+                    title: block.title,
+                    lines: `${block.startLine}-${block.endLine}`,
+                    content: block.content
+                }))
+            };
+
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${file.name}_blocks.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // 초기화
+        function clearAll() {
+            fileData.clear();
+            currentFile = null;
+            renderFileTree();
+            document.getElementById('fileInfo').textContent = '파일을 선택해주세요';
+            document.getElementById('codeViewer').innerHTML = `
+                <div class="empty-state">
+                    <h3>🚀 코드 블록 뷰어</h3>
+                    <p>좌측에서 파일을 선택하면 코드가 블록별로 표시됩니다.</p>
+                </div>
+            `;
+        }
+
+        // 문법 하이라이팅 (간단한 버전)
+        function highlightCode(code, ext) {
+            let highlighted = escapeHtml(code);
+
+            if (ext === '.js' || ext === '.jsx' || ext === '.ts' || ext === '.tsx') {
+                // JavaScript/TypeScript 키워드
+                const keywords = ['function', 'const', 'let', 'var', 'class', 'if', 'else', 'for', 'while', 'return', 'import', 'export', 'default', 'async', 'await', 'try', 'catch', 'finally'];
+                keywords.forEach(keyword => {
+                    const regex = new RegExp(`\\b(${keyword})\\b`, 'g');
+                    highlighted = highlighted.replace(regex, '<span class="keyword">$1</span>');
+                });
+            } else if (ext === '.py') {
+                // Python 키워드
+                const keywords = ['def', 'class', 'if', 'elif', 'else', 'for', 'while', 'return', 'import', 'from', 'try', 'except', 'finally', 'with', 'as'];
+                keywords.forEach(keyword => {
+                    const regex = new RegExp(`\\b(${keyword})\\b`, 'g');
+                    highlighted = highlighted.replace(regex, '<span class="keyword">$1</span>');
+                });
+            }
+
+            // 문자열
+            highlighted = highlighted.replace(/(['"`])((?:\\.|(?!\1)[^\\])*?)\1/g, '<span class="string">$1$2$1</span>');
+            
+            // 주석
+            highlighted = highlighted.replace(/(\/\/.*$|\/\*[\s\S]*?\*\/|#.*$)/gm, '<span class="comment">$1</span>');
+            
+            // 숫자
+            highlighted = highlighted.replace(/\b(\d+\.?\d*)\b/g, '<span class="number">$1</span>');
+            
+            // 괄호
+            highlighted = highlighted.replace(/([{}[\]()])/g, '<span class="bracket">$1</span>');
+
+            return highlighted;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📦 코드 블록 뷰어 준비 완료!');
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,268 @@
+작업 날짜: 2025-09-09
+작업명: 유튜브 챕터 바 페이지네이션 시스템 구현
+
+구현 내용:
+유튜브 영상의 챕터를 페이지 단위로 나누어 표시하는 페이지네이션 시스템을 구현했습니다. 사용자가 원하는 챕터 개수를 실시간으로 조절할 수 있고, 화면 크기에 따라 페이지 번호가 동적으로 조절됩니다.
+
+수정 파일 및 변경 내용:
+
+1. C:\Users\ksj\OneDrive\바탕 화면\gemini\제작파일\유튜브노트\client\src\components\ChapterBar.tsx
+
+   추가됨:
+   import React, { useState, useEffect, useRef } from "react";
+   
+   const [currentPage, setCurrentPage] = useState(0);
+   const [chaptersPerPage, setChaptersPerPage] = useState(chapters.length);
+   const [pageWindowStart, setPageWindowStart] = useState(0);
+   const [maxVisiblePages, setMaxVisiblePages] = useState(7);
+   const containerRef = useRef<HTMLDivElement>(null);
+   
+   useEffect(() => {
+     setChaptersPerPage(chapters.length);
+   }, [chapters.length]);
+   
+   useEffect(() => {
+     const calculateMaxVisiblePages = () => {
+       if (containerRef.current) {
+         const containerWidth = containerRef.current.offsetWidth;
+         const availableWidth = containerWidth - 230;
+         const pageButtonWidth = 40;
+         const maxPages = Math.floor(availableWidth / pageButtonWidth);
+         setMaxVisiblePages(Math.max(3, maxPages));
+       }
+     };
+     calculateMaxVisiblePages();
+     window.addEventListener('resize', calculateMaxVisiblePages);
+     return () => window.removeEventListener('resize', calculateMaxVisiblePages);
+   }, []);
+   
+   const totalPages = Math.ceil(chapters.length / chaptersPerPage);
+   
+   useEffect(() => {
+     if (currentChapterIndex >= 0) {
+       const targetPage = Math.floor(currentChapterIndex / chaptersPerPage);
+       if (targetPage !== currentPage) {
+         setCurrentPage(targetPage);
+       }
+     }
+   }, [currentChapterIndex, chaptersPerPage]);
+   
+   const startIndex = currentPage * chaptersPerPage;
+   const endIndex = Math.min(startIndex + chaptersPerPage, chapters.length);
+   const currentPageChapters = chapters.slice(startIndex, endIndex);
+   
+   const pageStartTime = currentPageChapters[0]?.seconds || 0;
+   const pageEndTime = currentPageChapters[currentPageChapters.length - 1]?.seconds + (currentPageChapters[currentPageChapters.length - 1]?.duration || 0) || 0;
+   const pageTotalDuration = pageEndTime - pageStartTime;
+   
+   const chaptersWithRelativeWidth = currentPageChapters.map(chapter => ({
+     ...chapter,
+     relativeWidth: pageTotalDuration > 0 ? ((chapter.duration || 0) / pageTotalDuration) * 100 : 100 / currentPageChapters.length
+   }));
+   
+   const handlePrevPage = () => {
+     if (currentPage > 0) {
+       const newPage = currentPage - 1;
+       setCurrentPage(newPage);
+       if (newPage < pageWindowStart) {
+         setPageWindowStart(Math.max(0, pageWindowStart - 1));
+       }
+     }
+   };
+   
+   const handleNextPage = () => {
+     if (currentPage < totalPages - 1) {
+       const newPage = currentPage + 1;
+       setCurrentPage(newPage);
+       if (newPage >= pageWindowStart + maxVisiblePages) {
+         setPageWindowStart(pageWindowStart + 1);
+       }
+     }
+   };
+   
+   const handlePageClick = (pageNumber: number) => {
+     setCurrentPage(pageNumber);
+   };
+   
+   useEffect(() => {
+     if (currentPage < pageWindowStart) {
+       setPageWindowStart(currentPage);
+     } else if (currentPage >= pageWindowStart + maxVisiblePages) {
+       setPageWindowStart(Math.max(0, currentPage - maxVisiblePages + 1));
+     }
+   }, [currentPage, pageWindowStart, maxVisiblePages]);
+
+   수정됨:
+   변경 전: 모든 챕터를 한 번에 표시
+   변경 후: 페이지네이션으로 나누어 표시
+   
+   return (
+     <div className={`w-full ${className}`}>
+       <div className="flex w-full mb-1 h-4">
+         {chaptersWithRelativeWidth.map((chapter, index) => (
+           // 짝수 인덱스 챕터 제목 표시
+         ))}
+       </div>
+       
+       <div className="flex w-full h-2">
+         {chaptersWithRelativeWidth.map((chapter, originalIndex) => {
+           const globalIndex = startIndex + originalIndex;
+           return (
+             <button
+               key={globalIndex}
+               className={globalIndex === currentChapterIndex ? 'bg-blue-500' : 'bg-gray-300'}
+               style={{ width: `${chapter.relativeWidth}%` }}
+               onClick={() => onChapterClick(chapter.seconds)}
+             />
+           );
+         })}
+       </div>
+       
+       <div className="flex w-full mt-1 h-4">
+         {chaptersWithRelativeWidth.map((chapter, index) => (
+           // 홀수 인덱스 챕터 제목 표시
+         ))}
+       </div>
+       
+       <div className="flex w-full mt-1">
+         {chaptersWithRelativeWidth.map((chapter, index) => (
+           // 챕터 시간 표시
+         ))}
+       </div>
+       
+       <div className="flex items-center mt-2 gap-2" ref={containerRef}>
+         <div className="flex-1 flex justify-center items-center">
+           {totalPages > 1 && (
+             <div className="flex items-center">
+               <button onClick={handlePrevPage} disabled={currentPage === 0}>
+                 &lt;
+               </button>
+               <div className="flex gap-1 overflow-hidden mx-1" style={{ maxWidth: `${maxVisiblePages * 40}px` }}>
+                 <div style={{ transform: `translateX(-${pageWindowStart * 40}px)` }}>
+                   {[...Array(totalPages)].map((_, index) => (
+                     <button onClick={() => handlePageClick(index)}>
+                       {index + 1}
+                     </button>
+                   ))}
+                 </div>
+               </div>
+               <button onClick={handleNextPage} disabled={currentPage === totalPages - 1}>
+                 &gt;
+               </button>
+             </div>
+           )}
+         </div>
+         <div className="flex items-center gap-1 flex-shrink-0">
+           <input
+             type="number"
+             min="1"
+             max={chapters.length}
+             value={chaptersPerPage}
+             onChange={(e) => {
+               const 값 = parseInt(e.target.value) || chapters.length;
+               const 제한값 = Math.min(Math.max(값, 1), chapters.length);
+               setChaptersPerPage(제한값);
+               setCurrentPage(0);
+             }}
+             className="w-12 px-1 py-0.5 text-sm text-center border border-gray-300 rounded"
+           />
+           <span className="text-sm text-gray-600">챕터 표시 개수</span>
+         </div>
+       </div>
+     </div>
+   );
+
+2. C:\Users\ksj\OneDrive\바탕 화면\gemini\제작파일\유튜브노트\client\src\components\SettingsPanel.tsx
+
+   삭제됨:
+   바설정: {
+     커스텀바: boolean;
+     챕터바: boolean;
+     챕터표시개수: number;
+   };
+   
+   바설정: { 커스텀바: true, 챕터바: true, 챕터표시개수: 6 },
+   
+   <div className="flex justify-between items-center">
+     <div className="flex flex-col">
+       <span className="text-sm">챕터 표시 개수</span>
+       <span className="text-xs text-gray-500">한 페이지에 보여줄 챕터 수</span>
+     </div>
+     <Input
+       type="number"
+       min="1"
+       max="20"
+       value={settings.바설정?.챕터표시개수 ?? 6}
+       onChange={(e) => {
+         const 값 = parseInt(e.target.value) || 6;
+         handleSettingChange("바설정", {
+           ...settings.바설정,
+           챕터표시개수: 값
+         });
+       }}
+       className="w-20"
+     />
+   </div>
+
+   수정됨:
+   바설정: {
+     커스텀바: boolean;
+     챕터바: boolean;
+   };
+   
+   바설정: { 커스텀바: true, 챕터바: true },
+
+3. C:\Users\ksj\OneDrive\바탕 화면\gemini\제작파일\유튜브노트\client\src\pages\HomePage.tsx
+
+   수정됨:
+   변경 전: 바설정: { 커스텀바: true, 챕터바: true, 챕터표시개수: 6 },
+   변경 후: 바설정: { 커스텀바: true, 챕터바: true },
+
+4. C:\Users\ksj\OneDrive\바탕 화면\gemini\제작파일\유튜브노트\client\src\components\YouTubePlayer.tsx
+
+   수정됨:
+   변경 전:
+   바설정?: {
+     커스텀바: boolean;
+     챕터바: boolean;
+     챕터표시개수: number;
+   };
+   바설정 = { 커스텀바: true, 챕터바: true, 챕터표시개수: 6 },
+   <ChapterBar
+     chapters={chapters}
+     currentTime={currentTime}
+     onChapterClick={handleChapterClick}
+     chaptersPerPage={바설정.챕터표시개수}
+   />
+   
+   변경 후:
+   바설정?: {
+     커스텀바: boolean;
+     챕터바: boolean;
+   };
+   바설정 = { 커스텀바: true, 챕터바: true },
+   <ChapterBar
+     chapters={chapters}
+     currentTime={currentTime}
+     onChapterClick={handleChapterClick}
+   />
+
+데이터 구조:
+ChapterBar 컴포넌트 내부 상태로 관리:
+- currentPage: 현재 표시 중인 페이지 번호
+- chaptersPerPage: 한 페이지에 표시할 챕터 수 (기본값: 전체 챕터 수)
+- pageWindowStart: overflow로 숨겨진 페이지들의 시작 인덱스
+- maxVisiblePages: 화면 크기에 따라 보일 수 있는 최대 페이지 수
+
+삭제된 기능:
+- 설정 패널에서 챕터 표시 개수 설정하는 기능
+
+추가된 기능:
+- 페이지네이션 시스템 (6개씩 기본값 대신 전체 챕터 표시가 기본값)
+- 페이지 네비게이션 (< 1 2 3 > 형태)
+- 실시간 챕터 표시 개수 조절 (페이지 우측 입력란)
+- 현재 재생 중인 챕터 페이지로 자동 이동
+- 화면 크기에 따른 동적 페이지 번호 표시
+- overflow hidden으로 넘치는 페이지 번호 숨김
+- 화살표 클릭 시 1칸씩 이동 및 숨겨진 페이지로 스크롤
+- 챕터별 상대적 너비 계산으로 페이지 내 챕터 바 확장
