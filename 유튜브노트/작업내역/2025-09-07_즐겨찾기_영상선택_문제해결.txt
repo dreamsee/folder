@@ -1,0 +1,66 @@
+작업 날짜: 2025-09-07
+작업명: 즐겨찾기에서 영상 선택 시 영상 변경 안되는 문제 해결
+
+구현 내용:
+즐겨찾기에서 영상을 클릭해도 새 영상으로 전환되지 않던 문제를 해결함
+
+수정 파일 및 변경 내용:
+
+1. client/src/pages/HomePage.tsx
+
+   수정됨:
+   onVideoSelect={(videoId: string) => {
+     setCurrentVideoId(videoId);
+   }}
+   →
+   onVideoSelect={(videoId: string) => {
+     // 즐겨찾기에서 영상 정보 가져오기
+     const favoritesData = JSON.parse(localStorage.getItem('videoFavorites') || '{}');
+     const videoInfo = favoritesData[videoId];
+     
+     if (videoInfo) {
+       // 비디오 ID와 정보 설정
+       setCurrentVideoId(videoId);
+       setCurrentVideoInfo({
+         title: videoInfo.title,
+         channelName: videoInfo.channelTitle,
+         thumbnailUrl: videoInfo.thumbnail,
+       });
+       
+       // 플레이어가 준비된 경우 바로 로드
+       if (isPlayerReady && player) {
+         player.loadVideoById(videoId);
+         showNotification(`"${videoInfo.title}" 영상을 로드했습니다.`, "success");
+       } else {
+         showNotification(`"${videoInfo.title}" 영상을 준비하고 있습니다.`, "info");
+       }
+     } else {
+       // 즐겨찾기에서 정보를 찾을 수 없는 경우
+       setCurrentVideoId(videoId);
+       showNotification("영상을 로드했습니다.", "info");
+     }
+   }}
+
+데이터 구조:
+변경 없음
+
+삭제된 기능:
+없음
+
+추가된 기능:
+- 즐겨찾기 영상 선택 시 완전한 영상 정보 로드
+- 즐겨찾기 영상 선택 시 플레이어 직접 로드 기능
+- 영상 로드 상태에 따른 사용자 피드백 메시지
+- localStorage에서 영상 정보를 찾을 수 없는 경우 예외 처리
+
+문제 해결 과정:
+1. 문제 분석: 즐겨찾기 클릭 시 setCurrentVideoId만 호출되고 currentVideoInfo 미설정
+2. VideoLoader 컴포넌트의 handleVideoSelect 로직 참조
+3. localStorage에서 영상 정보 가져와서 완전한 상태 설정
+4. 플레이어가 준비된 상태에서 player.loadVideoById() 직접 호출
+5. 적절한 알림 메시지 및 오류 처리 추가
+
+기술적 개선사항:
+- 기존 단순한 ID 설정에서 완전한 영상 데이터 로드로 개선
+- 플레이어 상태 확인 후 즉시 영상 로드로 사용자 경험 개선
+- 오류 상황에 대한 안전장치 추가

@@ -1,0 +1,53 @@
+작업 날짜: 2025-09-03
+작업명: 유튜브 도장 기능 모달창 UI 개선
+
+구현 내용:
+도장 버튼 클릭시 텍스트 직접 편집 대신 모달창을 통한 편집 기능 구현
+
+수정 파일 및 변경 내용:
+
+1. client/src/components/TimestampEditModal.tsx
+   
+   추가됨:
+   - 새로운 모달 컴포넌트 생성
+   - 시작/종료 시간 숫자 입력 필드 
+   - 볼륨 슬라이더 (0-100%)
+   - 재생 속도 슬라이더 (0.25x-2.0x, 0.05 단위)
+   - 자동 점프 체크박스
+   - 정지 시간 입력 필드
+   - 포커스시 해당 시간으로 영상 이동 기능
+   - HH:MM:SS.sss 형식 시간 파싱 및 검증
+
+2. client/src/components/NoteArea.tsx
+   
+   수정됨:
+   - import 구문에 TimestampEditModal 추가
+   - isTimestampModalOpen, modalCurrentTime 상태 추가
+   - addTimestamp 함수 -> 모달 열기로 변경
+   - addTimestampFromModal 함수 추가 (기존 로직 이동)
+   - return 구문에 TimestampEditModal 컴포넌트 추가
+
+데이터 구조:
+TimestampEditModal에서 저장시 전달되는 데이터:
+{
+  startTime: number,      // 시작 시간(초)
+  endTime: number,        // 종료 시간(초)  
+  volume: number,         // 볼륨 (0-100)
+  playbackRate: number,   // 재생 속도 (0.25-2.0)
+  pauseDuration?: number, // 정지 시간(선택)
+  autoJump: boolean      // 자동 점프 여부
+}
+
+추가된 기능:
+- 모달창을 통한 타임스탬프 편집
+- 시간 입력시 실시간 영상 프리뷰
+- 숫자만 입력 가능한 유효성 검사
+- 모바일 친화적 UI
+- 고급 설정 옵션 (자동 점프, 정지 시간)
+
+보존된 기능:
+- 기존 타임스탬프 형식 유지
+- 텍스트 에리어 직접 편집 가능
+- 타임스탬프 순서 로직
+- 이전 시간대 감지 및 자동점프 추가
+- 더블클릭 이동 기능
