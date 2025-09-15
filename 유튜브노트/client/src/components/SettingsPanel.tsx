@@ -43,6 +43,7 @@ export interface UISettings {
     글자크기여백: boolean;
     색상설정: boolean;
     배경투명도: boolean;
+    정지시YouTube숨김?: boolean;
   };
   프리셋: {
     최소모드명: string;
@@ -777,6 +778,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
                   </div>
                 )}
+                <div className="flex justify-between items-center mt-3">
+                  <div className="flex flex-col">
+                    <span className="text-sm">정지 시 YouTube UI 숨김</span>
+                    <span className="text-xs text-gray-500">일시정지 시 YouTube 오버레이 숨김</span>
+                  </div>
+                  <Switch
+                    checked={settings.화면텍스트.정지시YouTube숨김 ?? false}
+                    onCheckedChange={(값) => 설정업데이트("화면텍스트", "정지시YouTube숨김", 값)}
+                  />
+                </div>
               </div>
             )}
           </div>

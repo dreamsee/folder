@@ -145,6 +145,30 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
 
   // 영상 재생
   const handleVideoPlay = (videoId: string) => {
+    // 시청 횟수만 증가
+    const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
+    const video = favorites.find(v => v.videoId === videoId);
+    
+    if (!watchHistory[videoId]) {
+      watchHistory[videoId] = {
+        videoId: videoId,
+        firstWatchedAt: new Date().toISOString(),
+        lastWatchedAt: new Date().toISOString(),
+        watchCount: 1,
+        totalWatchTime: 0,
+        lastPosition: 0,
+        duration: 0,
+        title: video?.title || '제목 없음',
+        channelTitle: video?.channelTitle || '채널 없음',
+        thumbnail: video?.thumbnail || ''
+      };
+    } else {
+      watchHistory[videoId].watchCount = (watchHistory[videoId].watchCount || 0) + 1;
+      watchHistory[videoId].lastWatchedAt = new Date().toISOString();
+    }
+    
+    localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+    
     onVideoSelect(videoId);
     onClose();
   };
