@@ -1,0 +1,179 @@
+유튜브노트 프로젝트 작업 추적 파일
+==========================================
+
+프로젝트 위치: /data/data/com.termux/files/home/folder/유튜브노트
+깃허브 저장소: https://github.com/dreamsee/folder (유튜브노트 폴더)
+
+현재 진행 상황
+===============
+
+최근 완료된 작업 (2025-09-07):
+- 타임스탬프에서 시간 정보를 가져와 오버레이 생성 기능
+- 텍스트 정렬 기능 (좌측/중앙/우측) 및 빠른 설정 연동
+- 영상별 오버레이 저장 시스템 (localStorage에 videoId별 분리 저장)
+- 재생 컨트롤 설정 독립성 개선 (속도 토글이 다른 기능 숨기던 문제 해결)
+
+다음 해결해야 할 작업들
+======================
+
+1. 타임스탬프 정지 시 YouTube 오버레이 숨김 기능 ★★ 중간
+
+   현재 문제:
+   - |3 타임스탬프에서 일시정지하면 YouTube 제목, 관련 영상, 재생 버튼 등이 화면을 가림
+   - 텍스트 오버레이가 YouTube UI에 가려져 읽기 어려움
+
+   개선 요구사항:
+   - 일시정지 시 YouTube의 기본 오버레이 UI 숨김 처리
+   - 사용자의 텍스트 오버레이만 깨끗하게 표시
+
+   작업 계획:
+   a) YouTube Player API 옵션 활용
+      - controls=0으로 컨트롤 숨김 (단, 사용자 컨트롤도 사라지는 문제)
+      - CSS를 통한 오버레이 가림 처리 검토
+
+   b) 일시정지 감지 및 처리
+      - onStateChange 이벤트로 일시정지 상태 감지
+      - 정지 시 YouTube iframe 위에 투명 레이어 추가
+      - 클릭 이벤트 가로채기로 YouTube UI 활성화 방지
+
+   c) 사용자 경험 개선
+      - 설정에서 "정지 시 YouTube UI 숨김" 토글 추가
+      - 숨김 상태에서도 재생/정지는 가능하도록 커스텀 버튼
+
+   관련 파일:
+   - client/src/pages/HomePage.tsx (YouTube Player 초기화)
+   - client/src/components/TextOverlay.tsx (오버레이 렌더링)
+
+2. 타임스탬프 태그/그룹 시스템 ★★★ 높음
+
+   현재 상황:
+   - 모든 타임스탬프가 순차적으로만 작동
+   - 특정 타임스탬프들만 선택적으로 활성화 불가능
+
+   개선 요구사항:
+   - 타임스탬프에 태그/그룹 지정 가능
+   - 원하는 그룹만 선택적으로 활성화
+   - 순서와 무관하게 그룹별로 묶어서 관리
+
+   작업 계획:
+   a) 태그 문법 설계
+      - 기존: "0:30|3 텍스트"
+      - 제안: "0:30|3#그룹명 텍스트" 또는 "0:30|3[태그1,태그2] 텍스트"
+      - 정규식 패턴 수정으로 태그 파싱
+
+   b) 그룹 관리 UI
+      - 감지된 모든 그룹/태그 목록 표시
+      - 체크박스로 활성화할 그룹 선택
+      - "전체 선택/해제" 버튼
+
+   c) 선택적 활성화 로직
+      - 선택된 그룹의 타임스탬프만 timestamps 배열에 포함
+      - localStorage에 선택 상태 저장
+      - 영상별로 그룹 선택 상태 독립 관리
+
+   d) 활용 예시
+      - #중요: 핵심 내용만 보기
+      - #연습: 연습 문제 타임스탬프
+      - #해설: 해설 부분만 선택적으로 보기
+
+   관련 파일:
+   - client/src/utils/timestampParser.ts (파싱 로직)
+   - client/src/components/NoteArea.tsx (타임스탬프 관리)
+   - client/src/components/SettingsPanel.tsx (그룹 선택 UI)
+
+GitHub에서 파일 찾는 요령 및 방법
+================================
+
+1. 주요 파일 위치
+   - client/src/pages/HomePage.tsx: 메인 페이지 (전체 레이아웃과 상태 관리)
+   - client/src/components/SettingsPanel.tsx: 우측 설정 패널 (톱니바퀴 버튼)
+   - client/src/components/NoteArea.tsx: 노트 영역 및 재생 컨트롤
+   - client/src/components/OverlayInput.tsx: 오버레이 입력 패널
+   - client/src/components/TextOverlay.tsx: 화면 위 텍스트 오버레이
+
+2. 파일에서 특정 기능 찾는 방법
+   GitHub에서 파일 열고 Ctrl+F로 다음 키워드 검색:
+   - 프리셋 관련: "프리셋적용", "최소모드", "노트모드", "preset"
+   - 재생속도 관련: "defaultPlaybackRate", "재생 기본값", "playback-defaults"
+   - 설정 저장: "localStorage", "handleSettingChange"
+   - UI 요소: "Switch", "Select", "SelectItem", "Button"
+
+작업 시 주의사항
+===============
+
+1. 기존 작동하는 기능을 건드리지 말 것
+2. localStorage 키 충돌 방지를 위해 명확한 네이밍 사용
+3. 변경 전후 반드시 테스트
+4. CLAUDE.md의 작업 규칙 준수 (마크다운/이모티콘 사용 금지)
+5. 작업내역 상세 기록 필수
+
+3. 타임스탬프 정지 시 YouTube 오버레이 숨김 기능 ★★ 중간
+
+   현재 문제:
+   - |3 타임스탬프에서 일시정지하면 YouTube 제목, 관련 영상, 재생 버튼 등이 화면을 가림
+   - 텍스트 오버레이가 YouTube UI에 가려져 읽기 어려움
+
+   개선 요구사항:
+   - 일시정지 시 YouTube의 기본 오버레이 UI 숨김 처리
+   - 사용자의 텍스트 오버레이만 깨끗하게 표시
+
+   작업 계획:
+   a) YouTube Player API 옵션 활용
+      - controls=0으로 컨트롤 숨김 (단, 사용자 컨트롤도 사라지는 문제)
+      - CSS를 통한 오버레이 가림 처리 검토
+
+   b) 일시정지 감지 및 처리
+      - onStateChange 이벤트로 일시정지 상태 감지
+      - 정지 시 YouTube iframe 위에 투명 레이어 추가
+      - 클릭 이벤트 가로채기로 YouTube UI 활성화 방지
+
+   c) 사용자 경험 개선
+      - 설정에서 "정지 시 YouTube UI 숨김" 토글 추가
+      - 숨김 상태에서도 재생/정지는 가능하도록 커스텀 버튼
+
+   관련 파일:
+   - client/src/pages/HomePage.tsx (YouTube Player 초기화)
+   - client/src/components/TextOverlay.tsx (오버레이 렌더링)
+
+4. 타임스탬프 태그/그룹 시스템 ★★★ 높음
+
+   현재 상황:
+   - 모든 타임스탬프가 순차적으로만 작동
+   - 특정 타임스탬프들만 선택적으로 활성화 불가능
+
+   개선 요구사항:
+   - 타임스탬프에 태그/그룹 지정 가능
+   - 원하는 그룹만 선택적으로 활성화
+   - 순서와 무관하게 그룹별로 묶어서 관리
+
+   작업 계획:
+   a) 태그 문법 설계
+      - 기존: "0:30|3 텍스트"
+      - 제안: "0:30|3#그룹명 텍스트" 또는 "0:30|3[태그1,태그2] 텍스트"
+      - 정규식 패턴 수정으로 태그 파싱
+
+   b) 그룹 관리 UI
+      - 감지된 모든 그룹/태그 목록 표시
+      - 체크박스로 활성화할 그룹 선택
+      - "전체 선택/해제" 버튼
+
+   c) 선택적 활성화 로직
+      - 선택된 그룹의 타임스탬프만 timestamps 배열에 포함
+      - localStorage에 선택 상태 저장
+      - 영상별로 그룹 선택 상태 독립 관리
+
+   d) 활용 예시
+      - #중요: 핵심 내용만 보기
+      - #연습: 연습 문제 타임스탬프
+      - #해설: 해설 부분만 선택적으로 보기
+
+   관련 파일:
+   - client/src/utils/timestampParser.ts (파싱 로직)
+   - client/src/components/NoteArea.tsx (타임스탬프 관리)
+   - client/src/components/SettingsPanel.tsx (그룹 선택 UI)
+
+긴급도 및 우선순위
+==================
+
+★★★ 높음: 타임스탬프 태그/그룹 시스템 (고급 활용도 높음)
+★★ 중간: 타임스탬프 정지 시 YouTube 오버레이 숨김 (시각적 개선)

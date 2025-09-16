@@ -1,0 +1,415 @@
+작업설계서: 유튜브 도장 기능 개선
+작성일: 2025-09-03
+작업명: 도장 버튼 모달창 UI 개선
+
+========================================
+1. 기존 기능 분석
+========================================
+
+1.1 현재 도장 버튼 위치
+- 파일: client/src/components/NoteArea.tsx (2085-2104줄)
+- 재생 컨트롤 섹션 내에 위치
+- Clock 아이콘과 "도장" 텍스트로 구성된 버튼
+
+1.2 현재 도장 기능 동작 방식
+- 파일: client/src/components/NoteArea.tsx (1546-1668줄)
+- addTimestamp 함수가 핵심 로직 담당
+
+현재 동작 순서:
+1) 도장 버튼 클릭
+2) 영상 자동 일시정지 (playerState === 1일 때만 일시정지, 1 = 재생중, 2 = 일시정지, 3 = 버퍼링)
+3) 현재 재생 시간 가져오기
+4) 타임스탬프 문자열 생성: [시작시간-종료시간, 볼륨%, 속도x]
+5) 텍스트 에리어 커서 위치에 삽입
+6) 자동 저장
+
+1.3 현재 타임스탬프 형식
+- 기본 형식: [HH:MM:SS-HH:MM:SS, 100%, 1.00x]
+- 자동점프 모드: 끝에 ", ->" 추가 (쉼표 필수)
+- 정지재생 모드: 끝에 ", |3" (3초 정지) 추가 (쉼표 필수)
+- 소수점 3자리까지 지원: [HH:MM:SS.sss-HH:MM:SS.sss, 100%, 1.00x]
+
+1.4 관련 상태 변수
+- volume: 현재 볼륨 (0-100)
+- playbackRate: 재생 속도 (0.25-2.0)
+- duration: 지속시간 (1-60초)
+- player: YouTube 플레이어 객체
+- isPlayerReady: 플레이어 준비 상태
+- noteText: 노트 텍스트 전체 내용
+
+1.5 핵심 백업 코드 (절대 보존해야 할 로직)
+
+============ 타임스탬프 순서 결정 로직 (474-523줄) ============
+// 텍스트 순서 기반 타임스탬프 우선순위 파싱
+const parseTimestampPriority = (noteText: string) => {
+  // 동작 모드까지 포함한 패턴
+  const timestampRegex = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+  const timestampOrder: { 
+    startTime: number; 
+    endTime: number; 
+    priority: number; 
+    match: string;
+    textIndex: number; // 텍스트에서의 위치
+    volume: number;
+    playbackRate: number;
+    jumpMode: string; // 동작 모드 추가
+    pauseDuration: number; // 정지 시간 추가
+  }[] = [];
+  let match;
+  let priority = 0;
+
+  while ((match = timestampRegex.exec(noteText)) !== null) {
+    const startHour = parseInt(match[1]);
+    const startMin = parseInt(match[2]);
+    const startSec = parseFloat(match[3]); // 소수점 지원
+    const endHour = parseInt(match[4]);
+    const endMin = parseInt(match[5]);
+    const endSec = parseFloat(match[6]); // 소수점 지원
+    const volume = parseInt(match[7]);
+    const playbackRate = parseFloat(match[8]);
+    const actionMode = match[9]; // 동작 모드: '->', '|숫자', undefined
+    
+    const startTime = startHour * 3600 + startMin * 60 + startSec;
+    const endTime = endHour * 3600 + endMin * 60 + endSec;
+    
+    // 동작 모드 파싱
+    let jumpMode = 'natural'; // 기본값: 자연재생
+    let pauseDuration = 0;
+    
+    if (actionMode === '->') {
+      jumpMode = 'jump'; // 자동점프
+    } else if (actionMode && actionMode.startsWith('|')) {
+      jumpMode = 'pause'; // 정지재생
+      pauseDuration = parseInt(actionMode.substring(1)) || 3; // 기본 3초
+    }
+    
+    timestampOrder.push({
+      startTime,
+      endTime,
+      priority: priority++, // 텍스트 순서가 우선순위
+      match: match[0],
+      textIndex: match.index,
+      volume,
+      playbackRate,
+      jumpMode,
+      pauseDuration
+    });
+  }
+  
+  return timestampOrder;
+};
+
+============ 이전 시간대 타임스탬프 감지 및 자동점프 추가 로직 (1562-1655줄) ============
+// 이전 시간대 타임스탬프 감지 로직
+let 이전시간대여부 = false;
+
+if (textareaRef.current) {
+  const 커서위치 = textareaRef.current.selectionStart;
+  const 커서이전텍스트 = noteText.substring(0, 커서위치);
+  
+  // 커서 이전 텍스트에서 가장 마지막 타임스탬프 찾기
+  const 타임스탬프정규식 = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+  let 마지막매치 = null;
+  let 매치결과;
+  
+  while ((매치결과 = 타임스탬프정규식.exec(커서이전텍스트)) !== null) {
+    마지막매치 = 매치결과;
+  }
+  
+  if (마지막매치) {
+    // 직전 타임스탬프의 시작 시간 계산
+    const 직전시간 = parseInt(마지막매치[1]) * 3600 + parseInt(마지막매치[2]) * 60 + parseFloat(마지막매치[3]);
+    이전시간대여부 = newTimestampTime < 직전시간;
+    
+    console.log(`커서 직전 타임스탬프: ${직전시간}초, 새 타임스탬프: ${newTimestampTime}초, 이전시간대여부: ${이전시간대여부}`);
+  }
+}
+
+// 이전 시간대 타임스탬프인 경우 직전 타임스탬프에 -> 표시 추가
+if (이전시간대여부) {
+  // 직전 타임스탬프에 -> 추가하기 위해 텍스트 수정
+  const 커서위치 = textareaRef.current.selectionStart;
+  const 커서이전텍스트 = noteText.substring(0, 커서위치);
+  const 커서이후텍스트 = noteText.substring(textarea.selectionEnd);
+  
+  // 직전 타임스탬프 찾아서 -> 추가
+  const 타임스탬프정규식 = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+  let 수정된커서이전텍스트 = 커서이전텍스트;
+  let 마지막매치 = null;
+  let 마지막매치위치 = -1;
+  let 매치결과;
+  
+  while ((매치결과 = 타임스탬프정규식.exec(커서이전텍스트)) !== null) {
+    마지막매치 = 매치결과;
+    마지막매치위치 = 매치결과.index;
+  }
+  
+  if (마지막매치 && 마지막매치위치 >= 0) {
+    // 기존 타임스탬프를 -> 포함한 형태로 교체 (쉼표 포함 필수!)
+    const 기존타임스탬프 = 마지막매치[0];
+    const 새로운타임스탬프 = 기존타임스탬프.replace(/\]$/, ', ->]');  // 쉼표 필수!
+    
+    수정된커서이전텍스트 = 커서이전텍스트.substring(0, 마지막매치위치) + 
+                         새로운타임스탬프 + 
+                         커서이전텍스트.substring(마지막매치위치 + 기존타임스탬프.length);
+  }
+}
+
+============ 타임스탬프 독점 실행 관리 (143-149줄) ============
+// 타임스탬프 독점 실행 관리
+const [activeTimestampId, setActiveTimestampId] = useState<number | null>(null);
+const [timestampStartMode, setTimestampStartMode] = useState<'natural' | 'jump' | null>(null);
+const [nextAllowedTimestampIndex, setNextAllowedTimestampIndex] = useState<number>(0); // 다음에 실행 가능한 타임스탬프 인덱스
+const [userSeekedTime, setUserSeekedTime] = useState<number | null>(null); // 사용자가 임의로 클릭한 시간
+const [executedTimestampIds, setExecutedTimestampIds] = useState<number[]>([]); // 실행된 타임스탬프 ID 순서
+
+============ 영상 재시작 감지 및 초기화 (152-186줄) ============
+// 영상 재시작 감지 - playerState 변화 감지
+useEffect(() => {
+  if (!player || !isPlayerReady) return;
+  
+  // 영상이 끝났을 때
+  if (playerState === 0) { // YT.PlayerState.ENDED
+    // 다시보기를 위해 실행 기록 초기화
+    setExecutedTimestampIds([]);
+    setActiveTimestampId(null);
+    setTimestampStartMode(null);
+    setNextAllowedTimestampIndex(0);
+    setAutoJumpChain([]);
+    console.log("영상 종료: 타임스탬프 실행 기록 초기화");
+  }
+  
+  // 영상이 재생 중이고 시간이 처음으로 돌아간 경우
+  if (playerState === 1) { // YT.PlayerState.PLAYING
+    try {
+      const currentTime = player.getCurrentTime();
+      if (currentTime < 2) { // 처음 2초 이내면 재시작으로 간주
+        setExecutedTimestampIds([]);
+        setActiveTimestampId(null);
+        setTimestampStartMode(null);
+        setNextAllowedTimestampIndex(0);
+        setAutoJumpChain([]);
+        console.log("영상 재시작: 타임스탬프 실행 기록 초기화");
+      }
+    } catch (error) {
+      console.error('시간 확인 오류:', error);
+    }
+  }
+}, [playerState, player, isPlayerReady]);
+
+============ 사용자 임의 시간 이동시 타임스탬프 순서 재계산 (1730-1799줄) ============
+// 사용자가 타임스탬프를 더블클릭하여 이동 시
+// 사용자 직접 클릭 시 추적 기록 초기화
+setAutoJumpChain([]);
+setExecutedTimestampIds([]); // 실행 기록 초기화
+
+// 먼저 해당 시간으로 이동
+player.seekTo(targetTime, true);
+
+// 클릭한 타임스탬프 찾기 및 활성화
+const clickedTimestampData = timestamps.find(ts => 
+  Math.abs(ts.timeInSeconds - startSeconds) < 1
+);
+
+if (clickedTimestampData) {
+  // 타임스탬프가 DB에 있으면 활성화
+  setActiveTimestampId(clickedTimestampData.id);
+  setTimestampStartMode('jump');
+  
+  // 텍스트 순서에서 현재 위치 찾기
+  const priorityOrder = parseTimestampPriority(noteText);
+  const currentIndex = priorityOrder.findIndex(item => 
+    Math.abs(item.startTime - startSeconds) < 1
+  );
+  
+  if (currentIndex !== -1) {
+    setNextAllowedTimestampIndex(currentIndex + 1);
+  }
+  
+  // 진행 상황 표시 (점프 실행)
+  const totalTimestamps = priorityOrder.length;
+  const currentPosition = currentIndex !== -1 ? currentIndex + 1 : '?';
+  showNotification(`타임스탬프 점프 (${currentPosition}/${totalTimestamps}) ${formatTime(startSeconds)}`, "info");
+}
+
+============ 가장 가까운 시간대 타임스탬프 자동 활성화 (838-899줄) ============
+// 독점 상태가 아닐 때, 실행되지 않은 타임스탬프 중 텍스트 순서가 가장 빠른 것 찾기
+const unexecutedTimestamps = candidateTimestamps.filter(ts => 
+  !executedTimestampIds.includes(ts.id)
+);
+
+if (unexecutedTimestamps.length > 0) {
+  // 텍스트 순서에서 가장 앞에 있는 타임스탬프 찾기
+  const candidate = unexecutedTimestamps.sort((a, b) => {
+    const aMatch = priorityOrder.find(item => 
+      Math.abs(item.startTime - a.timeInSeconds) < 1 &&
+      Math.abs(item.volume - (a.volume || 100)) < 1 &&
+      Math.abs(item.playbackRate - (a.playbackRate || 1.0)) < 0.01
+    );
+    const bMatch = priorityOrder.find(item => 
+      Math.abs(item.startTime - b.timeInSeconds) < 1 &&
+      Math.abs(item.volume - (b.volume || 100)) < 1 &&
+      Math.abs(item.playbackRate - (b.playbackRate || 1.0)) < 0.01
+    );
+    
+    const aPriority = aMatch ? aMatch.priority : 999;
+    const bPriority = bMatch ? bMatch.priority : 999;
+    return aPriority - bPriority;
+  })[0];
+  
+  if (candidate && Math.abs(currentTime - candidate.timeInSeconds) < 0.5) {
+    // 타임스탬프 활성화
+    setActiveTimestampId(candidate.id);
+    setTimestampStartMode('natural');
+    activeNow = [candidate];
+    
+    // 텍스트 순서에서 현재 타임스탬프의 위치 찾기
+    const candidateIndex = priorityOrder.findIndex(item => 
+      Math.abs(item.startTime - candidate.timeInSeconds) < 1 &&
+      Math.abs(item.volume - (candidate.volume || 100)) < 1 &&
+      Math.abs(item.playbackRate - (candidate.playbackRate || 1.0)) < 0.01
+    );
+    
+    // 진행 상황 표시 (현재/전체)
+    const totalTimestamps = priorityOrder.length;
+    const currentPosition = candidateIndex + 1;
+    showNotification(`타임스탬프 실행 (${currentPosition}/${totalTimestamps}) ${formatTime(candidate.timeInSeconds)}`, "info");
+    
+    // 이전 타임스탬프들을 모두 실행된 것으로 표시 (배타적 실행 보장)
+    if (candidateIndex > 0) {
+      const previousIds: number[] = [];
+      for (let i = 0; i < candidateIndex; i++) {
+        const ts = timestamps.find(t => 
+          Math.abs(t.timeInSeconds - priorityOrder[i].startTime) < 1 &&
+          Math.abs((t.volume || 100) - priorityOrder[i].volume) < 1 &&
+          Math.abs((t.playbackRate || 1.0) - priorityOrder[i].playbackRate) < 0.01
+        );
+        if (ts && !executedTimestampIds.includes(ts.id)) {
+          previousIds.push(ts.id);
+        }
+      }
+      setExecutedTimestampIds(prev => [...prev, ...previousIds, candidate.id]);
+    } else {
+      // 첫 번째 타임스탬프인 경우
+      setExecutedTimestampIds(prev => [...prev, candidate.id]);
+    }
+  }
+}
+
+========================================
+2. 문제점 분석
+========================================
+
+2.1 모바일 환경 문제
+- 텍스트 직접 편집이 불편함
+- 작은 화면에서 정밀한 시간 조절 어려움
+- 가상 키보드가 화면을 가림
+
+2.2 사용성 문제
+- 시작/종료 시간 수정이 텍스트 편집으로만 가능
+- 실시간 미리보기 없음
+- 구간 설정 후 확인이 어려움
+
+2.3 정확성 문제
+- 원하는 구간을 정확히 설정하기 어려움
+- 시간 조절 시 영상 확인 불가
+
+========================================
+3. 개선 방안
+========================================
+
+3.1 UI 개선 - 모달창 도입
+- 도장 버튼 클릭 시 편집 모달창 표시
+- 모바일 친화적인 터치 인터페이스
+- 실시간 미리보기 기능
+
+3.2 모달창 구성 요소
+1) 헤더
+   - 제목: "타임스탬프 편집"
+   - 닫기(X) 버튼
+
+2) 시간 설정 섹션
+   - 시작 시간: 숫자 입력 필드 (HH:MM:SS.sss 형식)
+   - 종료 시간: 숫자 입력 필드 (HH:MM:SS.sss 형식)
+   - 포커스 시 해당 시간으로 영상 화면 이동 (정지 상태)
+
+3) 재생 설정 섹션
+   - 볼륨: 0-100% 슬라이더
+   - 재생 속도: 0.25x-2.0x 슬라이더 (0.05 단위)
+   
+4) 고급 설정 섹션
+   - 정지 시간: 숫자 입력 (선택적)
+   - 자동 점프: 체크박스
+
+5) 하단 버튼
+   - 저장: 타임스탬프 생성 및 노트에 삽입
+   - 취소: 모달 닫기
+
+3.3 기능 개선
+- 시간 입력 필드 포커스 시 해당 시간으로 영상 이동 (정지 상태)
+- 숫자만 입력 가능 (유효성 검사)
+- 터치 제스처 지원
+
+========================================
+4. 구현 계획
+========================================
+
+4.1 단계별 구현
+
+1단계: 모달 컴포넌트 생성
+- TimestampEditModal.tsx 새 파일 생성
+- shadcn/ui Dialog 컴포넌트 활용
+- 기본 레이아웃 구성
+
+2단계: 시간 입력 UI 구현
+- 시작/종료 시간 숫자 입력 필드
+- 포커스 이벤트로 영상 시간 이동
+- HH:MM:SS.sss 형식 파싱 및 검증
+
+3단계: 재생 설정 UI 구현
+- 볼륨 슬라이더 (0-100%)
+- 속도 슬라이더 (0.25x-2.0x, 0.05 단위)
+- 현재 값 표시
+- 기본값 리셋 버튼
+
+4단계: 고급 설정 구현
+- 정지 시간 입력
+- 자동 점프 체크박스
+- 조건부 UI 표시
+
+5단계: 기존 코드와 통합
+- addTimestamp 함수 수정
+- 모달 열기/닫기 로직
+- 데이터 전달 및 저장
+
+4.2 파일 구조
+- 새 파일: client/src/components/TimestampEditModal.tsx
+- 수정 파일: client/src/components/NoteArea.tsx
+- 스타일: Tailwind CSS + shadcn/ui 활용
+
+4.3 상태 관리
+- 모달 열림/닫힘 상태
+- 임시 타임스탬프 데이터
+- 포커스된 입력 필드 추적
+
+========================================
+5. 주의사항 및 제약사항
+========================================
+
+5.1 보존해야 할 기능
+- 기존 타임스탬프 형식 유지 (호환성)
+- 텍스트 에리어 직접 편집 기능 유지
+- 더블클릭 이동 기능 유지
+- 타임스탬프 순서 로직 유지 (왼쪽->우측, 위->아래)
+- 자동점프 쉼표 필수 규칙 유지
+- 사용자 임의 시간 이동시 순서 재계산 로직 유지
+
+5.2 기술적 제약
+- YouTube Player API 제한사항 준수
+- 모바일 브라우저 제약 고려
+- 성능 최적화 (불필요한 리렌더링 방지)
+
+5.3 롤백 계획
+- 작업설계서에서 백업된 기능 코드 참조하여 복구
+- 필요시 GitHub에서 이전 버전 파일 가져와서 복구
+- git restore 명령으로 특정 파일 복구 가능

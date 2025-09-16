@@ -1,0 +1,231 @@
+작업 날짜: 2025-09-05
+작업명: 재생 컨트롤 완전 복구 및 설정 시스템 구축
+
+구현 내용:
+타임스탬프 기능 정상화, 재생 컨트롤 UI 복구, 설정 패널을 통한 개별 요소 토글 기능 구현
+
+수정 파일 및 변경 내용:
+
+1. client/src/components/NoteArea.tsx
+   
+   추가됨:
+   // 드래그 컨트롤 상태
+   const [isDragging, setIsDragging] = useState(false);
+   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+   const [startRate, setStartRate] = useState(1);
+   const [startVolume, setStartVolume] = useState(100);
+   const [volume, setVolume] = useState(100);
+   const [playbackRate, setPlaybackRate] = useState(1.0);
+   const [duration, setDuration] = useState(5);
+   const controlRef = useRef<HTMLDivElement>(null);
+
+   // 재생 컨트롤 섹션 전체 UI
+   {uiSettings?.재생컨트롤?.전체표시 !== false && (
+     <div className="mb-4 space-y-2">
+       {/* 메인 드래그 컨트롤 */}
+       <div className="space-y-1">
+         <div className="flex items-center justify-between">
+           <p className="text-sm font-medium text-gray-700">재생 컨트롤</p>
+           <div className="flex items-center space-x-1 text-sm text-gray-600 font-mono">
+             <span>{Math.round(volume || 100)}%</span>
+             <span>•</span>
+             <span>{(currentRate || 1.0).toFixed(2)}x</span>
+           </div>
+         </div>
+         <div
+           ref={controlRef}
+           onPointerDown={handlePointerDown}
+           onPointerMove={handlePointerMove}
+           onPointerUp={handlePointerUp}
+           className="relative w-full h-16 bg-gradient-to-r from-blue-50 to-red-50 border-2 border-gray-200 rounded-lg cursor-pointer"
+         >
+           {/* 드래그 컨트롤 내용 */}
+         </div>
+       </div>
+     </div>
+   )}
+
+   // 개별 설정에 따른 버튼 표시
+   {uiSettings?.재생컨트롤?.녹화 !== false && (
+     <Button onClick={녹화토글}>녹화</Button>
+   )}
+   {uiSettings?.재생컨트롤?.도장 !== false && (
+     <Button onClick={addTimestamp}>도장</Button>
+   )}
+   {uiSettings?.재생컨트롤?.편집 !== false && (
+     <Button onClick={openTimestampModal}>편집</Button>
+   )}
+
+   // 노트 영역 조건부 렌더링
+   {uiSettings?.노트영역?.표시 !== false && (
+     <div className="flex-1 flex flex-col">
+       <Textarea ref={textareaRef} value={noteText} onChange={(e) => setNoteText(e.target.value)} />
+     </div>
+   )}
+
+   수정됨:
+   // 타임스탬프 정지 기능 수정 (SimpleNoteArea에서 검증된 로직 적용)
+   if (actionMode && actionMode.startsWith('|')) {
+     const pauseSeconds = parseInt(actionMode.substring(1));
+     if (!isNaN(pauseSeconds)) {
+       player.pauseVideo();
+       showNotification(`${pauseSeconds}초간 정지 - 이후 자동 재생`, "warning");
+       setTimeout(() => {
+         player.playVideo();
+         showNotification(`${pauseSeconds}초 정지 후 재생 재개`, "success");
+       }, pauseSeconds * 1000);
+     }
+   }
+
+2. client/src/components/SettingsPanel.tsx
+   
+   수정됨:
+   재생컨트롤: {
+     전체표시: boolean;
+     볼륨: boolean;
+     속도: boolean;
+     녹화: boolean;
+     도장: boolean;
+     편집: boolean;
+   };
+
+   // 설정 순서 변경: 볼륨, 속도, 녹화, 도장, 편집
+   <div className="flex justify-between items-center">
+     <span className="text-sm">볼륨</span>
+     <Switch checked={settings.재생컨트롤.볼륨} onCheckedChange={(값) => 설정업데이트("재생컨트롤", "볼륨", 값)} />
+   </div>
+   <div className="flex justify-between items-center">
+     <span className="text-sm">속도</span>
+     <Switch checked={settings.재생컨트롤.속도} onCheckedChange={(값) => 설정업데이트("재생컨트롤", "속도", 값)} />
+   </div>
+   <div className="flex justify-between items-center">
+     <span className="text-sm">녹화</span>
+     <Switch checked={settings.재생컨트롤.녹화} onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)} />
+   </div>
+   <div className="flex justify-between items-center">
+     <span className="text-sm">도장</span>
+     <Switch checked={settings.재생컨트롤.도장} onCheckedChange={(값) => 설정업데이트("재생컨트롤", "도장", 값)} />
+   </div>
+   <div className="flex justify-between items-center">
+     <span className="text-sm">편집</span>
+     <Switch checked={settings.재생컨트롤.편집} onCheckedChange={(값) => 설정업데이트("재생컨트롤", "편집", 값)} />
+   </div>
+
+3. client/src/components/YouTubePlayer.tsx
+   
+   수정됨:
+   // 진행바 상단 마진 제거
+   <div className="mt-2 space-y-1"> → <div className="mt-0 space-y-1">
+
+4. client/src/pages/HomePage.tsx
+   
+   수정됨:
+   // YouTubePlayer 하단 마진 제거
+   <div className="transition-all duration-300 mb-4"> → <div className="transition-all duration-300">
+
+5. client/src/components/ErrorBoundary.tsx
+   
+   추가됨:
+   import React from 'react';
+
+   interface ErrorBoundaryState {
+     hasError: boolean;
+     error: Error | null;
+   }
+
+   class ErrorBoundary extends React.Component<React.PropsWithChildren<{}>, ErrorBoundaryState> {
+     constructor(props: React.PropsWithChildren<{}>) {
+       super(props);
+       this.state = { hasError: false, error: null };
+     }
+
+     static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+       return { hasError: true, error };
+     }
+
+     componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+       console.error('ErrorBoundary caught an error:', error, errorInfo);
+     }
+
+     render() {
+       if (this.state.hasError) {
+         return (
+           <div className="min-h-screen flex items-center justify-center bg-gray-100">
+             <div className="text-center p-8">
+               <h1 className="text-2xl font-bold text-red-600 mb-4">오류가 발생했습니다</h1>
+               <p className="text-gray-600 mb-4">페이지를 새로고침하거나 잠시 후 다시 시도해주세요.</p>
+               <button 
+                 onClick={() => window.location.reload()} 
+                 className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+               >
+                 새로고침
+               </button>
+               <details className="mt-4 text-left">
+                 <summary className="cursor-pointer text-sm text-gray-500">오류 세부사항</summary>
+                 <pre className="mt-2 text-xs text-gray-400 bg-gray-50 p-2 rounded overflow-auto">
+                   {this.state.error?.toString()}
+                 </pre>
+               </details>
+             </div>
+           </div>
+         );
+       }
+
+       return this.props.children;
+     }
+   }
+
+   export default ErrorBoundary;
+
+6. client/src/components/SimpleNoteArea.tsx
+   
+   추가됨:
+   // 참고용 간소화된 NoteArea 컴포넌트
+   // 타임스탬프 기본 로직과 정지 기능 검증을 위한 테스트 컴포넌트
+   // 원본 파일 수정 시 이 파일의 검증된 로직 참고
+
+7. client/src/App.tsx
+   
+   추가됨:
+   import ErrorBoundary from "@/components/ErrorBoundary";
+   
+   수정됨:
+   <Route path="/">
+     <ErrorBoundary>
+       <HomePage />
+     </ErrorBoundary>
+   </Route>
+
+8. CLAUDE.md
+   
+   추가됨:
+   테스트 파일 관리 방침:
+
+   테스트 목적으로 생성된 간소화된 컴포넌트들은 삭제하지 말고 참고용으로 보관합니다.
+   이러한 파일들은 향후 디버깅이나 기능 개발 시 기본 로직을 확인하는 용도로 사용됩니다.
+
+   예시:
+   - SimpleNoteArea.tsx: 타임스탬프 기본 로직 참고용 컴포넌트
+   - 원본 파일 수정 시 테스트 파일의 검증된 로직을 참고하여 적용
+   - 파일 상단에 참고용임을 명시하는 주석 추가
+
+   테스트 파일 명명 규칙:
+   - Simple[원본파일명].tsx 형태로 작성
+   - 파일 상단에 용도와 참고할 로직에 대한 설명 주석 포함
+
+데이터 구조:
+UISettings 인터페이스에 편집 설정 추가
+재생컨트롤 설정 순서 변경 (볼륨, 속도, 녹화, 도장, 편집)
+지속시간 입력은 도장 설정과 연동
+
+삭제된 기능:
+- 대체 노트 영역 (uiSettings.note.hidden 조건)
+- 불필요한 중복 코드
+
+추가된 기능:
+- 드래그 컨트롤을 통한 볼륨/속도 조절
+- 개별 재생 컨트롤 요소 토글
+- 노트 영역 표시/숨김 토글
+- ErrorBoundary를 통한 에러 처리
+- 타임스탬프 정지 기능 정상화
+- 테스트용 Simple 컴포넌트들 보관
