@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>채팅형 스마트 노트 시스템 - 데모</title>
+    <style>
+        /* 채팅형 스마트 노트 시스템 메인 스타일 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+
+        .앱-컨테이너 {
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .메인-레이아웃 {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* 왼쪽 패널 스타일 */
+        .왼쪽-패널 {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0;
+            background-color: #f9f9f9;
+        }
+
+        /* 오른쪽 패널 스타일 */
+        .오른쪽-패널 {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            background-color: #ffffff;
+        }
+
+        /* 폴더 목록 영역 */
+        .폴더목록-컨테이너 {
+            height: 200px;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .폴더목록-제목 {
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #333;
+        }
+
+        .폴더-아이템 {
+            padding: 8px 12px;
+            margin-bottom: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .폴더-아이템:hover {
+            background-color: #e8e8e8;
+        }
+
+        .폴더-아이템.활성 {
+            background-color: #007bff;
+            color: white;
+        }
+
+        /* 채팅 패널 영역 */
+        .채팅패널-컨테이너 {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+        }
+
+        .채팅메시지-목록 {
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .채팅메시지-아이템 {
+            margin-bottom: 12px;
+            padding: 8px 12px;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            max-width: 80%;
+        }
+
+        .채팅메시지-시간 {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .채팅메시지-텍스트 {
+            color: #333;
+        }
+
+        .채팅입력-영역 {
+            display: flex;
+            gap: 8px;
+        }
+
+        .채팅입력-필드 {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .채팅전송-버튼 {
+            padding: 8px 16px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .채팅전송-버튼:hover {
+            background-color: #0056b3;
+        }
+
+        /* 노트 패널 영역 */
+        .노트패널-컨테이너 {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+        }
+
+        .노트-상단-고정영역 {
+            height: 120px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background-color: #f8f9fa;
+        }
+
+        .노트-상단-제목 {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .노트-요약입력 {
+            width: 100%;
+            height: 80px;
+            border: none;
+            background: transparent;
+            resize: none;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .노트-편집영역 {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .노트제목-입력 {
+            font-size: 20px;
+            font-weight: bold;
+            padding: 8px 0;
+            border: none;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 16px;
+            outline: none;
+        }
+
+        .노트내용-입력 {
+            flex: 1;
+            border: none;
+            resize: none;
+            font-size: 14px;
+            line-height: 1.6;
+            outline: none;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* 공통 버튼 스타일 */
+        .기본-버튼 {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .기본-버튼:hover {
+            background-color: #f0f0f0;
+        }
+
+        .주요-버튼 {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .주요-버튼:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="앱-컨테이너">
+        <!-- 전체 레이아웃: 좌우 패널 분할 -->
+        <div class="메인-레이아웃">
+            <!-- 왼쪽 영역: 폴더 목록 + 채팅 패널 -->
+            <div class="왼쪽-패널">
+                <!-- 폴더 목록 -->
+                <div class="폴더목록-컨테이너">
+                    <div class="폴더목록-제목">
+                        📁 폴더 목록
+                        <button class="기본-버튼" style="float: right; font-size: 12px; padding: 4px 8px;">
+                            + 새 폴더
+                        </button>
+                    </div>
+                    <div class="폴더목록-리스트">
+                        <div class="폴더-아이템 활성" onclick="폴더클릭('1')">음식일지</div>
+                        <div class="폴더-아이템" onclick="폴더클릭('2')">소설 대화</div>
+                        <div class="폴더-아이템" onclick="폴더클릭('3')">일반 노트</div>
+                    </div>
+                </div>
+                
+                <!-- 채팅 패널 -->
+                <div class="채팅패널-컨테이너">
+                    <div class="채팅메시지-목록" id="채팅메시지목록">
+                        <div class="채팅메시지-아이템">
+                            <div class="채팅메시지-시간">08:30</div>
+                            <div class="채팅메시지-텍스트">제육볶음, 쌀밥</div>
+                        </div>
+                        <div class="채팅메시지-아이템">
+                            <div class="채팅메시지-시간">11:15</div>
+                            <div class="채팅메시지-텍스트">떡볶이</div>
+                        </div>
+                    </div>
+                    
+                    <div class="채팅입력-영역">
+                        <input type="text" class="채팅입력-필드" id="채팅입력" placeholder="메시지를 입력하세요..." onkeydown="엔터키처리(event)">
+                        <button class="채팅전송-버튼" onclick="메시지전송()">전송</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 오른쪽 영역: 노트 패널 -->
+            <div class="오른쪽-패널">
+                <div class="노트패널-컨테이너">
+                    <!-- 상단 고정 요약/메모창 -->
+                    <div class="노트-상단-고정영역">
+                        <div class="노트-상단-제목">📝 요약 / 메모</div>
+                        <textarea class="노트-요약입력" placeholder="이 노트의 요약이나 임시 메모를 작성하세요...">제육볶음, 떡볶이</textarea>
+                    </div>
+
+                    <!-- 노트 편집 영역 -->
+                    <div class="노트-편집영역">
+                        <input type="text" class="노트제목-입력" placeholder="노트 제목을 입력하세요" value="2025-07-15">
+                        
+                        <textarea class="노트내용-입력" placeholder="자유롭게 노트를 작성하세요...">오늘 먹은 것들을 기록해보자.
+
+아침: 제육볶음과 쌀밥을 먹었다. 맛있었지만 조금 짰다.
+점심: 떡볶이를 먹었다. 달콤하고 매콤했다.</textarea>
+
+                        <div style="margin-top: 16px; text-align: right;">
+                            <button class="주요-버튼" onclick="노트저장()">💾 저장</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 폴더 클릭 처리
+        function 폴더클릭(폴더아이디) {
+            console.log('폴더 선택됨:', 폴더아이디);
+            // 활성 폴더 표시 변경
+            document.querySelectorAll('.폴더-아이템').forEach(item => {
+                item.classList.remove('활성');
+            });
+            event.target.classList.add('활성');
+        }
+
+        // 메시지 전송
+        function 메시지전송() {
+            const 입력필드 = document.getElementById('채팅입력');
+            const 입력값 = 입력필드.value.trim();
+            
+            if (입력값 === '') return;
+
+            const 현재시간 = new Date();
+            const 시간문자열 = 현재시간.getHours().toString().padStart(2, '0') + ':' + 
+                             현재시간.getMinutes().toString().padStart(2, '0');
+
+            const 메시지HTML = `
+                <div class="채팅메시지-아이템">
+                    <div class="채팅메시지-시간">${시간문자열}</div>
+                    <div class="채팅메시지-텍스트">${입력값}</div>
+                </div>
+            `;
+
+            document.getElementById('채팅메시지목록').insertAdjacentHTML('beforeend', 메시지HTML);
+            입력필드.value = '';
+            
+            // 스크롤을 맨 아래로
+            const 메시지목록 = document.getElementById('채팅메시지목록');
+            메시지목록.scrollTop = 메시지목록.scrollHeight;
+            
+            console.log('새 메시지 전송됨:', 입력값);
+        }
+
+        // 엔터키 처리
+        function 엔터키처리(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                메시지전송();
+            }
+        }
+
+        // 노트 저장
+        function 노트저장() {
+            const 제목 = document.querySelector('.노트제목-입력').value;
+            const 내용 = document.querySelector('.노트내용-입력').value;
+            const 요약 = document.querySelector('.노트-요약입력').value;
+            
+            console.log('노트 저장됨:', {
+                제목: 제목,
+                내용: 내용,
+                요약: 요약,
+                저장시간: new Date()
+            });
+            
+            alert('노트가 저장되었습니다!');
+        }
+    </script>
+</body>
+</html>

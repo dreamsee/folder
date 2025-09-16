@@ -22,6 +22,8 @@ UI 컴포넌트:
 
 모달 및 입력:
 - client/src/components/TimestampEditModal.tsx: 타임스탬프 편집 모달
+- client/src/components/CommentModal.tsx: 댓글 상세보기 모달 (평가 시스템)
+- client/src/components/CommentInputModal.tsx: 댓글 입력 모달 (별점 선택)
 - client/src/components/FolderSelector.tsx: 폴더 선택기
 - client/src/components/CoordinateInput.tsx: 좌표 입력
 - client/src/components/PositionGrid.tsx: 위치 그리드
@@ -33,11 +35,15 @@ UI 컴포넌트:
 
 유틸리티:
 - client/src/components/SimpleNoteArea.tsx: 타임스탬프 로직 참고용
+- client/src/components/SimpleShareArea.tsx: 공유 노트 로직 참고용
 - client/src/components/ErrorBoundary.tsx: 에러 경계
 - client/src/components/Notification.tsx: 알림
 - client/src/components/DebugLogPanel.tsx: 모바일 디버그 로그
 - client/src/lib/youtubeUtils.ts: YouTube 유틸리티 (formatTime 등)
 - client/src/utils/chapterParser.ts: 챕터 파싱
+
+테스트 페이지:
+- client/src/pages/TestSharePage.tsx: 댓글 시스템 테스트 페이지
 
 서버:
 - server/index.ts: Express 서버 메인
@@ -122,6 +128,13 @@ UI 컴포넌트:
 
 === 3. 최근 중요 변경사항 ===
 
+2025-09-16: 댓글 시스템 구현 완료
+- CommentModal.tsx: 댓글 상세보기 모달 (필터링, 정렬, 평균 점수 표시)
+- CommentInputModal.tsx: 댓글 입력 모달 (별점 선택 UI, 버전 관리)
+- TestSharePage.tsx: 댓글 시스템 테스트 페이지
+- SimpleShareArea.tsx: 공유 노트 로직 참고용 컴포넌트
+→ 주의: 메인 앱에 연결 작업 필요 (App.tsx에 import 및 연결)
+
 2025-09-14: requestAnimationFrame 기반 감지 시스템 구현
 - NoteArea.tsx: setInterval(500ms) → requestAnimationFrame(~16ms) 변환
 - 관련 코드 위치 변경: checkIntervalRef 제거, trackingRef 추가
@@ -129,3 +142,13 @@ UI 컴포넌트:
 2025-09-13: 타임스탬프 우선순위 시스템 추가
 - NoteArea.tsx: lastActiveIndex 상태 추가
 - 연관 코드: 수동이동 감지 및 더블클릭 핸들러에 우선순위 로직 추가
+
+=== 4. 댓글 시스템 기능별 코드 위치 ===
+
+📝 댓글 시스템 (미연결 상태):
+- CommentModal.tsx:전체컴포넌트 댓글 조회, 필터링, 정렬
+- CommentInputModal.tsx:전체컴포넌트 댓글 작성, 별점 선택
+- TestSharePage.tsx:전체컴포넌트 댓글 시스템 테스트
+- CommentModal.tsx:getAverageRatingByRange 별점 범위별 평균 점수 계산
+- CommentInputModal.tsx:renderNewRatingSelector 가로 배치 별점 선택 UI
+→ 연결 작업 필요: App.tsx에 import하여 메인 앱에서 사용 가능하게 해야 함
