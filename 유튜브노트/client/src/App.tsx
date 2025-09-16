@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/HomePage";
 import SimpleHomePage from "@/pages/SimpleHomePage";
+import TestSharePage from "@/pages/TestSharePage";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 console.log("🔍 App.tsx 로딩");
@@ -18,6 +19,7 @@ function Router() {
         </ErrorBoundary>
       </Route>
       <Route path="/simple" component={SimpleHomePage} />
+      <Route path="/test-share" component={TestSharePage} />
       <Route component={NotFound} />
     </Switch>
   );

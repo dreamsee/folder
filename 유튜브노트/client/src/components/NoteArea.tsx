@@ -1130,13 +1130,13 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         
         // 타임스탬프 형식 생성
         let timestamp = `[${timeFormatted}-${endTimeFormatted}, ${timestampData.volume}%, ${timestampData.playbackRate.toFixed(2)}x`;
-        
+
         if (timestampData.pauseDuration && timestampData.pauseDuration > 0) {
           timestamp += `, |${timestampData.pauseDuration}`;
-        } else if (timestampData.autoJump) {
-          timestamp += `, ->`;
         }
-        
+        // 자동점프 플래그가 true여도 새 타임스탬프에는 화살표 추가하지 않음
+        // 화살표는 이전 타임스탬프에만 추가됨 (위의 1100-1129줄에서 처리)
+
         timestamp += `]`;
         
         const start = cursorPosition + cursorOffset;
