@@ -5,6 +5,7 @@ import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/HomePage";
 import SimpleHomePage from "@/pages/SimpleHomePage";
 import TestSharePage from "@/pages/TestSharePage";
+import TestTimestampPage from "@/pages/TestTimestampPage";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 console.log("🔍 App.tsx 로딩");
@@ -20,6 +21,7 @@ function Router() {
       </Route>
       <Route path="/simple" component={SimpleHomePage} />
       <Route path="/test-share" component={TestSharePage} />
+      <Route path="/test-timestamp" component={TestTimestampPage} />
       <Route component={NotFound} />
     </Switch>
   );

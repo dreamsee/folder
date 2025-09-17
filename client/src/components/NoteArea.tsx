@@ -1694,7 +1694,12 @@ const NoteArea: React.FC<NoteAreaProps> = ({
 
 예시: [00:01:30-00:01:35, 100%, 1.25x, -&gt;]
      [00:01:30-00:01:35, 100%, 1.25x, |3]"
-                  className="w-full resize-y min-h-[130px]"
+                  className="w-full resize-y min-h-[130px] overflow-auto scrollbar-hide"
+                  style={{
+                    WebkitOverflowScrolling: 'touch',
+                    scrollbarWidth: 'none',
+                    msOverflowStyle: 'none'
+                  }}
                 />
                 
                 <div className="flex justify-between mt-2">

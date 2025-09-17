@@ -214,6 +214,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     if (저장여부) {
       localStorage.setItem('uiSettings', JSON.stringify(새설정));
     }
+
+    // 현재 활성화된 프리셋이 있으면 해당 프리셋에도 저장
+    const activePreset = presetStates.최소 ? "최소" : presetStates.노트 ? "노트" : null;
+    if (activePreset) {
+      savePresetSettings(activePreset, 새설정);
+    }
   };
 
   const handleSettingChange = (카테고리: keyof UISettings, 값: any) => {
@@ -221,6 +227,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     새설정[카테고리] = 값;
     onSettingsChange(새설정);
     localStorage.setItem('uiSettings', JSON.stringify(새설정));
+
+    // 현재 활성화된 프리셋이 있으면 해당 프리셋에도 저장
+    const activePreset = presetStates.최소 ? "최소" : presetStates.노트 ? "노트" : null;
+    if (activePreset) {
+      savePresetSettings(activePreset, 새설정);
+    }
   };
 
   const 프리셋선택 = (프리셋: "최소" | "노트") => {
