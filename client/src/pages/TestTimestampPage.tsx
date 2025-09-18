@@ -3,6 +3,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import SimpleNoteArea from '@/components/SimpleNoteArea';
+import NoteOverlayPanel from '@/components/NoteOverlayPanel';
 import YouTubePlayer from '@/components/YouTubePlayer';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -11,6 +12,8 @@ import { formatTime } from '@/lib/youtubeUtils';
 
 const TestTimestampPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('timestamp');
+  const [overlayMode, setOverlayMode] = useState(false);
+  const [isOverlayOpen, setIsOverlayOpen] = useState(false);
   const [noteText, setNoteText] = useState(`타임스탬프 테스트 노트
 
 📌 기본 타임스탬프:
@@ -125,18 +128,20 @@ const TestTimestampPage: React.FC = () => {
                 </div>
 
                 {/* YouTube 플레이어 */}
-                <div className="mb-4 border rounded-lg overflow-hidden">
-                  <YouTubePlayer
-                    player={player}
-                    setPlayer={setPlayer}
-                    isPlayerReady={isPlayerReady}
-                    setIsPlayerReady={setIsPlayerReady}
-                    currentVideoId={testVideoId}
-                    setPlayerState={setPlayerState}
-                    showNotification={showNotification}
-                    className="w-full h-64"
-                  />
-                </div>
+                {!(overlayMode && isOverlayOpen) && (
+                  <div className="mb-4 border rounded-lg overflow-hidden">
+                    <YouTubePlayer
+                      player={player}
+                      setPlayer={setPlayer}
+                      isPlayerReady={isPlayerReady}
+                      setIsPlayerReady={setIsPlayerReady}
+                      currentVideoId={testVideoId}
+                      setPlayerState={setPlayerState}
+                      showNotification={showNotification}
+                      className="w-full h-64"
+                    />
+                  </div>
+                )}
 
                 {/* 플레이어 상태 정보 */}
                 <div className="mb-4 p-3 bg-gray-50 rounded-lg text-sm">
@@ -177,8 +182,37 @@ const TestTimestampPage: React.FC = () => {
                     player={player}
                     isPlayerReady={isPlayerReady}
                     showNotification={showNotification}
+                    overlayMode={overlayMode}
+                    onOverlayOpen={() => setIsOverlayOpen(true)}
+                    noteText={noteText}
+                    onNoteTextChange={setNoteText}
                   />
                 </div>
+
+                {/* NoteOverlayPanel 컴포넌트 */}
+                <NoteOverlayPanel
+                  isOpen={isOverlayOpen}
+                  noteText={noteText}
+                  onNoteChange={setNoteText}
+                  onClose={() => setIsOverlayOpen(false)}
+                  currentTime={formatTime(currentTime)}
+                  playerElement={overlayMode && isOverlayOpen ? (
+                    <YouTubePlayer
+                      player={player}
+                      setPlayer={setPlayer}
+                      isPlayerReady={isPlayerReady}
+                      setIsPlayerReady={setIsPlayerReady}
+                      currentVideoId={testVideoId}
+                      setPlayerState={setPlayerState}
+                      showNotification={showNotification}
+                      className="w-full aspect-video"
+                      바설정={{
+                        커스텀바: false,
+                        챕터바: false
+                      }}
+                    />
+                  ) : undefined}
+                />
               </div>
             </TabsContent>
 
@@ -255,8 +289,13 @@ const TestTimestampPage: React.FC = () => {
             <p>현재 탭: <span className="font-mono bg-gray-100 px-1">{activeTab}</span></p>
             <p>비디오 ID: <span className="font-mono bg-gray-100 px-1">{testVideoId}</span></p>
             <p>노트 텍스트 길이: <span className="font-mono bg-gray-100 px-1">{noteText.length}</span></p>
+            <p>오버레이 모드: <span className="font-mono bg-gray-100 px-1">{overlayMode ? 'ON' : 'OFF'}</span></p>
+            <p>오버레이 열림: <span className="font-mono bg-gray-100 px-1">{isOverlayOpen ? '열림' : '닫힘'}</span></p>
+            <p>플레이어 오버레이 조건: <span className="font-mono bg-gray-100 px-1">
+              {overlayMode && isOverlayOpen ? '✅ 활성' : '❌ 비활성'}
+            </span></p>
             <p>타임스탬프 개수: <span className="font-mono bg-gray-100 px-1">
-              {(noteText.match(/\[\d{2}:\d{2}:\d{2}-\d{2}:\d{2}:\d{2},\s*\d+%,\s*[\d.]+x(?:,\s*(?:->|\|\d+))?\]/g) || []).length}
+              {(noteText.match(/\[\d{2}:\d{2}:\d{2}-\d{2}:\d{2}:\d{2},\s*\d+%,\s*[\d.]+x(?:,(?:->|\|\d+))?\]/g) || []).length}
             </span></p>
           </div>
 
@@ -265,21 +304,22 @@ const TestTimestampPage: React.FC = () => {
               size="sm"
               variant="outline"
               onClick={() => {
-                setNoteText(`간단한 테스트 노트
-
-[00:00:05-00:00:10, 100%, 1.00x] 시작 부분
-[00:00:15-00:00:20, 80%, 1.25x, ->] 중간 부분
-[00:00:25-00:00:30, 100%, 1.50x] 마지막 부분
-`);
+                // 오버레이 모드 토글
+                setOverlayMode(!overlayMode);
+                // 오버레이 모드가 꺼지면 패널도 닫기
+                if (overlayMode) {
+                  setIsOverlayOpen(false);
+                }
               }}
             >
-              간단한 노트로 변경
+              {overlayMode ? '오버레이 모드 끄기' : '노트 입력창 띄우기'}
             </Button>
             <Button
               size="sm"
               variant="outline"
               onClick={() => {
-                const timestamps = noteText.match(/\[\d{2}:\d{2}:\d{2}-\d{2}:\d{2}:\d{2},\s*\d+%,\s*[\d.]+x(?:,\s*(?:->|\|\d+))?\]/g) || [];
+                // 정규식: 쉼표 뒤 공백 없이 바로 기능 표시도 인식 (,-> 또는 ,|3 형식)
+                const timestamps = noteText.match(/\[\d{2}:\d{2}:\d{2}-\d{2}:\d{2}:\d{2},\s*\d+%,\s*[\d.]+x(?:,(?:->|\|\d+))?\]/g) || [];
                 alert(`발견된 타임스탬프:\n${timestamps.join('\n') || '없음'}`);
               }}
             >

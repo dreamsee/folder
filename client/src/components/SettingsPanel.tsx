@@ -757,14 +757,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 {settings.화면텍스트.스타일설정 && (
                   <div className="ml-4 space-y-2 border-l-2 border-gray-300 pl-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-xs text-gray-600">지속시간</span>
-                      <Switch
-                        checked={settings.화면텍스트.지속시간 !== false}
-                        onCheckedChange={(값) => 설정업데이트("화면텍스트", "지속시간", 값)}
-                        className="scale-90"
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
                       <span className="text-xs text-gray-600">글자크기, 여백</span>
                       <Switch
                         checked={settings.화면텍스트.글자크기여백 !== false}
@@ -785,6 +777,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       <Switch
                         checked={settings.화면텍스트.배경투명도 !== false}
                         onCheckedChange={(값) => 설정업데이트("화면텍스트", "배경투명도", 값)}
+                        className="scale-90"
+                      />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-gray-600">지속시간</span>
+                      <Switch
+                        checked={settings.화면텍스트.지속시간 !== false}
+                        onCheckedChange={(값) => 설정업데이트("화면텍스트", "지속시간", 값)}
                         className="scale-90"
                       />
                     </div>

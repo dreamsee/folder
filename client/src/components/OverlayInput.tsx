@@ -38,6 +38,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   const [coordinates, setCoordinates] = useState<Coordinates>({ x: 50, y: 90, unit: "%" });
   const [position] = useState<OverlayPosition>("bottom-center"); // 기본 위치
   const [duration, setDuration] = useState(5);
+  const [actualDuration, setActualDuration] = useState<number | null>(null); // 타임스탬프에서 가져온 실제 지속시간 (소수점 포함)
   const [fontSize, setFontSize] = useState(20);
   const [textColor, setTextColor] = useState("#FFFFFF");
   const [bgColor, setBgColor] = useState("#000000");
@@ -47,7 +48,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   const [startTime, setStartTime] = useState<number | null>(null);
   const [endTime, setEndTime] = useState<number | null>(null);
   const [showTimestampPicker, setShowTimestampPicker] = useState(false);
-  const [availableTimestamps, setAvailableTimestamps] = useState<Array<{text: string, start: number, end: number}>>([]);
+  const [availableTimestamps, setAvailableTimestamps] = useState<Array<{text: string, start: number, end: number, description: string}>>([]);
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
   // 투명도를 16진수로 변환하는 함수
@@ -70,12 +71,12 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     return bgColor + opacityToHex(bgOpacity);
   };
 
-  // 노트에서 타임스탬프 파싱
+  // 노트에서 타임스탬프 파싱 (설명 텍스트 포함)
   const parseTimestamps = () => {
     const timestampRegex = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
     const timestamps = [];
     let match;
-    
+
     while ((match = timestampRegex.exec(noteText)) !== null) {
       const startHours = parseInt(match[1]);
       const startMinutes = parseInt(match[2]);
@@ -83,17 +84,38 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       const endHours = parseInt(match[4]);
       const endMinutes = parseInt(match[5]);
       const endSeconds = parseFloat(match[6]);
-      
+
       const start = startHours * 3600 + startMinutes * 60 + startSeconds;
       const end = endHours * 3600 + endMinutes * 60 + endSeconds;
-      
+
+      // 타임스탬프 뒤 설명 텍스트 추출
+      const timestampEnd = match.index! + match[0].length;
+      const remainingText = noteText.substring(timestampEnd);
+
+      // 다음 줄바꿈 또는 다음 타임스탬프까지의 텍스트 추출
+      const nextLineBreak = remainingText.indexOf('\n');
+      const nextTimestampMatch = remainingText.match(/\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/);
+      const nextTimestampPos = nextTimestampMatch ? nextTimestampMatch.index! : -1;
+
+      let endPos = remainingText.length;
+      if (nextLineBreak !== -1 && (nextTimestampPos === -1 || nextLineBreak < nextTimestampPos)) {
+        endPos = nextLineBreak;
+      } else if (nextTimestampPos !== -1) {
+        endPos = nextTimestampPos;
+      }
+
+      let description = remainingText.substring(0, endPos).trim();
+      // 앞쪽 공백이나 특수문자 제거
+      description = description.replace(/^[\s\-\*\•\>\→\|\:\,\.\!]*/, '').trim();
+
       timestamps.push({
         text: match[0],
         start,
-        end
+        end,
+        description: description || '' // 설명 텍스트가 없으면 빈 문자열
       });
     }
-    
+
     return timestamps;
   };
 
@@ -108,13 +130,25 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     setShowTimestampPicker(true);
   };
 
-  // 타임스탬프 선택 처리
-  const selectTimestamp = (timestamp: {text: string, start: number, end: number}) => {
+  // 타임스탬프 선택 처리 (설명 텍스트 포함)
+  const selectTimestamp = (timestamp: {text: string, start: number, end: number, description: string}) => {
     setStartTime(timestamp.start);
     setEndTime(timestamp.end);
-    setDuration(Math.round(timestamp.end - timestamp.start));
+
+    // 실제 지속시간 계산 (소수점 포함)
+    const realDuration = timestamp.end - timestamp.start;
+    setActualDuration(realDuration);
+    setDuration(Math.round(realDuration)); // 슬라이더용 정수값
+
+    // 설명 텍스트가 있으면 오버레이 텍스트로 자동 설정
+    if (timestamp.description && timestamp.description.trim()) {
+      setOverlayText(timestamp.description.trim());
+      showNotification(`타임스탬프+텍스트를 가져왔습니다: ${formatTime(timestamp.start)} - ${formatTime(timestamp.end)}`, "success");
+    } else {
+      showNotification(`타임스탬프 시간을 가져왔습니다: ${formatTime(timestamp.start)} - ${formatTime(timestamp.end)}`, "success");
+    }
+
     setShowTimestampPicker(false);
-    showNotification(`타임스탬프 시간을 가져왔습니다: ${formatTime(timestamp.start)} - ${formatTime(timestamp.end)}`, "success");
   };
 
 
@@ -240,7 +274,18 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
           <Type className="w-5 h-5 mr-2" />
           화면 텍스트 오버레이
         </h3>
-        {editingId && (
+        {!editingId ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={loadTimestampTimes}
+            disabled={!isPlayerReady}
+            className="text-xs"
+          >
+            <Clock className="w-3 h-3 mr-1" />
+            타임스탬프+텍스트
+          </Button>
+        ) : (
           <Button size="sm" variant="ghost" onClick={cancelEdit}>
             <X className="w-4 h-4 mr-1" />
             취소
@@ -248,15 +293,26 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
         )}
       </div>
       
-      {/* PC용 취소 버튼 (우상단) */}
-      {editingId && (
-        <div className="hidden md:flex justify-end mb-2">
+      {/* PC용 버튼 (우상단) */}
+      <div className="hidden md:flex justify-end mb-2">
+        {!editingId ? (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={loadTimestampTimes}
+            disabled={!isPlayerReady}
+            className="text-xs"
+          >
+            <Clock className="w-3 h-3 mr-1" />
+            타임스탬프+텍스트 가져오기
+          </Button>
+        ) : (
           <Button size="sm" variant="ghost" onClick={cancelEdit}>
             <X className="w-4 h-4 mr-1" />
             취소
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* 텍스트 입력 */}
       <div>
@@ -319,21 +375,6 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
         </div>
       )}
 
-      {/* 지속 시간 - 스타일 설정에 포함 */}
-      {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.지속시간 !== false && (
-        <div>
-          <Label htmlFor="duration">지속 시간: {duration}초</Label>
-          <Slider
-            id="duration"
-            value={[duration]}
-            onValueChange={([value]) => setDuration(value)}
-            min={1}
-            max={30}
-            step={1}
-            className="mt-1"
-          />
-        </div>
-      )}
 
       {/* 글자크기, 여백 설정 */}
       {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.글자크기여백 !== false && (
@@ -437,6 +478,32 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
         </div>
       )}
 
+      {/* 지속 시간 설정 (버튼 바로 위) */}
+      {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.지속시간 !== false && (
+        <div>
+          <Label htmlFor="duration">
+            지속 시간: {duration}초
+            {actualDuration !== null && actualDuration !== duration && (
+              <span className="text-gray-500 text-sm ml-1">
+                ({actualDuration.toFixed(2)}초)
+              </span>
+            )}
+          </Label>
+          <Slider
+            id="duration"
+            value={[duration]}
+            onValueChange={([value]) => {
+              setDuration(value);
+              setActualDuration(null); // 수동 조정 시 실제 지속시간 초기화
+            }}
+            min={1}
+            max={30}
+            step={1}
+            className="mt-1"
+          />
+        </div>
+      )}
+
       {/* 추가/수정 버튼 */}
       <div className="space-y-2">
         {/* 타임스탬프에서 시간 가져오기 버튼 */}
@@ -448,7 +515,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
             variant="outline"
           >
             <Clock className="w-4 h-4 mr-2" />
-            타임스탬프에서 시간 가져오기
+            타임스탬프+텍스트 가져오기
             {startTime !== null && endTime !== null && (
               <span className="ml-2 text-xs">
                 ({formatTime(startTime)} - {formatTime(endTime)})
@@ -487,12 +554,17 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
                 <button
                   key={index}
                   onClick={() => selectTimestamp(ts)}
-                  className="w-full text-left p-2 hover:bg-gray-100 rounded border border-gray-200"
+                  className="w-full text-left p-3 hover:bg-gray-100 rounded border border-gray-200"
                 >
                   <div className="font-mono text-sm">{ts.text}</div>
                   <div className="text-xs text-gray-500 mt-1">
                     {formatTime(ts.start)} - {formatTime(ts.end)} ({Math.round(ts.end - ts.start)}초)
                   </div>
+                  {ts.description && ts.description.trim() && (
+                    <div className="text-sm text-gray-700 mt-2 p-2 bg-gray-50 rounded">
+                      <span className="font-medium text-blue-600">텍스트:</span> {ts.description.trim()}
+                    </div>
+                  )}
                 </button>
               ))}
             </div>

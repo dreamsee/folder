@@ -127,4 +127,37 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* 오버레이 텍스트에어리어용 스크롤바 강제 표시 */
+  .overlay-textarea-scrollbar {
+    /* Firefox용 - 두꺼운 스크롤바 */
+    scrollbar-width: thick !important;
+    /* WebKit 브라우저용 - 스크롤바 강제 표시 */
+    overflow-y: scroll !important;
+  }
+
+  /* WebKit 브라우저용 스크롤바 스타일링 */
+  .overlay-textarea-scrollbar::-webkit-scrollbar {
+    display: block !important;
+    width: 16px !important; /* 두꺼운 스크롤바 */
+  }
+
+  .overlay-textarea-scrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1 !important;
+    border-radius: 8px !important;
+  }
+
+  .overlay-textarea-scrollbar::-webkit-scrollbar-thumb {
+    background: #888 !important;
+    border-radius: 8px !important;
+    border: 2px solid #f1f1f1 !important;
+  }
+
+  .overlay-textarea-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #555 !important;
+  }
+
+  .overlay-textarea-scrollbar::-webkit-scrollbar-thumb:active {
+    background: #333 !important;
+  }
 }

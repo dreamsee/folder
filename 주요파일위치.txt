@@ -22,6 +22,8 @@ UI 컴포넌트:
 
 모달 및 입력:
 - client/src/components/TimestampEditModal.tsx: 타임스탬프 편집 모달
+- client/src/components/CommentModal.tsx: 댓글 상세보기 모달 (평가 시스템)
+- client/src/components/CommentInputModal.tsx: 댓글 입력 모달 (별점 선택)
 - client/src/components/FolderSelector.tsx: 폴더 선택기
 - client/src/components/CoordinateInput.tsx: 좌표 입력
 - client/src/components/PositionGrid.tsx: 위치 그리드
@@ -33,11 +35,16 @@ UI 컴포넌트:
 
 유틸리티:
 - client/src/components/SimpleNoteArea.tsx: 타임스탬프 로직 참고용
+- client/src/components/SimpleShareArea.tsx: 공유 노트 로직 참고용
+- client/src/components/NoteOverlayPanel.tsx: 오버레이 노트 입력 패널
 - client/src/components/ErrorBoundary.tsx: 에러 경계
 - client/src/components/Notification.tsx: 알림
 - client/src/components/DebugLogPanel.tsx: 모바일 디버그 로그
 - client/src/lib/youtubeUtils.ts: YouTube 유틸리티 (formatTime 등)
 - client/src/utils/chapterParser.ts: 챕터 파싱
+
+테스트 페이지:
+- client/src/pages/TestSharePage.tsx: 댓글 시스템 테스트 페이지
 
 서버:
 - server/index.ts: Express 서버 메인
@@ -68,7 +75,13 @@ UI 컴포넌트:
 
 📱 화면 오버레이 시스템:
 - TextOverlay.tsx:전체컴포넌트 텍스트 표시 로직
-- OverlayInput.tsx:전체컴포넌트 입력 패널 로직
+- OverlayInput.tsx:전체컴포넌트 입력 패널 로직 (타임스탬프+텍스트 추출 포함)
+- OverlayInput.tsx:74-119 parseTimestamps() 타임스탬프+설명텍스트 파싱
+- OverlayInput.tsx:134-152 selectTimestamp() 설명텍스트 자동입력 & 실제지속시간 계산
+- OverlayInput.tsx:484-505 지속시간 표시 (정수/소수점 이중표시)
+- OverlayInput.tsx:511 "타임스탬프+텍스트 가져오기" 버튼
+- OverlayInput.tsx:547-563 타임스탬프 선택 모달 (설명텍스트 미리보기 포함)
+- NoteOverlayPanel.tsx:전체컴포넌트 오버레이 노트 입력 패널
 - SettingsPanel.tsx:화면텍스트섹션 오버레이 설정 UI
 - HomePage.tsx:오버레이상태들 오버레이 관련 상태 관리
 
@@ -81,6 +94,7 @@ UI 컴포넌트:
 
 ⚙️ 설정 관리:
 - SettingsPanel.tsx:전체컴포넌트 모든 설정 UI
+- SettingsPanel.tsx:783-790 지속시간 토글 (스타일설정 섹션 맨 아래)
 - SettingsPanel.tsx:1080-1170 프리셋 설정 저장 로직 (최소모드/노트모드)
 - SettingsPanel.tsx:1200-1270 실시간 프리셋 업데이트 (handleSettingChange)
 - SettingsPanel.tsx:savePresetSettings() 프리셋별 설정 저장 함수
@@ -129,17 +143,12 @@ UI 컴포넌트:
 - NoteArea.tsx:우선순위검색로직 우선순위 기반 타임스탬프 검색
 - NoteArea.tsx:수동이동시우선순위재설정 수동 이동시 우선순위 재설정
 
-=== 3. 최근 중요 변경사항 ===
+=== 3. 댓글 시스템 기능별 코드 위치 ===
 
-2025-09-17: 프리셋 설정 저장 및 노트 영역 스크롤 개선
-- SettingsPanel.tsx: 최소모드/노트모드 각각 설정값 저장 기능 추가
-- NoteArea.tsx: 노트 영역 터치 스크롤 최적화 (스크롤바 숨김)
-- index.css: .scrollbar-hide 유틸리티 클래스 추가
-
-2025-09-14: requestAnimationFrame 기반 감지 시스템 구현
-- NoteArea.tsx: setInterval(500ms) → requestAnimationFrame(~16ms) 변환
-- 관련 코드 위치 변경: checkIntervalRef 제거, trackingRef 추가
-
-2025-09-13: 타임스탬프 우선순위 시스템 추가
-- NoteArea.tsx: lastActiveIndex 상태 추가
-- 연관 코드: 수동이동 감지 및 더블클릭 핸들러에 우선순위 로직 추가
+📝 댓글 시스템 (미연결 상태):
+- CommentModal.tsx:전체컴포넌트 댓글 조회, 필터링, 정렬
+- CommentInputModal.tsx:전체컴포넌트 댓글 작성, 별점 선택
+- TestSharePage.tsx:전체컴포넌트 댓글 시스템 테스트
+- CommentModal.tsx:getAverageRatingByRange 별점 범위별 평균 점수 계산
+- CommentInputModal.tsx:renderNewRatingSelector 가로 배치 별점 선택 UI
+→ 연결 작업 필요: App.tsx에 import하여 메인 앱에서 사용 가능하게 해야 함

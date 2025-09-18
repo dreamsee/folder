@@ -20,14 +20,25 @@ interface SimpleNoteAreaProps {
   player: any;
   isPlayerReady: boolean;
   showNotification: (message: string, type: "info" | "success" | "warning" | "error") => void;
+  overlayMode?: boolean;
+  onOverlayOpen?: () => void;
+  noteText?: string;
+  onNoteTextChange?: (text: string) => void;
 }
 
 const SimpleNoteArea: React.FC<SimpleNoteAreaProps> = ({
   player,
   isPlayerReady,
-  showNotification
+  showNotification,
+  overlayMode = false,
+  onOverlayOpen,
+  noteText: externalNoteText,
+  onNoteTextChange
 }) => {
-  const [noteText, setNoteText] = useState("");
+  // 외부에서 노트 텍스트를 관리하면 외부 상태 사용, 아니면 내부 상태 사용
+  const [internalNoteText, setInternalNoteText] = useState("");
+  const noteText = externalNoteText !== undefined ? externalNoteText : internalNoteText;
+  const setNoteText = onNoteTextChange || setInternalNoteText;
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 타임스탬프 추가
@@ -61,8 +72,8 @@ const SimpleNoteArea: React.FC<SimpleNoteAreaProps> = ({
     const textarea = e.currentTarget;
     const clickPosition = textarea.selectionStart;
     
-    // 타임스탬프 정규식 - |숫자 또는 -> 패턴 모두 인식
-    const timestampRegex = /\[(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2}),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+    // 타임스탬프 정규식 - 쉼표 뒤 공백 없이 바로 기능 표시도 인식 (,-> 또는 ,|3 형식)
+    const timestampRegex = /\[(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2}),\s*(\d+)%,\s*([\d.]+)x(?:,(->|\|\d+))?\]/g;
     let match;
     let clickedTimestamp = null;
 
@@ -123,8 +134,8 @@ const SimpleNoteArea: React.FC<SimpleNoteAreaProps> = ({
             // 현재 타임스탬프 이후의 텍스트에서 다음 타임스탬프 찾기
             const afterCurrent = noteText.substring(currentIndex + currentTimestampText.length);
             
-            // 새로운 정규식으로 다음 타임스탬프 찾기
-            const nextRegex = /\[(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2}),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/;
+            // 새로운 정규식으로 다음 타임스탬프 찾기 (쉼표 뒤 공백 없이도 인식)
+            const nextRegex = /\[(\d{2}):(\d{2}):(\d{2})-(\d{2}):(\d{2}):(\d{2}),\s*(\d+)%,\s*([\d.]+)x(?:,(->|\|\d+))?\]/;
             const nextMatch = nextRegex.exec(afterCurrent);
             
             if (nextMatch) {
@@ -204,12 +215,20 @@ const SimpleNoteArea: React.FC<SimpleNoteAreaProps> = ({
           value={noteText}
           onChange={(e) => setNoteText(e.target.value)}
           onDoubleClick={handleTimestampClick}
+          onClick={() => {
+            // 오버레이 모드일 때 클릭하면 오버레이 패널 열기
+            if (overlayMode && onOverlayOpen) {
+              onOverlayOpen();
+            }
+          }}
+          readOnly={overlayMode} // 오버레이 모드에서는 직접 편집 불가
           placeholder="타임스탬프 테스트:
 [00:00:10-00:00:15, 100%, 1.00x, |3] - 3초 정지 테스트
 [00:00:20-00:00:25, 100%, 1.00x] - 일반 구간 재생
 
 더블클릭으로 타임스탬프 실행"
           className="flex-1 resize-none"
+          style={overlayMode ? { cursor: 'pointer' } : {}}
         />
       </CardContent>
     </Card>
