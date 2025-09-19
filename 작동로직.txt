@@ -465,9 +465,10 @@ TestTimestampPage (상태 관리)
 타임스탬프에서 시간과 설명 텍스트를 자동으로 추출하여 활용합니다.
 
 [시스템 구성]
-- OverlayInput.tsx: 오버레이 입력 및 설정 컴포넌트
-- TextOverlay.tsx: 실제 화면 오버레이 표시 컴포넌트
+- OverlayInput.tsx: 오버레이 입력 및 설정 컴포넌트 (회전 기능 포함)
+- TextOverlay.tsx: 실제 화면 오버레이 표시 컴포넌트 (회전 변환 처리)
 - SettingsPanel.tsx: 오버레이 관련 설정 UI
+- rotation: -180~180도 회전 각도 지원 (5도 단위)
 
 [타임스탬프+텍스트 추출 작동 원리]
 
@@ -520,17 +521,59 @@ SettingsPanel 연동:
 - 시간 확인과 텍스트 가져오기의 연속적인 작업 흐름 지원
 - 우측 패널과 오버레이 입력 패널의 설정 일관성 유지
 
+[회전 기능 구현]
+
+회전 시스템:
+- rotation 상태: -180~180도 범위의 회전 각도
+- 각도 슬라이더: 5도 단위 조정 UI (OverlayInput.tsx:468-478)
+- CSS transform: 회전, 위치, 스케일 변환 통합 처리
+- 실시간 반영: 슬라이더 조정 시 즉시 화면에 회전 적용
+
+CSS 변환 통합 (TextOverlay.tsx:125-177):
+- rotationTransform: rotate(각도deg)
+- alignTransform: translateX(-50%) 등 정렬 변환
+- scaleTransform: scale(1.05) 드래그시 확대
+- transform 속성에 모든 변환 조합하여 적용
+
+[편집 모드 시간 보존]
+
+실시간 업데이트 시스템 (OverlayInput.tsx:77-110):
+- updateExistingOverlay() 함수에서 기존 오버레이의 startTime, duration 보존
+- 편집 중에도 텍스트가 화면에서 사라지지 않음
+- 시간 정보만 원본 값으로 유지하고 나머지는 사용자 입력값 적용
+- overlays.find()로 기존 오버레이 검색 후 시간 정보 추출
+
+시간 보존 로직:
+const existingOverlay = overlays.find(overlay => overlay.id === editingId);
+startTime: existingOverlay.startTime,  // 원본 시간 보존
+duration: existingOverlay.duration,    // 원본 지속시간 보존
+
 [핵심 주의사항]
 
-1. 정규식 매칭 정확성:
+1. 시간 정보 보존:
+- 편집 모드에서 updateExistingOverlay 함수는 반드시 기존 startTime, duration 보존
+- startTime: startTime || 0 형태 사용 금지 (편집시 시간 손실 발생)
+- 기존 오버레이를 찾지 못하면 함수 중단 필요
+
+2. CSS transform 순서:
+- 위치 변환 → 회전 변환 → 스케일 변환 순서로 조합
+- transform 속성에 여러 변환을 공백으로 구분하여 나열
+- 잘못된 순서시 예상과 다른 결과 발생 가능
+
+3. 실시간 업데이트 최적화:
+- 과도한 디버그 로그 출력 금지 (useEffect 실행시마다 로그 생성)
+- console.log는 개발 단계에서만 사용하고 완료 후 제거
+- 실시간 반영과 성능 최적화 균형 유지
+
+4. 정규식 매칭 정확성:
 - 타임스탬프 패턴이 변경되면 parseTimestamps 함수도 업데이트 필요
 - 설명 텍스트 경계 분석시 줄바꿈 처리 주의
 
-2. 상태 동기화:
+5. 상태 동기화:
 - duration (정수) vs actualDuration (소수점) 분리 관리
 - 슬라이더 변경시 actualDuration 초기화 필수
 
-3. UI 설정 의존성:
+6. UI 설정 의존성:
 - 화면텍스트.스타일설정과 화면텍스트.지속시간 토글에 의존
 - 토글 비활성화시 관련 기능 숨김 처리
 
@@ -538,6 +581,7 @@ SettingsPanel 연동:
 - 다양한 타임스탬프 형식 지원 확장
 - 자동 번역 기능과의 연동 가능
 - 오버레이 애니메이션 효과 추가 가능
+- 3D 회전 효과 (rotateX, rotateY) 확장
 
 ==========================================
 

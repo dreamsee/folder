@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -50,6 +50,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   const [showTimestampPicker, setShowTimestampPicker] = useState(false);
   const [availableTimestamps, setAvailableTimestamps] = useState<Array<{text: string, start: number, end: number, description: string}>>([]);
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
+  const [rotation, setRotation] = useState(0); // 회전 각도 (-180 ~ 180도)
 
   // 투명도를 16진수로 변환하는 함수
   const opacityToHex = (opacity: number): string => {
@@ -70,6 +71,51 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   const getFinalBgColor = (): string => {
     return bgColor + opacityToHex(bgOpacity);
   };
+
+
+  // 편집 중인 오버레이를 즉시 업데이트하는 함수 (실시간 반영)
+  const updateExistingOverlay = (): void => {
+    if (!editingId || !overlayText.trim()) {
+      return;
+    }
+
+    // 기존 오버레이에서 원래 시간 정보를 찾아서 보존
+    const existingOverlay = overlays.find(overlay => overlay.id === editingId);
+    if (!existingOverlay) {
+      return;
+    }
+
+    const updatedOverlay: OverlayData = {
+      id: editingId,
+      text: overlayText,
+      positionMode,
+      position: positionMode === "preset" ? position : undefined,
+      coordinates: positionMode === "coordinate" ? coordinates : undefined,
+      startTime: existingOverlay.startTime, // 기존 오버레이의 시작시간 보존
+      duration: existingOverlay.duration,   // 기존 오버레이의 지속시간 보존
+      rotation,
+      style: {
+        fontSize,
+        color: textColor,
+        backgroundColor: getFinalBgColor(),
+        padding,
+        textAlign,
+      },
+    };
+
+    // 기존 오버레이 목록에서 해당 ID의 오버레이를 즉시 업데이트
+    setOverlays(prev => prev.map(overlay =>
+      overlay.id === editingId ? updatedOverlay : overlay
+    ));
+  };
+
+  // 실시간 업데이트: 편집 모드일 때 설정 변경시 기존 오버레이를 즉시 업데이트
+  useEffect(() => {
+    if (editingId) {
+      // 편집 모드: 기존 오버레이를 즉시 업데이트 (실시간 반영)
+      updateExistingOverlay();
+    }
+  }, [overlayText, coordinates, rotation, fontSize, textColor, bgColor, bgOpacity, padding, textAlign, editingId]);
 
   // 노트에서 타임스탬프 파싱 (설명 텍스트 포함)
   const parseTimestamps = () => {
@@ -177,6 +223,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
         coordinates: positionMode === "coordinate" ? coordinates : undefined,
         startTime: overlayStartTime,
         duration: overlayDuration,
+        rotation, // 회전 각도 추가
         style: {
           fontSize,
           color: textColor,
@@ -216,7 +263,8 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     setFontSize(overlay.style.fontSize);
     setTextColor(overlay.style.color);
     setTextAlign(overlay.style.textAlign || 'left');
-    
+    setRotation(overlay.rotation || 0); // 회전 각도 설정
+
     // 배경 색상과 투명도 분리
     const bgColorValue = overlay.style.backgroundColor.length === 9 
       ? overlay.style.backgroundColor.slice(0, 7) 
@@ -252,6 +300,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
     setStartTime(null);
     setEndTime(null);
     setTextAlign('left');
+    setRotation(0); // 회전 각도 초기화
   };
 
 
@@ -379,30 +428,44 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
       )}
 
 
-      {/* 글자크기, 여백 설정 */}
+      {/* 글자크기, 여백, 각도 설정 */}
       {uiSettings?.화면텍스트?.스타일설정 !== false && uiSettings?.화면텍스트?.글자크기여백 !== false && (
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
-            <Slider
-              id="font-size"
-              value={[fontSize]}
-              onValueChange={([value]) => setFontSize(value)}
-              min={12}
-              max={48}
-              step={2}
-              className="mt-1"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="font-size">글자 크기: {fontSize}px</Label>
+              <Slider
+                id="font-size"
+                value={[fontSize]}
+                onValueChange={([value]) => setFontSize(value)}
+                min={12}
+                max={48}
+                step={2}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label htmlFor="padding">여백: {padding}px</Label>
+              <Slider
+                id="padding"
+                value={[padding]}
+                onValueChange={([value]) => setPadding(value)}
+                min={4}
+                max={20}
+                step={2}
+                className="mt-1"
+              />
+            </div>
           </div>
           <div>
-            <Label htmlFor="padding">여백: {padding}px</Label>
+            <Label htmlFor="rotation">각도: {rotation}°</Label>
             <Slider
-              id="padding"
-              value={[padding]}
-              onValueChange={([value]) => setPadding(value)}
-              min={4}
-              max={20}
-              step={2}
+              id="rotation"
+              value={[rotation]}
+              onValueChange={([value]) => setRotation(value)}
+              min={-180}
+              max={180}
+              step={5}
               className="mt-1"
             />
           </div>

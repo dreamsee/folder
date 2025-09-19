@@ -97,6 +97,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   
   // 현재 플레이어 상태 추적 (props에 없어서 직접 추적)
   const [currentVolume, setCurrentVolume] = useState(100);
+
+  // 실시간 미리보기 오버레이 상태
   const [currentPlaybackRate, setCurrentPlaybackRate] = useState(1);
   const [currentTime, setCurrentTime] = useState(0);
   

@@ -25,6 +25,7 @@ export interface OverlayData {
   coordinates?: Coordinates; // coordinate 모드일 때
   startTime: number; // 초 단위
   duration: number; // 초 단위
+  rotation?: number; // 회전 각도 (기본값 0, -180~180도)
   style: {
     fontSize: number; // px
     color: string;
@@ -39,13 +40,15 @@ interface TextOverlayProps {
   currentTime: number;
   isPlaying: boolean;
   onOverlayPositionChange?: (id: string, coordinates: Coordinates) => void;
+  editingId?: string; // 편집 중인 오버레이 ID
 }
 
-const TextOverlay: React.FC<TextOverlayProps> = ({ 
-  overlays, 
-  currentTime, 
-  isPlaying, 
-  onOverlayPositionChange 
+const TextOverlay: React.FC<TextOverlayProps> = ({
+  overlays,
+  currentTime,
+  isPlaying,
+  onOverlayPositionChange,
+  editingId
 }) => {
   const [activeOverlays, setActiveOverlays] = useState<OverlayData[]>([]);
   const [dragging, setDragging] = useState<{ id: string; startX: number; startY: number; initialCoords: Coordinates } | null>(null);
@@ -56,12 +59,13 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
       const endTime = overlay.startTime + overlay.duration;
       return currentTime >= overlay.startTime && currentTime <= endTime;
     });
+
     setActiveOverlays(active);
   }, [currentTime, overlays]);
 
-  // 드래그 시작 (일시정지 상태에서만 가능)
+  // 드래그 시작 (정지 상태에서만 가능, 미리보기는 드래그 불가)
   const handleMouseDown = (e: React.MouseEvent, overlay: OverlayData) => {
-    if (!onOverlayPositionChange || !overlay.coordinates || isPlaying) return;
+    if (!onOverlayPositionChange || !overlay.coordinates || overlay.id === "preview-overlay" || isPlaying) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -112,49 +116,58 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
     };
   }, [dragging, onOverlayPositionChange]);
 
-  // 위치에 따른 CSS 스타일 반환
-  const getPositionStyle = (overlay: OverlayData): React.CSSProperties => {
+  // 위치에 따른 CSS 스타일 반환 (회전 기능 포함)
+  const getPositionStyle = (overlay: OverlayData, isDragging: boolean = false): React.CSSProperties => {
+    // 회전 각도 처리
+    const rotation = overlay.rotation || 0;
+    const rotationTransform = rotation !== 0 ? `rotate(${rotation}deg)` : '';
+    const scaleTransform = isDragging ? 'scale(1.05)' : '';
+
+
     if (overlay.positionMode === "coordinate" && overlay.coordinates) {
       const { x, y, unit } = overlay.coordinates;
       const textAlign = overlay.style.textAlign || 'left';
-      
+
       // 텍스트 정렬에 따른 transform 설정
-      let transform = '';
+      let alignTransform = '';
       if (textAlign === 'center') {
-        transform = 'translateX(-50%)';
+        alignTransform = 'translateX(-50%)';
       } else if (textAlign === 'right') {
-        transform = 'translateX(-100%)';
+        alignTransform = 'translateX(-100%)';
       }
-      
+
+      // 정렬 transform과 회전 transform, 스케일 transform 결합
+      const combinedTransform = [alignTransform, rotationTransform, scaleTransform].filter(Boolean).join(' ');
+
       return {
         position: "absolute",
         left: `${x}${unit}`,
         top: `${y}${unit}`,
-        transform,
+        transform: combinedTransform,
         textAlign,
       };
     } else if (overlay.positionMode === "preset" && overlay.position) {
-      // 기존 preset 위치 로직
+      // 기존 preset 위치 로직 (회전 및 스케일 포함)
       const positions: Record<OverlayPosition, React.CSSProperties> = {
-        "top-left": { position: "absolute", top: "16px", left: "16px" },
-        "top-center": { position: "absolute", top: "16px", left: "50%", transform: "translateX(-50%)" },
-        "top-right": { position: "absolute", top: "16px", right: "16px" },
-        "middle-left": { position: "absolute", top: "50%", left: "16px", transform: "translateY(-50%)" },
-        "middle-center": { position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" },
-        "middle-right": { position: "absolute", top: "50%", right: "16px", transform: "translateY(-50%)" },
-        "bottom-left": { position: "absolute", bottom: "16px", left: "16px" },
-        "bottom-center": { position: "absolute", bottom: "16px", left: "50%", transform: "translateX(-50%)" },
-        "bottom-right": { position: "absolute", bottom: "16px", right: "16px" },
+        "top-left": { position: "absolute", top: "16px", left: "16px", transform: [rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "top-center": { position: "absolute", top: "16px", left: "50%", transform: [`translateX(-50%)`, rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "top-right": { position: "absolute", top: "16px", right: "16px", transform: [rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "middle-left": { position: "absolute", top: "50%", left: "16px", transform: [`translateY(-50%)`, rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "middle-center": { position: "absolute", top: "50%", left: "50%", transform: [`translate(-50%, -50%)`, rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "middle-right": { position: "absolute", top: "50%", right: "16px", transform: [`translateY(-50%)`, rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "bottom-left": { position: "absolute", bottom: "16px", left: "16px", transform: [rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "bottom-center": { position: "absolute", bottom: "16px", left: "50%", transform: [`translateX(-50%)`, rotationTransform, scaleTransform].filter(Boolean).join(' ') },
+        "bottom-right": { position: "absolute", bottom: "16px", right: "16px", transform: [rotationTransform, scaleTransform].filter(Boolean).join(' ') },
       };
       return positions[overlay.position] || positions["bottom-center"];
     }
-    
-    // 기본값
+
+    // 기본값 (회전 및 스케일 포함)
     return {
       position: "absolute",
       bottom: "16px",
       left: "50%",
-      transform: "translateX(-50%)",
+      transform: [`translateX(-50%)`, rotationTransform, scaleTransform].filter(Boolean).join(' '),
     };
   };
 
@@ -167,36 +180,46 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
     <>
       {activeOverlays.map((overlay) => {
         const isDraggingThis = dragging?.id === overlay.id;
-        const canDrag = onOverlayPositionChange && overlay.coordinates && !isPlaying;
-        
+        const isPreview = overlay.id === "preview-overlay"; // 미리보기 오버레이 확인
+        const canDrag = onOverlayPositionChange && overlay.coordinates && !isPreview && !isPlaying;
+
         return (
           <div
             key={overlay.id}
             className="z-50 transition-opacity duration-300"
             style={{
-              ...getPositionStyle(overlay),
+              ...getPositionStyle(overlay, isDraggingThis),
               fontSize: `${overlay.style.fontSize}px`,
               color: overlay.style.color,
               backgroundColor: overlay.style.backgroundColor,
               padding: `${overlay.style.padding}px`,
-              opacity: isPlaying ? (isDraggingThis ? 0.8 : 1) : 0.7,
+              opacity: isPreview ? 0.9 : (isPlaying ? (isDraggingThis ? 0.8 : 1) : 0.7),
               cursor: canDrag ? 'move' : 'default',
               pointerEvents: canDrag ? "auto" : "none",
-              transform: isDraggingThis 
-                ? `${getPositionStyle(overlay).transform || ''} scale(1.05)` 
-                : getPositionStyle(overlay).transform,
               textAlign: overlay.style.textAlign as any || 'left',
               transition: isDraggingThis ? 'none' : 'all 0.3s ease',
-              border: isDraggingThis ? '2px solid #3b82f6' : 'none',
-              // 그림자 제거, 배경만 유지
-              boxShadow: 'none',
-              borderRadius: '0px',
+              border: isPreview
+                ? '2px dashed #10d876' // 미리보기: 초록색 점선 테두리
+                : isDraggingThis
+                  ? '2px solid #3b82f6' // 드래그 중: 파란색 실선 테두리
+                  : 'none',
+              boxShadow: isPreview ? '0 0 8px rgba(16, 216, 118, 0.3)' : 'none', // 미리보기에 초록색 그림자
+              borderRadius: isPreview || isDraggingThis ? '4px' : '0px',
             }}
             onMouseDown={(e) => handleMouseDown(e, overlay)}
           >
             <div className="whitespace-pre-wrap">
               {overlay.text}
             </div>
+            {/* 미리보기 라벨 */}
+            {isPreview && (
+              <div
+                className="absolute -top-6 left-0 text-xs text-green-500 font-bold bg-white px-1 rounded"
+                style={{ fontSize: '10px' }}
+              >
+                미리보기
+              </div>
+            )}
           </div>
         );
       })}

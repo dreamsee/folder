@@ -456,7 +456,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
               <p>동영상을 검색해 주세요</p>
             </div>
           </div>
-          {/* 텍스트 오버레이 */}
+          {/* 텍스트 오버레이 (미리보기 포함) */}
           <TextOverlay
             overlays={overlays}
             currentTime={currentTime}

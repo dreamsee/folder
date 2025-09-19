@@ -74,16 +74,25 @@ UI 컴포넌트:
   4. 이탈시 재생 기본값 복원 변경 금지
 
 📱 화면 오버레이 시스템:
-- TextOverlay.tsx:전체컴포넌트 텍스트 표시 로직
+- TextOverlay.tsx:전체컴포넌트 텍스트 표시 로직 (회전 기능 포함)
+- TextOverlay.tsx:57-64 시간 기반 오버레이 필터링
+- TextOverlay.tsx:125-177 getPositionStyle() 위치 및 회전 CSS 변환
 - OverlayInput.tsx:전체컴포넌트 입력 패널 로직 (타임스탬프+텍스트 추출 포함)
-- OverlayInput.tsx:74-119 parseTimestamps() 타임스탬프+설명텍스트 파싱
-- OverlayInput.tsx:134-152 selectTimestamp() 설명텍스트 자동입력 & 실제지속시간 계산
-- OverlayInput.tsx:484-505 지속시간 표시 (정수/소수점 이중표시)
-- OverlayInput.tsx:511 "타임스탬프+텍스트 가져오기" 버튼
-- OverlayInput.tsx:547-563 타임스탬프 선택 모달 (설명텍스트 미리보기 포함)
+- OverlayInput.tsx:77-110 updateExistingOverlay() 실시간 오버레이 업데이트 (시간 정보 보존)
+- OverlayInput.tsx:53 rotation 상태 (-180~180도 회전 각도)
+- OverlayInput.tsx:468-478 각도 슬라이더 UI (5도 단위)
+- OverlayInput.tsx:127-173 parseTimestamps() 타임스탬프+설명텍스트 파싱
+- OverlayInput.tsx:186-204 selectTimestamp() 설명텍스트 자동입력 & 실제지속시간 계산
+- OverlayInput.tsx:555-577 지속시간 표시 (정수/소수점 이중표시)
+- OverlayInput.tsx:590 "타임스탬프+텍스트 가져오기" 버튼
+- OverlayInput.tsx:625-643 타임스탬프 선택 모달 (설명텍스트 미리보기 포함)
 - NoteOverlayPanel.tsx:전체컴포넌트 오버레이 노트 입력 패널
 - SettingsPanel.tsx:화면텍스트섹션 오버레이 설정 UI
 - HomePage.tsx:오버레이상태들 오버레이 관련 상태 관리
+→ 수정 시 주의:
+  1. updateExistingOverlay에서 기존 오버레이의 startTime, duration 보존 필수
+  2. CSS transform에서 회전과 위치 변환 조합 시 순서 중요
+  3. 실시간 업데이트로 과도한 로그 출력 금지
 
 🎬 영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가

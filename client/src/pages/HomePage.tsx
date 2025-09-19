@@ -57,6 +57,7 @@ const HomePage = () => {
 
   // 즐겨찾기 관련 상태
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
+
   
   // 검색 팝업 상태
   const [isSearchPopupOpen, setIsSearchPopupOpen] = useState(false);
