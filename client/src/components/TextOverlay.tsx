@@ -265,6 +265,7 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
                   : 'none',
               boxShadow: isPreview ? '0 0 8px rgba(16, 216, 118, 0.3)' : 'none', // 미리보기에 초록색 그림자
               borderRadius: isPreview || isDraggingThis ? '4px' : '0px',
+              width: 'max-content', // 텍스트 길이에 맞춰 자동 폭 조정
             }}
             onMouseDown={(e) => handleMouseDown(e, overlay)}
           >
