@@ -21,6 +21,13 @@ interface FeatureDefinition {
 // 기본 탭 설정
 const defaultTabConfig: TabConfig[] = [
   {
+    id: 'settings',
+    name: '설정',
+    icon: Settings,
+    visible: true,
+    features: ['tabConfiguration', 'layoutSettings']
+  },
+  {
     id: 'note',
     name: '노트',
     icon: Type,
@@ -52,6 +59,8 @@ const defaultTabConfig: TabConfig[] = [
 
 // 모든 가능한 기능들
 const allFeatures: FeatureDefinition[] = [
+  { id: 'tabConfiguration', title: '탭 설정', description: '탭의 이름, 순서, 표시/숨김 설정', category: 'settings' },
+  { id: 'layoutSettings', title: '레이아웃 설정', description: '탭 레이아웃 구성 및 기능 배치', category: 'settings' },
   { id: 'overlayText', title: '텍스트 입력', description: '화면에 표시할 텍스트 작성', category: 'input' },
   { id: 'positionGrid', title: '위치 그리드', description: '9개 위치 버튼으로 배치 선택', category: 'layout' },
   { id: 'coordinateInput', title: '좌표 직접 입력', description: 'X, Y 좌표값을 숫자로 정밀 지정', category: 'layout' },
@@ -195,7 +204,11 @@ const TabLayoutSettings: React.FC<TabLayoutSettingsProps> = ({
             <div key={tab.id} className="border rounded-lg p-4">
               {/* 탭 헤더 */}
               <div className="flex items-center gap-3 mb-4">
-                <tab.icon className="w-5 h-5" />
+                {tab.id === 'settings' && <Settings className="w-5 h-5" />}
+                {tab.id === 'note' && <Type className="w-5 h-5" />}
+                {tab.id === 'size' && <Sliders className="w-5 h-5" />}
+                {tab.id === 'color' && <Palette className="w-5 h-5" />}
+                {tab.id === 'time' && <Clock className="w-5 h-5" />}
                 <input
                   type="text"
                   value={tab.name}

@@ -45,7 +45,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   ]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // 탭 설정 및 상태
+  // 탭 설정 및 상태 (설정 탭 제외)
   const [tabConfig, setTabConfig] = useState([
     {
       id: 'note',
@@ -76,7 +76,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       features: ['duration', 'overlayList']
     }
   ]);
-  const [activeTab, setActiveTab] = useState('note');
+  const [activeTab, setActiveTab] = useState('settings');
   const [showSettings, setShowSettings] = useState(false);
 
   // 화면 크기 조절
@@ -122,10 +122,6 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   }, [player, isPlayerReady]);
 
   // 편집 중 실시간 업데이트
-  useEffect(() => {
-    updateEditingOverlay();
-  }, [editingId, overlayText, coordinates, overlayDuration, rotation, fontSize, textColor, bgColor, bgOpacity, padding, textAlign]);
-
   // 실시간 오버레이 업데이트 (편집 중일 때)
   const updateEditingOverlay = () => {
     if (!editingId) return;
@@ -151,6 +147,10 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       return overlay;
     }));
   };
+
+  useEffect(() => {
+    updateEditingOverlay();
+  }, [editingId, overlayText, coordinates, overlayDuration, rotation, fontSize, textColor, bgColor, bgOpacity, padding, textAlign]);
 
   // 플레이어 이벤트 핸들러
   const handlePlayerReady = (playerInstance: any) => {
@@ -183,13 +183,13 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
     try {
       if (!document.fullscreenElement) {
+        // 전체화면 진입
         await playerContainerRef.current.requestFullscreen();
-        setIsFullscreen(true);
-        console.log('전체화면 진입');
+        console.log('전체화면 진입 요청');
       } else {
+        // 전체화면 종료
         await document.exitFullscreen();
-        setIsFullscreen(false);
-        console.log('전체화면 종료');
+        console.log('전체화면 종료 요청');
       }
     } catch (error) {
       console.error('전체화면 전환 실패:', error);
@@ -199,15 +199,21 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   // 전체화면 변경 감지
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isNowFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isNowFullscreen);
+      console.log('전체화면 상태 변경:', isNowFullscreen ? '전체화면' : '일반화면');
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
     };
   }, []);
 
@@ -311,9 +317,23 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        setTabConfig(parsed);
+        // 아이콘 정보 복원
+        const iconMap = {
+          'settings': Settings,
+          'note': Type,
+          'size': Sliders,
+          'color': Palette,
+          'time': Clock
+        };
+        const restoredConfig = parsed
+          .filter((tab: any) => tab.id !== 'settings') // 설정 탭 제외
+          .map((tab: any) => ({
+            ...tab,
+            icon: iconMap[tab.id as keyof typeof iconMap] || Type
+          }));
+        setTabConfig(restoredConfig);
         // 첫 번째 보이는 탭으로 activeTab 설정
-        const firstVisibleTab = parsed.find((tab: any) => tab.visible);
+        const firstVisibleTab = restoredConfig.find((tab: any) => tab.visible);
         if (firstVisibleTab) {
           setActiveTab(firstVisibleTab.id);
         }
@@ -329,19 +349,13 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
     localStorage.setItem('overlayTabConfig', JSON.stringify(newConfig));
   };
 
-  // 탭별 컨텐츠 렌더링
-  const renderTabContent = () => {
-    // 현재 활성 탭 찾기
-    const currentTab = tabConfig.find(tab => tab.id === activeTab);
-    if (!currentTab) {
-      return <div>탭을 선택해주세요.</div>;
-    }
-
-    switch (activeTab) {
-      case 'note':
+  // 개별 기능 컴포넌트 렌더링 함수
+  const renderFeature = (featureId: string) => {
+    switch (featureId) {
+      case 'overlayText':
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">텍스트 입력</h3>
+          <div key={featureId} className="space-y-3">
+            <h4 className="font-medium">텍스트 입력</h4>
             <textarea
               value={overlayText}
               onChange={(e) => setOverlayText(e.target.value)}
@@ -349,107 +363,117 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
               className="w-full h-32 p-3 border rounded-lg resize-none"
               rows={4}
             />
+          </div>
+        );
 
-            {/* 위치 설정 그리드 */}
-            <div className="space-y-3">
-              <h4 className="font-medium">위치 설정</h4>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { name: "좌상단", x: 10, y: 10, align: 'left' as const },
-                  { name: "상단중앙", x: 50, y: 10, align: 'center' as const },
-                  { name: "우상단", x: 90, y: 10, align: 'right' as const },
-                  { name: "좌측중앙", x: 10, y: 50, align: 'left' as const },
-                  { name: "정중앙", x: 50, y: 50, align: 'center' as const },
-                  { name: "우측중앙", x: 90, y: 50, align: 'right' as const },
-                  { name: "좌하단", x: 10, y: 90, align: 'left' as const },
-                  { name: "하단중앙", x: 50, y: 90, align: 'center' as const },
-                  { name: "우하단", x: 90, y: 90, align: 'right' as const },
-                ].map((position, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      setCoordinates({ x: position.x, y: position.y, unit: "%" });
-                      setTextAlign(position.align);
-                    }}
-                    className="px-2 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm border border-gray-300 hover:border-gray-400 transition-colors"
-                  >
-                    {position.name}
-                  </button>
-                ))}
+      case 'positionGrid':
+        return (
+          <div key={featureId} className="space-y-3">
+            <h4 className="font-medium">위치 설정</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { name: "좌상단", x: 10, y: 10, align: 'left' as const },
+                { name: "상단중앙", x: 50, y: 10, align: 'center' as const },
+                { name: "우상단", x: 90, y: 10, align: 'right' as const },
+                { name: "좌측중앙", x: 10, y: 50, align: 'left' as const },
+                { name: "정중앙", x: 50, y: 50, align: 'center' as const },
+                { name: "우측중앙", x: 90, y: 50, align: 'right' as const },
+                { name: "좌하단", x: 10, y: 90, align: 'left' as const },
+                { name: "하단중앙", x: 50, y: 90, align: 'center' as const },
+                { name: "우하단", x: 90, y: 90, align: 'right' as const },
+              ].map((position, index) => (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => {
+                    setCoordinates({ x: position.x, y: position.y, unit: "%" });
+                    setTextAlign(position.align);
+                  }}
+                  className="px-2 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm border border-gray-300 hover:border-gray-400 transition-colors"
+                >
+                  {position.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 'coordinateInput':
+        return (
+          <div key={featureId} className="space-y-3">
+            <h4 className="font-medium">좌표 직접 입력</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  X 좌표 (0-100%)
+                </label>
+                <input
+                  type="number"
+                  value={coordinates.x}
+                  onChange={(e) => setCoordinates({ ...coordinates, x: Number(e.target.value) })}
+                  min={0}
+                  max={100}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="50"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Y 좌표 (0-100%)
+                </label>
+                <input
+                  type="number"
+                  value={coordinates.y}
+                  onChange={(e) => setCoordinates({ ...coordinates, y: Number(e.target.value) })}
+                  min={0}
+                  max={100}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="90"
+                />
               </div>
             </div>
-
-            {/* 좌표 직접 입력 */}
-            <div className="space-y-3">
-              <h4 className="font-medium">좌표 직접 입력</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    X 좌표 (0-100%)
-                  </label>
-                  <input
-                    type="number"
-                    value={coordinates.x}
-                    onChange={(e) => setCoordinates({ ...coordinates, x: Number(e.target.value) })}
-                    min={0}
-                    max={100}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="50"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Y 좌표 (0-100%)
-                  </label>
-                  <input
-                    type="number"
-                    value={coordinates.y}
-                    onChange={(e) => setCoordinates({ ...coordinates, y: Number(e.target.value) })}
-                    min={0}
-                    max={100}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="90"
-                  />
-                </div>
-              </div>
-              <div className="text-xs text-gray-500">
-                현재 위치: ({coordinates.x}%, {coordinates.y}%)
-              </div>
+            <div className="text-xs text-gray-500">
+              현재 위치: ({coordinates.x}%, {coordinates.y}%)
             </div>
+          </div>
+        );
 
-            {/* 텍스트 정렬 설정 */}
-            <div className="space-y-3">
-              <h4 className="font-medium">텍스트 정렬</h4>
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { name: "좌측", value: 'left' as const, icon: "⬅️" },
-                  { name: "중앙", value: 'center' as const, icon: "↔️" },
-                  { name: "우측", value: 'right' as const, icon: "➡️" },
-                ].map((align) => (
-                  <button
-                    key={align.value}
-                    type="button"
-                    onClick={() => setTextAlign(align.value)}
-                    className={`px-3 py-2 rounded text-sm border transition-colors ${
-                      textAlign === align.value
-                        ? 'bg-blue-500 text-white border-blue-500'
-                        : 'bg-gray-100 hover:bg-gray-200 border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="flex flex-col items-center gap-1">
-                      <span className="text-xs">{align.icon}</span>
-                      <span className="text-xs">{align.name}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
-              <div className="text-xs text-gray-500 text-center">
-                현재 정렬: {textAlign === 'left' ? '좌측' : textAlign === 'center' ? '중앙' : '우측'}
-              </div>
+      case 'textAlign':
+        return (
+          <div key={featureId} className="space-y-3">
+            <h4 className="font-medium">텍스트 정렬</h4>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { name: "좌측", value: 'left' as const, icon: "⬅️" },
+                { name: "중앙", value: 'center' as const, icon: "↔️" },
+                { name: "우측", value: 'right' as const, icon: "➡️" },
+              ].map((align) => (
+                <button
+                  key={align.value}
+                  type="button"
+                  onClick={() => setTextAlign(align.value)}
+                  className={`px-3 py-2 rounded text-sm border transition-colors ${
+                    textAlign === align.value
+                      ? 'bg-blue-500 text-white border-blue-500'
+                      : 'bg-gray-100 hover:bg-gray-200 border-gray-300 hover:border-gray-400'
+                  }`}
+                >
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs">{align.icon}</span>
+                    <span className="text-xs">{align.name}</span>
+                  </div>
+                </button>
+              ))}
             </div>
+            <div className="text-xs text-gray-500 text-center">
+              현재 정렬: {textAlign === 'left' ? '좌측' : textAlign === 'center' ? '중앙' : '우측'}
+            </div>
+          </div>
+        );
 
-            {/* 추가/수정 버튼 */}
+      case 'addButton':
+        return (
+          <div key={featureId} className="space-y-3">
             <button
               onClick={addOverlay}
               disabled={!isPlayerReady || !overlayText.trim()}
@@ -469,186 +493,203 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
           </div>
         );
 
-      case 'size':
+      case 'fontSize':
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">크기 및 회전</h3>
+          <div key={featureId} className="space-y-3">
+            <label className="block text-sm font-medium mb-2">
+              글자 크기: {fontSize}px
+            </label>
+            <input
+              type="range"
+              value={fontSize}
+              onChange={(e) => setFontSize(Number(e.target.value))}
+              min={12}
+              max={48}
+              step={2}
+              className="w-full"
+            />
+          </div>
+        );
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                글자 크기: {fontSize}px
-              </label>
+      case 'padding':
+        return (
+          <div key={featureId} className="space-y-3">
+            <label className="block text-sm font-medium mb-2">
+              여백: {padding}px
+            </label>
+            <input
+              type="range"
+              value={padding}
+              onChange={(e) => setPadding(Number(e.target.value))}
+              min={4}
+              max={20}
+              step={2}
+              className="w-full"
+            />
+          </div>
+        );
+
+      case 'rotation':
+        return (
+          <div key={featureId} className="space-y-3">
+            <label className="block text-sm font-medium mb-2">
+              회전 각도: {rotation}°
+            </label>
+            <input
+              type="range"
+              value={rotation}
+              onChange={(e) => setRotation(Number(e.target.value))}
+              min={-180}
+              max={180}
+              step={5}
+              className="w-full"
+            />
+          </div>
+        );
+
+      case 'textColor':
+        return (
+          <div key={featureId} className="space-y-3">
+            <label className="block text-sm font-medium mb-2">글자 색상</label>
+            <div className="flex items-center gap-2">
               <input
-                type="range"
-                value={fontSize}
-                onChange={(e) => setFontSize(Number(e.target.value))}
-                min={12}
-                max={48}
-                step={2}
-                className="w-full"
+                type="color"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="w-16 h-10 rounded border"
               />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                여백: {padding}px
-              </label>
               <input
-                type="range"
-                value={padding}
-                onChange={(e) => setPadding(Number(e.target.value))}
-                min={4}
-                max={20}
-                step={2}
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                회전 각도: {rotation}°
-              </label>
-              <input
-                type="range"
-                value={rotation}
-                onChange={(e) => setRotation(Number(e.target.value))}
-                min={-180}
-                max={180}
-                step={5}
-                className="w-full"
+                type="text"
+                value={textColor}
+                onChange={(e) => setTextColor(e.target.value)}
+                className="flex-1 px-3 py-2 border rounded"
+                placeholder="#FFFFFF"
               />
             </div>
           </div>
         );
 
-      case 'color':
+      case 'bgColor':
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">색상 설정</h3>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">글자 색상</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={textColor}
-                  onChange={(e) => setTextColor(e.target.value)}
-                  className="w-16 h-10 rounded border"
-                />
-                <input
-                  type="text"
-                  value={textColor}
-                  onChange={(e) => setTextColor(e.target.value)}
-                  className="flex-1 px-3 py-2 border rounded"
-                  placeholder="#FFFFFF"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">배경 색상</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={bgColor}
-                  onChange={(e) => setBgColor(e.target.value)}
-                  className="w-16 h-10 rounded border"
-                />
-                <input
-                  type="text"
-                  value={bgColor}
-                  onChange={(e) => setBgColor(e.target.value)}
-                  className="flex-1 px-3 py-2 border rounded"
-                  placeholder="#000000"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                배경 투명도: {bgOpacity}%
-              </label>
+          <div key={featureId} className="space-y-3">
+            <label className="block text-sm font-medium mb-2">배경 색상</label>
+            <div className="flex items-center gap-2">
               <input
-                type="range"
-                value={bgOpacity}
-                onChange={(e) => setBgOpacity(Number(e.target.value))}
-                min={0}
-                max={100}
-                step={5}
-                className="w-full"
+                type="color"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="w-16 h-10 rounded border"
               />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>투명</span>
-                <span>불투명</span>
-              </div>
+              <input
+                type="text"
+                value={bgColor}
+                onChange={(e) => setBgColor(e.target.value)}
+                className="flex-1 px-3 py-2 border rounded"
+                placeholder="#000000"
+              />
             </div>
           </div>
         );
 
-      case 'time':
+      case 'bgOpacity':
         return (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">시간 설정</h3>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                지속 시간: {overlayDuration}초
-              </label>
-              <input
-                type="range"
-                value={overlayDuration}
-                onChange={(e) => setOverlayDuration(Number(e.target.value))}
-                min={1}
-                max={30}
-                step={1}
-                className="w-full"
-              />
+          <div key={featureId} className="space-y-3">
+            <label className="block text-sm font-medium mb-2">
+              배경 투명도: {bgOpacity}%
+            </label>
+            <input
+              type="range"
+              value={bgOpacity}
+              onChange={(e) => setBgOpacity(Number(e.target.value))}
+              min={0}
+              max={100}
+              step={5}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-gray-500 mt-1">
+              <span>투명</span>
+              <span>불투명</span>
             </div>
+          </div>
+        );
 
+      case 'duration':
+        return (
+          <div key={featureId} className="space-y-3">
+            <label className="block text-sm font-medium mb-2">
+              지속 시간: {overlayDuration}초
+            </label>
+            <input
+              type="range"
+              value={overlayDuration}
+              onChange={(e) => setOverlayDuration(Number(e.target.value))}
+              min={1}
+              max={30}
+              step={1}
+              className="w-full"
+            />
             <div className="text-sm text-gray-600">
               <p>현재 시간: {formatTime(currentTime)}</p>
               <p>재생 상태: {isPlaying ? "재생 중" : "정지됨"}</p>
             </div>
+          </div>
+        );
 
-            {/* 등록된 오버레이 목록 */}
-            {overlays.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="font-medium">등록된 오버레이</h4>
-                <div className="max-h-40 overflow-y-auto space-y-2">
-                  {overlays.map((overlay) => (
-                    <div
-                      key={overlay.id}
-                      className="p-2 bg-gray-50 rounded text-sm"
-                    >
-                      <div className="font-medium truncate">{overlay.text}</div>
-                      <div className="text-xs text-gray-500">
-                        {formatTime(overlay.startTime)} → {formatTime(overlay.startTime + overlay.duration)}
-                      </div>
-                      <div className="flex gap-1 mt-1">
-                        <button
-                          onClick={() => editOverlay(overlay)}
-                          className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-                        >
-                          편집
-                        </button>
-                        <button
-                          onClick={() => deleteOverlay(overlay.id)}
-                          className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-                        >
-                          삭제
-                        </button>
-                      </div>
+      case 'overlayList':
+        return (
+          <div key={featureId} className="space-y-3">
+            <h4 className="font-medium">등록된 오버레이</h4>
+            {overlays.length === 0 ? (
+              <p className="text-gray-500 text-sm">등록된 오버레이가 없습니다.</p>
+            ) : (
+              <div className="max-h-40 overflow-y-auto space-y-2">
+                {overlays.map((overlay) => (
+                  <div key={overlay.id} className="p-2 bg-gray-50 rounded text-sm">
+                    <div className="font-medium truncate">{overlay.text}</div>
+                    <div className="text-xs text-gray-500">
+                      {formatTime(overlay.startTime)} → {formatTime(overlay.startTime + overlay.duration)}
                     </div>
-                  ))}
-                </div>
+                    <div className="flex gap-1 mt-1">
+                      <button
+                        onClick={() => editOverlay(overlay)}
+                        className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
+                      >
+                        편집
+                      </button>
+                      <button
+                        onClick={() => deleteOverlay(overlay.id)}
+                        className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
         );
 
       default:
-        return <div>탭을 선택해주세요.</div>;
+        return null;
     }
+  };
+
+  // 탭별 컨텐츠 렌더링 (동적 기능 순서 적용)
+  const renderTabContent = () => {
+    // 현재 활성 탭 찾기
+    const currentTab = tabConfig.find(tab => tab.id === activeTab);
+    if (!currentTab) {
+      return <div>탭을 선택해주세요.</div>;
+    }
+
+    return (
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">{currentTab.name}</h3>
+        {/* 탭에 설정된 기능들을 순서대로 렌더링 */}
+        {currentTab.features.map((featureId) => renderFeature(featureId))}
+      </div>
+    );
   };
 
   return (
@@ -721,6 +762,8 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                 currentTime={currentTime}
                 isPlaying={isPlaying}
                 editingId={editingId}
+                screenScale={screenScale}
+                isFullscreen={isFullscreen}
               />
               {/* 디버깅용 테스트 텍스트 */}
               <div className="absolute top-4 left-4 bg-red-500 text-white px-2 py-1 text-sm z-20">
@@ -728,15 +771,19 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
               </div>
             </div>
 
-            {/* 전체화면 버튼 */}
+            {/* 전체화면 버튼 - 전체화면일 때는 더 크게 표시 */}
             <button
               onClick={toggleFullscreen}
-              className="absolute bottom-4 right-4 bg-black/50 hover:bg-black/70
-                       text-white rounded p-2 transition-all duration-200 z-30 pointer-events-auto"
+              className={`absolute bg-black/50 hover:bg-black/70
+                       text-white rounded transition-all duration-200 z-30 pointer-events-auto
+                       ${isFullscreen
+                         ? 'bottom-2 right-4 p-1.6' // 전체화면: 더 크게
+                         : 'bottom-1.5 right-4 p-1.5' // 일반화면: 기존 크기
+                       }`}
               title={isFullscreen ? '전체화면 나가기' : '전체화면'}
             >
               {isFullscreen ? (
-                <Minimize className="w-5 h-5" />
+                <Minimize className={isFullscreen ? "w-7 h-7" : "w-5 h-5"} />
               ) : (
                 <Maximize className="w-5 h-5" />
               )}
@@ -774,23 +821,17 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
         {/* 우측 탭 버튼들 (10%) */}
         <div className="w-20 bg-gray-800 flex flex-col">
-          {/* 설정 버튼 */}
+          {/* 설정 탭 (별도) */}
           <button
-            onClick={() => console.log('설정 버튼 클릭됨')}
-            className="flex flex-col items-center justify-center py-3 text-xs text-gray-300 hover:bg-gray-700 hover:text-white transition-colors border-b border-gray-700"
-            title="탭 레이아웃 설정 (임시 비활성화)"
+            onClick={() => setShowSettings(true)}
+            className="flex flex-col items-center justify-center py-4 text-xs transition-colors text-gray-300 hover:bg-gray-700 hover:text-white"
           >
-            <Settings className="w-5 h-5 mb-1" />
+            <Settings className="w-6 h-6 mb-1" />
             <span>설정</span>
           </button>
 
-
-          {[
-            { id: 'note', icon: Type, label: '노트' },
-            { id: 'size', icon: Sliders, label: '크기' },
-            { id: 'color', icon: Palette, label: '색상' },
-            { id: 'time', icon: Clock, label: '시간' },
-          ].map((tab) => (
+          {/* 일반 탭들 */}
+          {tabConfig.filter(tab => tab.visible).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
@@ -800,21 +841,24 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                   : 'text-gray-300 hover:bg-gray-700 hover:text-white'
               }`}
             >
-              <tab.icon className="w-6 h-6 mb-1" />
-              <span>{tab.label}</span>
+              {tab.id === 'note' && <Type className="w-6 h-6 mb-1" />}
+              {tab.id === 'size' && <Sliders className="w-6 h-6 mb-1" />}
+              {tab.id === 'color' && <Palette className="w-6 h-6 mb-1" />}
+              {tab.id === 'time' && <Clock className="w-6 h-6 mb-1" />}
+              <span>{tab.name}</span>
             </button>
           ))}
         </div>
 
       </div>}
 
-      {/* 탭 설정 모달 - 임시 비활성화 */}
-      {false && <TabLayoutSettings
+      {/* 탭 설정 모달 */}
+      <TabLayoutSettings
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         onSave={handleTabConfigSave}
         currentConfig={tabConfig}
-      />}
+      />
     </div>
   );
 };

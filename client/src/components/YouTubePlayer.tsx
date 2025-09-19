@@ -446,10 +446,10 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         </>
       )}
 
-      <div className="mb-4">
+      <div>
         <div 
           ref={playerContainerRef}
-          className="relative w-full aspect-video bg-black rounded shadow-md youtube-player-container"
+          className="relative w-full aspect-video bg-black youtube-player-container"
         >
           <div id="player" className="w-full h-full">
             <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">

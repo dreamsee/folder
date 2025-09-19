@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
 // 오버레이 위치 타입
 export type OverlayPosition = 
@@ -41,6 +41,8 @@ interface TextOverlayProps {
   isPlaying: boolean;
   onOverlayPositionChange?: (id: string, coordinates: Coordinates) => void;
   editingId?: string; // 편집 중인 오버레이 ID
+  screenScale?: number; // 화면 크기 비율 (기본값 100)
+  isFullscreen?: boolean; // 전체화면 여부
 }
 
 const TextOverlay: React.FC<TextOverlayProps> = ({
@@ -48,10 +50,69 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
   currentTime,
   isPlaying,
   onOverlayPositionChange,
-  editingId
+  editingId,
+  screenScale = 100,
+  isFullscreen = false
 }) => {
   const [activeOverlays, setActiveOverlays] = useState<OverlayData[]>([]);
   const [dragging, setDragging] = useState<{ id: string; startX: number; startY: number; initialCoords: Coordinates } | null>(null);
+  const [containerScale, setContainerScale] = useState(1); // 실제 컨테이너 크기 비율
+  const [normalModeWidth, setNormalModeWidth] = useState(0); // 일반 모드에서의 영상 너비
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 기준 영상 크기 (16:9 비율의 표준 크기)
+  const BASE_VIDEO_WIDTH = 1280; // 720p 기준
+
+  // ResizeObserver로 컨테이너 크기 변화 감지
+  useEffect(() => {
+    const observeContainer = () => {
+      // 부모 컨테이너 찾기 (영상 플레이어 컨테이너)
+      const parentContainer = containerRef.current?.parentElement;
+      if (!parentContainer) return;
+
+      const resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const width = entry.contentRect.width;
+
+          if (isFullscreen) {
+            // 전체화면일 때: screenScale 비율만 사용
+            // 전체화면에서는 영상이 화면에 맞게 확대되지만,
+            // 글자는 screenScale 비율만 적용
+            const scale = screenScale / 100;
+            setContainerScale(scale);
+            console.log(`전체화면: 글자 비율 ${scale.toFixed(2)} (screenScale: ${screenScale}%)`);
+          } else {
+            // 일반 모드일 때: 실제 컨테이너 크기 대비 비율 계산
+            const scale = width / BASE_VIDEO_WIDTH;
+            setContainerScale(scale);
+            setNormalModeWidth(width); // 일반 모드 너비 저장
+            console.log(`일반화면: 컨테이너 ${width}px, 비율: ${scale.toFixed(2)}`);
+          }
+        }
+      });
+
+      resizeObserver.observe(parentContainer);
+      return () => resizeObserver.disconnect();
+    };
+
+    const cleanup = observeContainer();
+    return cleanup;
+  }, [isFullscreen, screenScale]); // screenScale 의존성 추가
+
+  // 화면 크기에 비례한 글자 크기 계산 함수
+  const getScaledFontSize = (baseFontSize: number): number => {
+    // containerScale이 이미 screenScale과 브라우저 크기를 모두 반영한 실제 비율
+    // screenScale을 다시 곱하면 중복 적용되므로 containerScale만 사용
+    const scaledSize = Math.round(baseFontSize * containerScale);
+
+    if (isFullscreen) {
+      console.log(`전체화면 글자 크기: ${baseFontSize}px → ${scaledSize}px (실제 비율: ${containerScale.toFixed(2)})`);
+    } else {
+      console.log(`일반화면 글자 크기: ${baseFontSize}px → ${scaledSize}px (컨테이너 비율: ${containerScale.toFixed(2)})`);
+    }
+
+    return scaledSize;
+  };
 
   // 현재 시간에 활성화되어야 할 오버레이 찾기
   useEffect(() => {
@@ -177,7 +238,7 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
   }
 
   return (
-    <>
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none">
       {activeOverlays.map((overlay) => {
         const isDraggingThis = dragging?.id === overlay.id;
         const isPreview = overlay.id === "preview-overlay"; // 미리보기 오버레이 확인
@@ -189,10 +250,10 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
             className="z-50 transition-opacity duration-300"
             style={{
               ...getPositionStyle(overlay, isDraggingThis),
-              fontSize: `${overlay.style.fontSize}px`,
+              fontSize: `${getScaledFontSize(overlay.style.fontSize)}px`,
               color: overlay.style.color,
               backgroundColor: overlay.style.backgroundColor,
-              padding: `${overlay.style.padding}px`,
+              padding: `${Math.round(overlay.style.padding * containerScale)}px`,
               opacity: isPreview ? 0.9 : (isPlaying ? (isDraggingThis ? 0.8 : 1) : 0.7),
               cursor: canDrag ? 'move' : 'default',
               pointerEvents: canDrag ? "auto" : "none",
@@ -223,7 +284,7 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
           </div>
         );
       })}
-    </>
+    </div>
   );
 };
 
