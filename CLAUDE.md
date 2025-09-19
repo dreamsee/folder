@@ -125,6 +125,7 @@ localStorage나 상태 구조 변경사항
 - 유브: /data/data/com.termux/files/home/folder/유튜브노트_브랜치 프로젝트
 - 유노: /data/data/com.termux/files/home/folder/유튜브노트 프로젝트 (참고용)
 - 테탐: TestTimestampPage.tsx (http://localhost:5174/test-timestamp)
+- 텍오버: TestOverlayPage.tsx (http://localhost:5174/test-overlay)
 
 파일 명칭 별칭:
 - 주요파일위치.txt는 다음과 같이 불릴 수 있습니다:

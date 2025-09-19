@@ -45,6 +45,8 @@ UI 컴포넌트:
 
 테스트 페이지:
 - client/src/pages/TestSharePage.tsx: 댓글 시스템 테스트 페이지
+- client/src/pages/TestTimestampPage.tsx: 타임스탬프 기능 테스트 페이지
+- client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 기능 테스트 페이지 (9:1 레이아웃)
 
 서버:
 - server/index.ts: Express 서버 메인
@@ -89,10 +91,18 @@ UI 컴포넌트:
 - NoteOverlayPanel.tsx:전체컴포넌트 오버레이 노트 입력 패널
 - SettingsPanel.tsx:화면텍스트섹션 오버레이 설정 UI
 - HomePage.tsx:오버레이상태들 오버레이 관련 상태 관리
+- TestOverlayPage.tsx:64-88 플레이어 시간 업데이트 useEffect (currentTime, duration, isPlaying)
+- TestOverlayPage.tsx:90-93 실시간 편집 업데이트 useEffect (설정값 변경시 즉시 반영)
+- TestOverlayPage.tsx:95-114 updateEditingOverlay() 편집 중 오버레이 실시간 수정
+- TestOverlayPage.tsx:126-153 addOverlay() 새 오버레이 생성 및 추가
+- TestOverlayPage.tsx:191-211 editOverlay() 기존 오버레이 편집 모드 진입
+- TestOverlayPage.tsx:478-484 TextOverlay 컴포넌트 연동 (currentTime, isPlaying 전달)
 → 수정 시 주의:
   1. updateExistingOverlay에서 기존 오버레이의 startTime, duration 보존 필수
   2. CSS transform에서 회전과 위치 변환 조합 시 순서 중요
   3. 실시간 업데이트로 과도한 로그 출력 금지
+  4. TestOverlayPage는 currentTime 업데이트가 필수 (TextOverlay 필터링용)
+  5. 편집 중 실시간 반영을 위해 useEffect 의존성 배열 정확히 설정
 
 🎬 영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가

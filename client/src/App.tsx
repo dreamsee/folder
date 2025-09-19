@@ -6,6 +6,7 @@ import HomePage from "@/pages/HomePage";
 import SimpleHomePage from "@/pages/SimpleHomePage";
 import TestSharePage from "@/pages/TestSharePage";
 import TestTimestampPage from "@/pages/TestTimestampPage";
+import TestOverlayPage from "@/pages/TestOverlayPage";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 console.log("🔍 App.tsx 로딩");
@@ -22,6 +23,7 @@ function Router() {
       <Route path="/simple" component={SimpleHomePage} />
       <Route path="/test-share" component={TestSharePage} />
       <Route path="/test-timestamp" component={TestTimestampPage} />
+      <Route path="/test-overlay" component={TestOverlayPage} />
       <Route component={NotFound} />
     </Switch>
   );

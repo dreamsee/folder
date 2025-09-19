@@ -1,6 +1,18 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-09-19: TestOverlayPage 생성 및 실시간 오버레이 편집 시스템 구현
+- TestOverlayPage.tsx: 새로운 텍스트 오버레이 테스트 페이지 생성 (9:1 레이아웃)
+- TestOverlayPage.tsx: useEffect 기반 플레이어 시간 업데이트 시스템 (currentTime, duration, isPlaying)
+- TestOverlayPage.tsx: updateEditingOverlay() 함수로 편집 중 실시간 오버레이 반영
+- TestOverlayPage.tsx: 편집 상태별 useEffect 의존성 관리로 설정값 변경시 즉시 화면 반영
+- App.tsx: /test-overlay 라우트 추가 및 TestOverlayPage 연동
+- CLAUDE.md: 텍오버 별칭 추가 (TestOverlayPage.tsx 참조용)
+- server/index.ts: 포트 6000으로 고정하여 포트 충돌 해결
+- client/vite.config.ts: API 프록시 타겟을 6000번 포트로 변경
+- 기능: 탭 기반 설정 UI, 실시간 미리보기, 화면 스케일 조정, 9:1 효율적 레이아웃
+→ 주요 성과: 오버레이가 표시되지 않던 문제 해결 및 실시간 편집 기능 완성
+
 2025-09-19: 텍스트 오버레이 회전 기능 구현 및 편집 모드 시간 보존 수정
 - OverlayInput.tsx: rotation 상태 추가 (-180~180도 범위)
 - OverlayInput.tsx: 각도 슬라이더 UI 추가 (5도 단위 조정)

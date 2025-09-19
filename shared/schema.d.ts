@@ -1,0 +1,47 @@
+import { z } from "zod";
+export declare const users: any;
+export declare const insertUserSchema: any;
+export declare const videos: any;
+export declare const noteSessions: any;
+export declare const timestamps: any;
+export declare const insertVideoSchema: any;
+export declare const insertNoteSessionSchema: any;
+export declare const insertTimestampSchema: any;
+export declare const usersRelations: any;
+export declare const videosRelations: any;
+export declare const noteSessionsRelations: any;
+export declare const timestampsRelations: any;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+export type InsertVideo = z.infer<typeof insertVideoSchema>;
+export type Video = typeof videos.$inferSelect;
+export type InsertNoteSession = z.infer<typeof insertNoteSessionSchema>;
+export type NoteSession = typeof noteSessions.$inferSelect;
+export type InsertTimestamp = z.infer<typeof insertTimestampSchema>;
+export type Timestamp = typeof timestamps.$inferSelect;
+export type InsertNote = InsertNoteSession;
+export type Note = NoteSession;
+export declare const youtubeVideoSchema: z.ZodObject<{
+    videoId: z.ZodString;
+    title: z.ZodString;
+    thumbnail: z.ZodString;
+    channelTitle: z.ZodString;
+}, z.core.$strip>;
+export declare const youtubeSearchResponseSchema: z.ZodObject<{
+    videos: z.ZodArray<z.ZodObject<{
+        videoId: z.ZodString;
+        title: z.ZodString;
+        thumbnail: z.ZodString;
+        channelTitle: z.ZodString;
+    }, z.core.$strip>>;
+}, z.core.$strip>;
+export type YoutubeVideo = z.infer<typeof youtubeVideoSchema>;
+export type YoutubeSearchResponse = z.infer<typeof youtubeSearchResponseSchema>;
+export declare const recordingSessions: any;
+export declare const rawTimestamps: any;
+export declare const insertRecordingSessionSchema: any;
+export declare const insertRawTimestampSchema: any;
+export type InsertRecordingSession = z.infer<typeof insertRecordingSessionSchema>;
+export type RecordingSession = typeof recordingSessions.$inferSelect;
+export type InsertRawTimestamp = z.infer<typeof insertRawTimestampSchema>;
+export type RawTimestamp = typeof rawTimestamps.$inferSelect;
