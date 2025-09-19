@@ -75,12 +75,11 @@ const TextOverlay: React.FC<TextOverlayProps> = ({
           const width = entry.contentRect.width;
 
           if (isFullscreen) {
-            // 전체화면일 때: screenScale 비율만 사용
-            // 전체화면에서는 영상이 화면에 맞게 확대되지만,
-            // 글자는 screenScale 비율만 적용
-            const scale = screenScale / 100;
+            // 전체화면일 때: 실제 컨테이너 크기만 반영 (screenScale 무시)
+            // 전체화면은 브라우저가 자동 확대하므로 실제 크기만 사용
+            const scale = width / BASE_VIDEO_WIDTH;
             setContainerScale(scale);
-            console.log(`전체화면: 글자 비율 ${scale.toFixed(2)} (screenScale: ${screenScale}%)`);
+            console.log(`전체화면: 컨테이너 ${width}px, 비율: ${scale.toFixed(2)} (screenScale 무시)`);
           } else {
             // 일반 모드일 때: 실제 컨테이너 크기 대비 비율 계산
             const scale = width / BASE_VIDEO_WIDTH;

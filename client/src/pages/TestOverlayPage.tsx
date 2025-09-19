@@ -503,8 +503,8 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
               type="range"
               value={fontSize}
               onChange={(e) => setFontSize(Number(e.target.value))}
-              min={12}
-              max={48}
+              min={6}
+              max={96}
               step={2}
               className="w-full"
             />

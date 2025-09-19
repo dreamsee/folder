@@ -103,6 +103,8 @@ UI 컴포넌트:
 - TestOverlayPage.tsx:180-212 전체화면 토글 함수 (브라우저 Fullscreen API)
 - TestOverlayPage.tsx:774-790 전체화면 버튼 UI (영상 우측 하단 Maximize/Minimize)
 - TestOverlayPage.tsx:780-781 전체화면 시 버튼 크기 확대 (p-1.6, bottom-2으로 YouTube 버튼을 가림)
+- TestOverlayPage.tsx:506-508 글자 크기 범위 확장 (6-96px, 2px 단위 조정)
+- TextOverlay.tsx:77-82 전체화면 스케일링 수정 (screenScale 무시, 실제 컨테이너 크기만 반영)
 - TestOverlayPage.tsx:747-763 커스텀 진행바 (클릭 탐색, 전체화면 지원)
 - TabLayoutSettings.tsx:전체컴포넌트 탭 커스터마이징 모달 (기능 재배치, 탭명 변경, 표시/숨김)
 → 수정 시 주의:
@@ -116,6 +118,7 @@ UI 컴포넌트:
   8. 좌표 입력은 0-100 범위로 제한, 백분율 기반 위치 계산
   9. 탭 설정 모달은 현재 임시 비활성화 상태 (화면 크래시 방지)
   10. 전체화면 시 버튼 크기 확대로 YouTube 컨트롤과 겹침 방지 필수
+  11. 전체화면에서 screenScale 무시하여 일관된 텍스트 크기 유지 (화면 비율 변경 영향 차단)
 
 🎬 영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가
