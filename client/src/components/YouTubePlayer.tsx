@@ -126,10 +126,9 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   // 영상 변경 시 세션 초기화 및 자동 로드/재생
   useEffect(() => {
     setCurrentSessionId(null);
-    
+
     // 플레이어가 준비되고 비디오 ID가 있으면 로드 및 재생
     if (player && isPlayerReady && currentVideoId) {
-      console.log('[YouTubePlayer] currentVideoId 변경됨, 영상 로드 및 재생:', currentVideoId);
       try {
         // 플레이어 DOM 요소 존재 여부 확인
         const playerElement = document.getElementById('player');
@@ -188,12 +187,10 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     applyDefaultSettings(event.target);
     
     // 초기 로드는 useEffect에서 처리하므로 여기서는 하지 않음
-    console.log('[YouTubePlayer] onPlayerReady - 플레이어 준비 완료, currentVideoId:', currentVideoId);
   };
 
   // 플레이어 상태 변경 이벤트 핸들러
   const onPlayerStateChange = (event: any) => {
-    console.log('[시청기록] 플레이어 상태 변경:', event.data, 'videoId:', currentVideoId);
     setPlayerState(event.data);
     // 재생 상태 업데이트 (YT.PlayerState.PLAYING = 1, PAUSED = 2)
     setIsPlaying(event.data === 1);

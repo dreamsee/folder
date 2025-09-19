@@ -255,15 +255,18 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
   };
 
 
-  // 오버레이 위치 설명 반환
+  // 오버레이 위치 설명 반환 (좌표 소수점 2자리수 제한)
   const getOverlayPositionDescription = (overlay: OverlayData): string => {
     if (overlay.coordinates) {
       const { x, y, unit } = overlay.coordinates;
       const textAlign = overlay.style.textAlign || 'left';
       const alignText = textAlign === 'left' ? '좌측' : textAlign === 'center' ? '중앙' : '우측';
-      return `좌표 (${x}${unit}, ${y}${unit}) • ${alignText}_정렬`;
+      // 좌표를 소수점 2자리수로 제한
+      const xFormatted = Number(x).toFixed(2);
+      const yFormatted = Number(y).toFixed(2);
+      return `좌표 (${xFormatted}${unit}, ${yFormatted}${unit}) • ${alignText}_정렬`;
     }
-    return "좌표 (50%, 90%) • 좌측_정렬";
+    return "좌표 (50.00%, 90.00%) • 좌측_정렬";
   };
 
 
@@ -596,7 +599,7 @@ const OverlayInput: React.FC<OverlayInputProps> = ({
                 <div className="flex-1 mr-2">
                   <div className="font-medium truncate">{overlay.text}</div>
                   <div className="text-xs text-gray-500">
-                    {formatTime(overlay.startTime)} • {overlay.duration}초 • {getOverlayPositionDescription(overlay)}
+                    <span className="font-bold">{formatTime(overlay.startTime)} → {formatTime(overlay.startTime + overlay.duration)}</span> | <span className="bg-gray-200 px-1 py-0.5 rounded text-gray-800">좌표 ({Number(overlay.coordinates?.x || 50).toFixed(2)}{overlay.coordinates?.unit || '%'}, {Number(overlay.coordinates?.y || 90).toFixed(2)}{overlay.coordinates?.unit || '%'})</span> | {overlay.style.textAlign === 'left' ? '좌측' : overlay.style.textAlign === 'center' ? '중앙' : '우측'}_정렬
                   </div>
                 </div>
                 <div className="flex items-center gap-1">

@@ -17,6 +17,7 @@ export interface UISettings {
   };
   검색창: {
     유지: boolean;
+    목록유지?: boolean;
   };
   바설정: {
     커스텀바: boolean;
@@ -197,7 +198,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const 기본설정: UISettings = {
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
-    검색창: { 유지: true },
+    검색창: { 유지: true, 목록유지: false },
     바설정: { 커스텀바: true, 챕터바: true },
     재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
     노트영역: { 표시: true },
@@ -283,7 +284,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       case "전체":
         새설정 = {
           상단부: { 제목표시: true, 부제목표시: true, 부제목내용: settings.상단부?.부제목내용 || "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
-          검색창: { 유지: true },
+          검색창: { 유지: true, 목록유지: settings.검색창?.목록유지 ?? false },
           바설정: { 커스텀바: true, 챕터바: true },
           재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
           노트영역: { 표시: true },
@@ -585,6 +586,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   onCheckedChange={(값) => 설정업데이트("검색창", "유지", 값)}
                 />
               </div>
+              {settings.검색창?.유지 && (
+                <div className="ml-6 flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500">검색_목록 유지</span>
+                  </div>
+                  <Switch
+                    checked={settings.검색창?.목록유지 ?? false}
+                    onCheckedChange={(값) => 설정업데이트("검색창", "목록유지", 값)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 

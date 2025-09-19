@@ -87,6 +87,9 @@ UI 컴포넌트:
 
 🎬 영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가
+- VideoLoader.tsx:283-329 handleVideoSelect() 영상 선택 및 검색 결과 처리 로직
+- VideoLoader.tsx:114-120 videoId 필터링 (undefined 제거)
+- VideoLoader.tsx:310-320 keepSearchResults 설정에 따른 검색 결과 유지/닫기
 - YouTubePlayer.tsx:loadVideoById YouTube API 영상 로딩
 - YouTubePlayer.tsx:onPlayerStateChange 재생 상태 변화 처리
 - FavoriteManager.tsx:handleVideoPlay 즐겨찾기 영상 재생
@@ -94,11 +97,15 @@ UI 컴포넌트:
 
 ⚙️ 설정 관리:
 - SettingsPanel.tsx:전체컴포넌트 모든 설정 UI
+- SettingsPanel.tsx:18-21 UISettings 인터페이스 정의 (검색창.목록유지 포함)
+- SettingsPanel.tsx:577-600 검색창 유지 설정 및 하위 "목록 열어두기" 토글
+- SettingsPanel.tsx:589-600 목록유지 토글 (검색창 유지가 ON일 때만 표시)
 - SettingsPanel.tsx:783-790 지속시간 토글 (스타일설정 섹션 맨 아래)
 - SettingsPanel.tsx:1080-1170 프리셋 설정 저장 로직 (최소모드/노트모드)
 - SettingsPanel.tsx:1200-1270 실시간 프리셋 업데이트 (handleSettingChange)
 - SettingsPanel.tsx:savePresetSettings() 프리셋별 설정 저장 함수
 - HomePage.tsx:uiSettings UISettings 상태 관리
+- HomePage.tsx:279 keepSearchResults prop 전달 (목록유지 설정 연결)
 - NoteArea.tsx:재생기본값적용 새 영상 로드시 기본값 적용
 - YouTubePlayer.tsx:설정동기화 플레이어 설정 동기화
 

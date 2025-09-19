@@ -46,7 +46,7 @@ const HomePage = () => {
   });
   const [uiSettings, setUiSettings] = useState<UISettings>({
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
-    검색창: { 유지: true },
+    검색창: { 유지: true, 목록유지: false },
     바설정: { 커스텀바: true, 챕터바: true },
     재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
     노트영역: { 표시: true },
@@ -86,13 +86,11 @@ const HomePage = () => {
   useEffect(() => {
     // @ts-ignore - YouTube API는 전역 객체에 함수를 추가함
     window.onYouTubeIframeAPIReady = () => {
-      console.log("YouTube 플레이어가 초기화되었습니다. 동영상을 로드하세요.");
     };
   }, []);
 
   // 알림 표시 함수 (토스트 비활성화)
   const showNotification = (message: string, type: "info" | "success" | "warning" | "error") => {
-    console.log(`${type.toUpperCase()}: ${message}`);
   };
 
   // 드래그로 오버레이 위치 변경 처리
@@ -278,6 +276,7 @@ const HomePage = () => {
           setCurrentVideoInfo={setCurrentVideoInfo}
           showNotification={showNotification}
           autoHide={false}
+          keepSearchResults={uiSettings.검색창.목록유지 ?? false}  // 목록유지 설정에 따라 동작
         />
       )}
       

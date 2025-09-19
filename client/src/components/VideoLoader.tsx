@@ -18,6 +18,7 @@ interface VideoLoaderProps {
   autoHide?: boolean;
   isPopup?: boolean;
   onClose?: () => void;
+  keepSearchResults?: boolean; // 검색창 유지 설정
 }
 
 const VideoLoader: React.FC<VideoLoaderProps> = ({
@@ -29,6 +30,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   autoHide = false,
   isPopup = false,
   onClose,
+  keepSearchResults = false,
 }) => {
   const [isVisible, setIsVisible] = useState(!autoHide);
   const [isHovering, setIsHovering] = useState(false);
@@ -64,14 +66,12 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     }
 
     try {
-      console.log("API 호출 시작:", searchQuery, "pageToken:", pageToken);
       let url = `/api/youtube/search?q=${encodeURIComponent(searchQuery)}`;
       if (pageToken) {
         url += `&pageToken=${pageToken}`;
       }
       
       const response = await fetch(url);
-      console.log("API 응답 상태:", response.status);
       
       if (!response.ok) {
         let errorMessage = "검색 중 오류가 발생했습니다.";
@@ -102,18 +102,26 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       const data: any = await response.json();
 
       if (data.videos && data.videos.length > 0) {
-        const newVideos = isInitialSearch 
-          ? data.videos 
-          : [...searchResults, ...data.videos];
-        
+        // videoId가 있는 영상만 필터링 (undefined 제거)
+        const validVideos = data.videos.filter((v: any) => v.videoId);
+        const invalidCount = data.videos.length - validVideos.length;
+
+        const newVideos = isInitialSearch
+          ? validVideos
+          : [...searchResults, ...validVideos];
+
         setSearchResults(newVideos);
         setNextPageToken(data.nextPageToken || null);
         
         // 필터링 적용
         applyFilter(newVideos, filterMode);
-        
+
         if (isInitialSearch) {
-          showNotification(`${data.videos.length}개의 검색 결과를 찾았습니다.`, "success");
+          if (invalidCount > 0) {
+            showNotification(`${validVideos.length}개의 검색 결과를 찾았습니다.`, "success");
+          } else {
+            showNotification(`${validVideos.length}개의 검색 결과를 찾았습니다.`, "success");
+          }
         }
       } else {
         if (isInitialSearch) {
@@ -265,7 +273,6 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   
   // 영상 선택 시 처리 (시청 횟수 증가 포함)
   const handleVideoSelect = (video: YoutubeVideo) => {
-    console.log('[VideoLoader] 영상 선택:', video.videoId, video.title);
     
     // 1. 시청 기록 업데이트 (여기가 핵심!)
     const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
@@ -281,12 +288,10 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
         lastPosition: 0,
         duration: 0,
       };
-      console.log('[VideoLoader] 새 영상 첫 시청:', video.videoId);
     } else {
       // 기존 영상 - 시청 횟수 증가
       watchHistory[video.videoId].watchCount = (watchHistory[video.videoId].watchCount || 0) + 1;
       watchHistory[video.videoId].lastWatchedAt = new Date().toISOString();
-      console.log('[VideoLoader] 재시청:', video.videoId, '횟수:', watchHistory[video.videoId].watchCount);
     }
     
     // 시청 기록 저장
@@ -301,23 +306,29 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     
     // 3. 영상 ID 설정 (YouTubePlayer에서 로드됨)
     setCurrentVideoId(video.videoId);
-    
-    // 4. 검색 결과 자동 닫기
-    setSearchResults([]);
-    setFilteredResults([]);
-    
+
+    // 4. 검색 결과 처리
+    // 검색창 유지 설정이 true면 검색 결과를 유지하되 시청 상태만 업데이트
+    // 검색창 유지 설정이 false면 검색 결과를 완전히 비움
+    if (keepSearchResults) {
+      // 검색창 유지 모드: 시청 상태 반영을 위해 재필터링
+      // 이렇게 하면 방금 선택한 영상에 시청 표시가 즉시 나타남
+      applyFilter(searchResults, filterMode);
+    } else {
+      // 검색창 비유지 모드: 검색 결과 완전히 닫기
+      setSearchResults([]);
+      setFilteredResults([]);
+    }
+
     // 5. 자동 숨김 모드에서는 검색 후 숨김
     if (autoHide) {
       setTimeout(() => setIsVisible(false), 1000);
     }
-    
+
     // 6. 팝업 모드면 닫기
     if (isPopup && onClose) {
       onClose();
     }
-    
-    // 7. 검색 결과 재필터링 (시청 상태 반영)
-    applyFilter(searchResults, filterMode);
   };
   
   // 필터 모드 및 정렬 순서 변경 시 재필터링
