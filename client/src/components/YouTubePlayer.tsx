@@ -104,7 +104,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             playerVars: {
               playsinline: 1,
               enablejsapi: 1,
-              modestbranding: 1,
+              modestbranding: 1, // YouTube 로고 최소화
               rel: 0,
             },
             events: {

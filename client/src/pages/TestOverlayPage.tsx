@@ -5,8 +5,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import YouTubePlayer from '../components/YouTubePlayer';
 import { OverlayData } from '../components/TextOverlay';
 import TextOverlay from '../components/TextOverlay';
+import TabLayoutSettings from '../components/TabLayoutSettings';
 import { formatTime } from '../lib/youtubeUtils';
-import { Type, Palette, Clock, Sliders } from 'lucide-react';
+import { Type, Palette, Clock, Sliders, Settings, Maximize, Minimize } from 'lucide-react';
 
 interface TestOverlayPageProps {}
 
@@ -20,6 +21,8 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
 
   // 오버레이 상태 (테스트용 기본 오버레이 추가)
   const [overlays, setOverlays] = useState<OverlayData[]>([
@@ -42,8 +45,39 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   ]);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // 탭 상태
-  const [activeTab, setActiveTab] = useState<'note' | 'size' | 'color' | 'time'>('note');
+  // 탭 설정 및 상태
+  const [tabConfig, setTabConfig] = useState([
+    {
+      id: 'note',
+      name: '노트',
+      icon: Type,
+      visible: true,
+      features: ['overlayText', 'positionGrid', 'coordinateInput', 'textAlign', 'addButton']
+    },
+    {
+      id: 'size',
+      name: '크기',
+      icon: Sliders,
+      visible: true,
+      features: ['fontSize', 'padding', 'rotation']
+    },
+    {
+      id: 'color',
+      name: '색상',
+      icon: Palette,
+      visible: true,
+      features: ['textColor', 'bgColor', 'bgOpacity']
+    },
+    {
+      id: 'time',
+      name: '시간',
+      icon: Clock,
+      visible: true,
+      features: ['duration', 'overlayList']
+    }
+  ]);
+  const [activeTab, setActiveTab] = useState('note');
+  const [showSettings, setShowSettings] = useState(false);
 
   // 화면 크기 조절
   const [screenScale, setScreenScale] = useState(100);
@@ -143,6 +177,40 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
     return bgColor + opacityToHex(bgOpacity);
   };
 
+  // 전체화면 토글 함수
+  const toggleFullscreen = async () => {
+    if (!playerContainerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await playerContainerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+        console.log('전체화면 진입');
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+        console.log('전체화면 종료');
+      }
+    } catch (error) {
+      console.error('전체화면 전환 실패:', error);
+    }
+  };
+
+  // 전체화면 변경 감지
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+    };
+  }, []);
+
   // 오버레이 추가/수정
   const addOverlay = () => {
     console.log('🔍 addOverlay 함수 호출됨');
@@ -237,8 +305,38 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
     setActiveTab('note');
   };
 
+  // localStorage에서 탭 설정 로드
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('overlayTabConfig');
+    if (savedConfig) {
+      try {
+        const parsed = JSON.parse(savedConfig);
+        setTabConfig(parsed);
+        // 첫 번째 보이는 탭으로 activeTab 설정
+        const firstVisibleTab = parsed.find((tab: any) => tab.visible);
+        if (firstVisibleTab) {
+          setActiveTab(firstVisibleTab.id);
+        }
+      } catch (error) {
+        console.error('탭 설정 로드 실패:', error);
+      }
+    }
+  }, []);
+
+  // 탭 설정 저장 핸들러
+  const handleTabConfigSave = (newConfig: any) => {
+    setTabConfig(newConfig);
+    localStorage.setItem('overlayTabConfig', JSON.stringify(newConfig));
+  };
+
   // 탭별 컨텐츠 렌더링
   const renderTabContent = () => {
+    // 현재 활성 탭 찾기
+    const currentTab = tabConfig.find(tab => tab.id === activeTab);
+    if (!currentTab) {
+      return <div>탭을 선택해주세요.</div>;
+    }
+
     switch (activeTab) {
       case 'note':
         return (
@@ -279,6 +377,75 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                     {position.name}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* 좌표 직접 입력 */}
+            <div className="space-y-3">
+              <h4 className="font-medium">좌표 직접 입력</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    X 좌표 (0-100%)
+                  </label>
+                  <input
+                    type="number"
+                    value={coordinates.x}
+                    onChange={(e) => setCoordinates({ ...coordinates, x: Number(e.target.value) })}
+                    min={0}
+                    max={100}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Y 좌표 (0-100%)
+                  </label>
+                  <input
+                    type="number"
+                    value={coordinates.y}
+                    onChange={(e) => setCoordinates({ ...coordinates, y: Number(e.target.value) })}
+                    min={0}
+                    max={100}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="90"
+                  />
+                </div>
+              </div>
+              <div className="text-xs text-gray-500">
+                현재 위치: ({coordinates.x}%, {coordinates.y}%)
+              </div>
+            </div>
+
+            {/* 텍스트 정렬 설정 */}
+            <div className="space-y-3">
+              <h4 className="font-medium">텍스트 정렬</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { name: "좌측", value: 'left' as const, icon: "⬅️" },
+                  { name: "중앙", value: 'center' as const, icon: "↔️" },
+                  { name: "우측", value: 'right' as const, icon: "➡️" },
+                ].map((align) => (
+                  <button
+                    key={align.value}
+                    type="button"
+                    onClick={() => setTextAlign(align.value)}
+                    className={`px-3 py-2 rounded text-sm border transition-colors ${
+                      textAlign === align.value
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-gray-100 hover:bg-gray-200 border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center gap-1">
+                      <span className="text-xs">{align.icon}</span>
+                      <span className="text-xs">{align.name}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-gray-500 text-center">
+                현재 정렬: {textAlign === 'left' ? '좌측' : textAlign === 'center' ? '중앙' : '우측'}
               </div>
             </div>
 
@@ -519,10 +686,24 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       {/* 영상 검색 및 YouTube 플레이어 영역 */}
       <div className="relative bg-black flex justify-center">
         <div
+          ref={playerContainerRef}
           className="relative bg-black transition-all duration-300"
-          style={{ width: `${screenScale}%` }}
+          style={{
+            width: isFullscreen ? '100vw' : `${screenScale}%`,
+            height: isFullscreen ? '100vh' : 'auto',
+            display: isFullscreen ? 'flex' : 'block',
+            alignItems: isFullscreen ? 'center' : undefined,
+            justifyContent: isFullscreen ? 'center' : undefined
+          }}
         >
-          <div className="aspect-video bg-gray-900 relative">
+          <div
+            className="bg-gray-900 relative"
+            style={{
+              width: isFullscreen ? '100%' : '100%',
+              maxWidth: isFullscreen ? '177.77vh' : '100%', // 16:9 비율 유지
+              aspectRatio: '16/9',
+              height: isFullscreen ? undefined : undefined
+            }}>
             <YouTubePlayer
               player={player}
               setPlayer={setPlayer}
@@ -531,6 +712,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
               currentVideoId={testVideoId}
               setPlayerState={() => {}}
               showNotification={(message) => console.log(message)}
+              바설정={{ 커스텀바: false, 챕터바: false }}
               className="w-full h-full absolute inset-0"
             />
             <div className="absolute inset-0 pointer-events-none z-10">
@@ -545,12 +727,46 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                 DEBUG: 오버레이 영역 테스트 (오버레이 개수: {overlays.length})
               </div>
             </div>
+
+            {/* 전체화면 버튼 */}
+            <button
+              onClick={toggleFullscreen}
+              className="absolute bottom-4 right-4 bg-black/50 hover:bg-black/70
+                       text-white rounded p-2 transition-all duration-200 z-30 pointer-events-auto"
+              title={isFullscreen ? '전체화면 나가기' : '전체화면'}
+            >
+              {isFullscreen ? (
+                <Minimize className="w-5 h-5" />
+              ) : (
+                <Maximize className="w-5 h-5" />
+              )}
+            </button>
           </div>
+
+            {/* 커스텀 진행바 */}
+            {isPlayerReady && duration > 0 && (
+              <div
+                className="absolute bottom-0 left-0 right-0 h-1 bg-gray-600/30 z-30 cursor-pointer"
+                onClick={(e) => {
+                  if (!player || !duration) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const percentage = x / rect.width;
+                  player.seekTo(duration * percentage);
+                }}
+              >
+                <div
+                  className="h-full bg-red-500 transition-all duration-100"
+                  style={{ width: `${(currentTime / duration) * 100}%` }}
+                />
+              </div>
+            )}
         </div>
+
       </div>
 
-      {/* 하단 노트/설정 영역 + 탭 */}
-      <div className="flex flex-1">
+      {/* 하단 노트/설정 영역 + 탭 - 전체화면에서는 숨김 */}
+      {!isFullscreen && <div className="flex flex-1">
         {/* 노트/설정 작업 영역 (90%) */}
         <div className="flex-1 p-4 bg-white overflow-y-auto">
           {renderTabContent()}
@@ -558,6 +774,17 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
         {/* 우측 탭 버튼들 (10%) */}
         <div className="w-20 bg-gray-800 flex flex-col">
+          {/* 설정 버튼 */}
+          <button
+            onClick={() => console.log('설정 버튼 클릭됨')}
+            className="flex flex-col items-center justify-center py-3 text-xs text-gray-300 hover:bg-gray-700 hover:text-white transition-colors border-b border-gray-700"
+            title="탭 레이아웃 설정 (임시 비활성화)"
+          >
+            <Settings className="w-5 h-5 mb-1" />
+            <span>설정</span>
+          </button>
+
+
           {[
             { id: 'note', icon: Type, label: '노트' },
             { id: 'size', icon: Sliders, label: '크기' },
@@ -578,7 +805,16 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
             </button>
           ))}
         </div>
-      </div>
+
+      </div>}
+
+      {/* 탭 설정 모달 - 임시 비활성화 */}
+      {false && <TabLayoutSettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSave={handleTabConfigSave}
+        currentConfig={tabConfig}
+      />}
     </div>
   );
 };

@@ -1,6 +1,18 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-09-19: TestOverlayPage 고급 위치 제어 및 전체화면 시스템 완성
+- TestOverlayPage.tsx: 좌표 직접 입력 기능 추가 (X, Y 숫자 입력으로 정밀 위치 조정)
+- TestOverlayPage.tsx: 텍스트 정렬 기능 추가 (좌측/중앙/우측 정렬 선택 버튼)
+- TabLayoutSettings.tsx: 탭 커스터마이징 컴포넌트 생성 (기능 재배치, 탭명 변경, 표시/숨김)
+- TestOverlayPage.tsx: 전체화면 토글 기능 구현 (브라우저 Fullscreen API 사용)
+- TestOverlayPage.tsx: 전체화면 버튼 UI 추가 (영상 우측 하단 Maximize/Minimize 아이콘)
+- TestOverlayPage.tsx: 빨간색 커스텀 진행바 구현 (클릭 탐색 가능, 전체화면 지원)
+- TestOverlayPage.tsx: 전체화면 시 16:9 비율 유지 및 크기 조정 (maxWidth: 177.77vh)
+- YouTubePlayer.tsx: 바설정 prop으로 커스텀바/챕터바 제어 (TestOverlayPage에서 false 설정)
+- 기능: 고급 오버레이 위치 제어 + 전체화면 시청 환경 + 탭 UI 커스터마이징 통합
+→ 주요 성과: 정밀한 오버레이 제어와 몰입형 전체화면 환경 구축 완료
+
 2025-09-19: TestOverlayPage 생성 및 실시간 오버레이 편집 시스템 구현
 - TestOverlayPage.tsx: 새로운 텍스트 오버레이 테스트 페이지 생성 (9:1 레이아웃)
 - TestOverlayPage.tsx: useEffect 기반 플레이어 시간 업데이트 시스템 (currentTime, duration, isPlaying)

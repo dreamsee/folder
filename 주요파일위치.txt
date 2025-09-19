@@ -27,6 +27,7 @@ UI 컴포넌트:
 - client/src/components/FolderSelector.tsx: 폴더 선택기
 - client/src/components/CoordinateInput.tsx: 좌표 입력
 - client/src/components/PositionGrid.tsx: 위치 그리드
+- client/src/components/TabLayoutSettings.tsx: 탭 레이아웃 설정 모달 (기능 재배치, 탭명 변경, 표시/숨김)
 
 녹화 기능:
 - client/src/components/RecordingMode.tsx: 녹화 모드
@@ -46,7 +47,7 @@ UI 컴포넌트:
 테스트 페이지:
 - client/src/pages/TestSharePage.tsx: 댓글 시스템 테스트 페이지
 - client/src/pages/TestTimestampPage.tsx: 타임스탬프 기능 테스트 페이지
-- client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 기능 테스트 페이지 (9:1 레이아웃)
+- client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 고급 테스트 페이지 (좌표 입력, 정렬, 전체화면, 커스텀 진행바)
 
 서버:
 - server/index.ts: Express 서버 메인
@@ -97,12 +98,22 @@ UI 컴포넌트:
 - TestOverlayPage.tsx:126-153 addOverlay() 새 오버레이 생성 및 추가
 - TestOverlayPage.tsx:191-211 editOverlay() 기존 오버레이 편집 모드 진입
 - TestOverlayPage.tsx:478-484 TextOverlay 컴포넌트 연동 (currentTime, isPlaying 전달)
+- TestOverlayPage.tsx:좌표입력섹션 coordinates 상태와 X,Y 숫자 입력 필드 (0-100 범위)
+- TestOverlayPage.tsx:정렬버튼섹션 textAlign 상태와 좌측/중앙/우측 선택 버튼 UI
+- TestOverlayPage.tsx:180-212 전체화면 토글 함수 (브라우저 Fullscreen API)
+- TestOverlayPage.tsx:730-742 전체화면 버튼 UI (영상 우측 하단 Maximize/Minimize)
+- TestOverlayPage.tsx:747-763 커스텀 진행바 (클릭 탐색, 전체화면 지원)
+- TabLayoutSettings.tsx:전체컴포넌트 탭 커스터마이징 모달 (기능 재배치, 탭명 변경, 표시/숨김)
 → 수정 시 주의:
   1. updateExistingOverlay에서 기존 오버레이의 startTime, duration 보존 필수
   2. CSS transform에서 회전과 위치 변환 조합 시 순서 중요
   3. 실시간 업데이트로 과도한 로그 출력 금지
   4. TestOverlayPage는 currentTime 업데이트가 필수 (TextOverlay 필터링용)
   5. 편집 중 실시간 반영을 위해 useEffect 의존성 배열 정확히 설정
+  6. 전체화면 시 aspectRatio: '16/9' 유지로 화면 비율 왜곡 방지
+  7. 전체화면 진입/종료 시 playerContainerRef DOM 요소 필수
+  8. 좌표 입력은 0-100 범위로 제한, 백분율 기반 위치 계산
+  9. 탭 설정 모달은 현재 임시 비활성화 상태 (화면 크래시 방지)
 
 🎬 영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가
