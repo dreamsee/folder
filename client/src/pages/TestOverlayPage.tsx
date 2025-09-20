@@ -24,25 +24,35 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const playerContainerRef = useRef<HTMLDivElement>(null);
 
-  // 오버레이 상태 (테스트용 기본 오버레이 추가)
-  const [overlays, setOverlays] = useState<OverlayData[]>([
-    {
-      id: "test1",
-      text: "테스트 오버레이",
-      positionMode: "coordinate",
-      coordinates: { x: 100, y: 100 },
-      startTime: 0,
-      duration: 10,
-      rotation: 0,
-      style: {
-        fontSize: 24,
-        color: "#FFFFFF",
-        backgroundColor: "#000000AA",
-        padding: 10,
-        textAlign: "left",
-      },
+  // 오버레이 상태
+  const [overlays, setOverlays] = useState<OverlayData[]>([]);
+
+  // 오버레이 localStorage 키 (현재 비디오 ID 기반)
+  const getOverlayStorageKey = () => `overlays_${testVideoId}`;
+
+  // 오버레이 저장 함수
+  const saveOverlaysToStorage = (overlayList: OverlayData[]) => {
+    try {
+      localStorage.setItem(getOverlayStorageKey(), JSON.stringify(overlayList));
+      console.log('오버레이 저장 완료:', overlayList.length, '개');
+    } catch (error) {
+      console.error('오버레이 저장 실패:', error);
     }
-  ]);
+  };
+
+  // 오버레이 로드 함수
+  const loadOverlaysFromStorage = () => {
+    try {
+      const saved = localStorage.getItem(getOverlayStorageKey());
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setOverlays(parsed);
+        console.log('오버레이 로드 완료:', parsed.length, '개');
+      }
+    } catch (error) {
+      console.error('오버레이 로드 실패:', error);
+    }
+  };
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // 탭 설정 및 상태 (설정 탭 제외)
@@ -94,6 +104,20 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   const [rotation, setRotation] = useState(0);
   const [textAlign, setTextAlign] = useState<'left' | 'center' | 'right'>('left');
 
+  // 시작/종료 시간 상태 (4자리 숫자로 관리)
+  const [startTime, setStartTime] = useState({
+    tens: 0, // 10초 단위 (0-9)
+    ones: 0, // 1초 단위 (0-9)
+    tenths: 0, // 0.1초 단위 (0-9)
+    hundredths: 0 // 0.01초 단위 (0-9)
+  });
+  const [endTime, setEndTime] = useState({
+    tens: 0,
+    ones: 5,
+    tenths: 0,
+    hundredths: 0
+  });
+
   // 플레이어 시간 업데이트 (TestTimestampPage와 동일한 로직)
   useEffect(() => {
     if (!player || !isPlayerReady) return;
@@ -126,26 +150,37 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   const updateEditingOverlay = () => {
     if (!editingId) return;
 
-    setOverlays(prev => prev.map(overlay => {
-      if (overlay.id === editingId) {
-        return {
-          ...overlay,
-          text: overlayText,
-          coordinates,
-          duration: overlayDuration,
-          rotation,
-          style: {
-            ...overlay.style,
-            fontSize,
-            color: textColor,
-            backgroundColor: getFinalBgColor(),
-            padding,
-            textAlign,
-          },
-        };
-      }
-      return overlay;
-    }));
+    setOverlays(prev => {
+      const newList = prev.map(overlay => {
+        if (overlay.id === editingId) {
+          const startSeconds = getTimeInSeconds(startTime);
+          const endSeconds = getTimeInSeconds(endTime);
+          const calculatedDuration = endSeconds - startSeconds;
+
+          return {
+            ...overlay,
+            text: overlayText,
+            coordinates,
+            startTime: startSeconds,
+            duration: calculatedDuration > 0 ? calculatedDuration : 1,
+            rotation,
+            style: {
+              ...overlay.style,
+              fontSize,
+              color: textColor,
+              backgroundColor: getFinalBgColor(),
+              padding,
+              textAlign,
+            },
+          };
+        }
+        return overlay;
+      });
+
+      // 실시간 업데이트는 너무 자주 저장하지 않기 위해 디바운싱 적용
+      setTimeout(() => saveOverlaysToStorage(newList), 500);
+      return newList;
+    });
   };
 
   useEffect(() => {
@@ -217,6 +252,11 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
     };
   }, []);
 
+  // 시간 값 계산 헬퍼 함수 (전역)
+  const getTimeInSeconds = (time: typeof startTime) => {
+    return time.tens * 10 + time.ones + time.tenths * 0.1 + time.hundredths * 0.01;
+  };
+
   // 오버레이 추가/수정
   const addOverlay = () => {
     console.log('🔍 addOverlay 함수 호출됨');
@@ -229,8 +269,13 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       return;
     }
 
-    const overlayStartTime = player.getCurrentTime();
+    const overlayStartTime = getTimeInSeconds(startTime);
+    const overlayEndTime = getTimeInSeconds(endTime);
+    const calculatedDuration = overlayEndTime - overlayStartTime;
+
     console.log('overlayStartTime:', overlayStartTime);
+    console.log('overlayEndTime:', overlayEndTime);
+    console.log('duration:', calculatedDuration);
 
     const newOverlay: OverlayData = {
       id: editingId || Date.now().toString(),
@@ -238,7 +283,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       positionMode: "coordinate",
       coordinates,
       startTime: overlayStartTime,
-      duration: overlayDuration,
+      duration: calculatedDuration > 0 ? calculatedDuration : 5, // 최소 5초
       rotation,
       style: {
         fontSize,
@@ -272,7 +317,27 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   const editOverlay = (overlay: OverlayData) => {
     setOverlayText(overlay.text);
     if (overlay.coordinates) setCoordinates(overlay.coordinates);
-    setOverlayDuration(overlay.duration);
+
+    // 시작/종료 시간 설정
+    const start = overlay.startTime;
+    const end = overlay.startTime + overlay.duration;
+
+    // 시작 시간 분해
+    setStartTime({
+      tens: Math.floor(start / 10) % 10,
+      ones: Math.floor(start) % 10,
+      tenths: Math.floor((start % 1) * 10),
+      hundredths: Math.floor(((start % 1) * 100) % 10)
+    });
+
+    // 종료 시간 분해
+    setEndTime({
+      tens: Math.floor(end / 10) % 10,
+      ones: Math.floor(end) % 10,
+      tenths: Math.floor((end % 1) * 10),
+      hundredths: Math.floor(((end % 1) * 100) % 10)
+    });
+
     setFontSize(overlay.style.fontSize);
     setTextColor(overlay.style.color);
     setTextAlign(overlay.style.textAlign || 'left');
@@ -296,7 +361,11 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
   // 오버레이 삭제
   const deleteOverlay = (id: string) => {
-    setOverlays(prev => prev.filter(o => o.id !== id));
+    setOverlays(prev => {
+      const newList = prev.filter(o => o.id !== id);
+      saveOverlaysToStorage(newList); // 저장
+      return newList;
+    });
   };
 
   // 편집 취소
@@ -341,7 +410,10 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
         console.error('탭 설정 로드 실패:', error);
       }
     }
-  }, []);
+
+    // 오버레이 로드
+    loadOverlaysFromStorage();
+  }, [testVideoId]); // testVideoId 변경 시에도 재로드
 
   // 탭 설정 저장 핸들러
   const handleTabConfigSave = (newConfig: any) => {
@@ -355,7 +427,86 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       case 'overlayText':
         return (
           <div key={featureId} className="space-y-3">
-            <h4 className="font-medium">텍스트 입력</h4>
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium">텍스트 입력</h4>
+              <button
+                onClick={() => {
+                  if (!overlayText.trim()) {
+                    alert('텍스트를 입력해주세요.');
+                    return;
+                  }
+
+                  if (!player || !isPlayerReady) {
+                    alert('플레이어가 준비되지 않았습니다.');
+                    return;
+                  }
+
+                  // 현재 영상 시간 가져오기
+                  const currentVideoTime = player.getCurrentTime();
+                  const endVideoTime = currentVideoTime + 1; // 1초 추가
+
+                  // 시작 시간 분해 (현재 시간)
+                  const startTens = Math.floor(currentVideoTime / 10) % 10;
+                  const startOnes = Math.floor(currentVideoTime) % 10;
+                  const startDecimal = currentVideoTime % 1;
+                  const startTenths = Math.floor(startDecimal * 10);
+                  const startHundredths = Math.floor((startDecimal * 100) % 10);
+
+                  setStartTime({
+                    tens: startTens,
+                    ones: startOnes,
+                    tenths: startTenths,
+                    hundredths: startHundredths
+                  });
+
+                  // 종료 시간 분해 (현재 시간 + 1초)
+                  const endTens = Math.floor(endVideoTime / 10) % 10;
+                  const endOnes = Math.floor(endVideoTime) % 10;
+                  const endDecimal = endVideoTime % 1;
+                  const endTenths = Math.floor(endDecimal * 10);
+                  const endHundredths = Math.floor((endDecimal * 100) % 10);
+
+                  setEndTime({
+                    tens: endTens,
+                    ones: endOnes,
+                    tenths: endTenths,
+                    hundredths: endHundredths
+                  });
+
+                  // 새 오버레이 생성
+                  const newOverlay: OverlayData = {
+                    id: Date.now().toString(),
+                    text: overlayText,
+                    positionMode: "coordinate",
+                    coordinates,
+                    startTime: currentVideoTime,
+                    duration: 1, // 1초
+                    rotation,
+                    style: {
+                      fontSize,
+                      color: textColor,
+                      backgroundColor: getFinalBgColor(),
+                      padding,
+                      textAlign,
+                    },
+                  };
+
+                  // 오버레이 추가하고 편집 모드로 진입
+                  setOverlays(prev => {
+                    const newList = [...prev, newOverlay];
+                    saveOverlaysToStorage(newList); // 저장
+                    return newList;
+                  });
+                  setEditingId(newOverlay.id);
+
+                  console.log('✅ 노트 적용 완료 - 편집 모드 진입:', newOverlay);
+                }}
+                disabled={!overlayText.trim() || !isPlayerReady}
+                className="px-3 py-1 bg-green-500 text-white rounded text-sm hover:bg-green-600 disabled:bg-gray-300"
+              >
+                노트 적용
+              </button>
+            </div>
             <textarea
               value={overlayText}
               onChange={(e) => setOverlayText(e.target.value)}
@@ -505,7 +656,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
               onChange={(e) => setFontSize(Number(e.target.value))}
               min={6}
               max={96}
-              step={2}
+              step={1}
               className="w-full"
             />
           </div>
@@ -523,7 +674,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
               onChange={(e) => setPadding(Number(e.target.value))}
               min={4}
               max={20}
-              step={2}
+              step={1}
               className="w-full"
             />
           </div>
@@ -614,23 +765,175 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
         );
 
       case 'duration':
+
+        // 시간 입력 컴포넌트
+        const TimeInput = ({
+          label,
+          time,
+          setTime
+        }: {
+          label: string;
+          time: typeof startTime;
+          setTime: React.Dispatch<React.SetStateAction<typeof startTime>>;
+        }) => {
+          const handleChange = (field: keyof typeof time, value: number) => {
+            setTime(prev => ({ ...prev, [field]: value }));
+
+            // 시간 변경시 영상 이동
+            const newTime = { ...time, [field]: value };
+            const seconds = getTimeInSeconds(newTime);
+            if (player && isPlayerReady) {
+              player.seekTo(seconds);
+            }
+          };
+
+          const handleIncrement = (field: keyof typeof time, max: number) => {
+            const current = time[field];
+            const newValue = current >= max ? 0 : current + 1;
+            handleChange(field, newValue);
+          };
+
+          const handleDecrement = (field: keyof typeof time, max: number) => {
+            const current = time[field];
+            const newValue = current <= 0 ? max : current - 1;
+            handleChange(field, newValue);
+          };
+
+          return (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{label}</span>
+                <button
+                  onClick={() => {
+                    if (player && isPlayerReady) {
+                      const current = player.getCurrentTime();
+                      const tens = Math.floor(current / 10) % 10;
+                      const ones = Math.floor(current) % 10;
+                      const decimal = current % 1;
+                      const tenths = Math.floor(decimal * 10);
+                      const hundredths = Math.floor((decimal * 100) % 10);
+                      setTime({ tens, ones, tenths, hundredths });
+                    }
+                  }}
+                  className="text-xs px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  현재 시간
+                </button>
+              </div>
+              <div className="flex items-center gap-1">
+                {/* 10초 단위 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('tens', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▲
+                  </button>
+                  <input
+                    type="number"
+                    value={time.tens}
+                    onChange={(e) => handleChange('tens', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('tens', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▼
+                  </button>
+                </div>
+
+                {/* 1초 단위 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('ones', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▲
+                  </button>
+                  <input
+                    type="number"
+                    value={time.ones}
+                    onChange={(e) => handleChange('ones', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('ones', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▼
+                  </button>
+                </div>
+
+                <span className="font-bold">.</span>
+
+                {/* 0.1초 단위 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('tenths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▲
+                  </button>
+                  <input
+                    type="number"
+                    value={time.tenths}
+                    onChange={(e) => handleChange('tenths', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('tenths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▼
+                  </button>
+                </div>
+
+                {/* 0.01초 단위 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('hundredths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▲
+                  </button>
+                  <input
+                    type="number"
+                    value={time.hundredths}
+                    onChange={(e) => handleChange('hundredths', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('hundredths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    ▼
+                  </button>
+                </div>
+
+                <span className="text-sm ml-2">초 = {getTimeInSeconds(time).toFixed(2)}초</span>
+              </div>
+            </div>
+          );
+        };
+
         return (
-          <div key={featureId} className="space-y-3">
-            <label className="block text-sm font-medium mb-2">
-              지속 시간: {overlayDuration}초
-            </label>
-            <input
-              type="range"
-              value={overlayDuration}
-              onChange={(e) => setOverlayDuration(Number(e.target.value))}
-              min={1}
-              max={30}
-              step={1}
-              className="w-full"
-            />
+          <div key={featureId} className="space-y-4">
+            <TimeInput label="시작 시간" time={startTime} setTime={setStartTime} />
+            <TimeInput label="종료 시간" time={endTime} setTime={setEndTime} />
+
             <div className="text-sm text-gray-600">
               <p>현재 시간: {formatTime(currentTime)}</p>
               <p>재생 상태: {isPlaying ? "재생 중" : "정지됨"}</p>
+              <p>오버레이 길이: {(getTimeInSeconds(endTime) - getTimeInSeconds(startTime)).toFixed(2)}초</p>
             </div>
           </div>
         );
@@ -647,7 +950,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                   <div key={overlay.id} className="p-2 bg-gray-50 rounded text-sm">
                     <div className="font-medium truncate">{overlay.text}</div>
                     <div className="text-xs text-gray-500">
-                      {formatTime(overlay.startTime)} → {formatTime(overlay.startTime + overlay.duration)}
+                      {overlay.startTime.toFixed(2)}초 → {(overlay.startTime + overlay.duration).toFixed(2)}초
                     </div>
                     <div className="flex gap-1 mt-1">
                       <button

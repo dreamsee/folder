@@ -93,34 +93,41 @@ UI 컴포넌트:
 - SettingsPanel.tsx:화면텍스트섹션 오버레이 설정 UI
 - HomePage.tsx:오버레이상태들 오버레이 관련 상태 관리
 - TestOverlayPage.tsx:64-88 플레이어 시간 업데이트 useEffect (currentTime, duration, isPlaying)
-- TestOverlayPage.tsx:90-93 실시간 편집 업데이트 useEffect (설정값 변경시 즉시 반영)
-- TestOverlayPage.tsx:95-114 updateEditingOverlay() 편집 중 오버레이 실시간 수정
-- TestOverlayPage.tsx:126-153 addOverlay() 새 오버레이 생성 및 추가
-- TestOverlayPage.tsx:191-211 editOverlay() 기존 오버레이 편집 모드 진입
+- TestOverlayPage.tsx:186-188 실시간 편집 업데이트 useEffect (설정값 변경시 즉시 반영)
+- TestOverlayPage.tsx:150-184 updateEditingOverlay() 편집 중 오버레이 실시간 수정 (시작/종료 시간 기반)
+- TestOverlayPage.tsx:479-485 노트 적용 버튼으로 즉시 편집 모드 진입 (현재 시간 + 1초)
+- TestOverlayPage.tsx:306-347 editOverlay() 기존 오버레이 편집 모드 진입 (시간 분해)
+- TestOverlayPage.tsx:30-55 localStorage 저장/로드 함수 (비디오별 오버레이 관리)
+- TestOverlayPage.tsx:218-220 getTimeInSeconds() 4자리 시간 계산 헬퍼 함수
 - TestOverlayPage.tsx:478-484 TextOverlay 컴포넌트 연동 (currentTime, isPlaying 전달)
 - TestOverlayPage.tsx:좌표입력섹션 coordinates 상태와 X,Y 숫자 입력 필드 (0-100 범위)
 - TestOverlayPage.tsx:정렬버튼섹션 textAlign 상태와 좌측/중앙/우측 선택 버튼 UI
 - TestOverlayPage.tsx:180-212 전체화면 토글 함수 (브라우저 Fullscreen API)
 - TestOverlayPage.tsx:774-790 전체화면 버튼 UI (영상 우측 하단 Maximize/Minimize)
 - TestOverlayPage.tsx:780-781 전체화면 시 버튼 크기 확대 (p-1.6, bottom-2으로 YouTube 버튼을 가림)
-- TestOverlayPage.tsx:506-508 글자 크기 범위 확장 (6-96px, 2px 단위 조정)
+- TestOverlayPage.tsx:656-660 글자 크기 범위 확장 (6-96px, 1px 단위 조정)
+- TestOverlayPage.tsx:674-678 여백 설정 (4-20px, 1px 단위 조정)
+- TestOverlayPage.tsx:756-922 4자리 시간 입력 컴포넌트 (10초/1초/0.1초/0.01초 단위별 조절)
+- TestOverlayPage.tsx:952-954 오버레이 목록에서 소수점 시간 표시 (toFixed(2))
 - TextOverlay.tsx:77-82 전체화면 스케일링 수정 (screenScale 무시, 실제 컨테이너 크기만 반영)
 - TextOverlay.tsx:268 텍스트 자동 줄바꿈 방지 (width: max-content로 텍스트 길이에 맞춰 자동 폭 조정)
 - TestOverlayPage.tsx:747-763 커스텀 진행바 (클릭 탐색, 전체화면 지원)
 - TabLayoutSettings.tsx:전체컴포넌트 탭 커스터마이징 모달 (기능 재배치, 탭명 변경, 표시/숨김)
 → 수정 시 주의:
-  1. updateExistingOverlay에서 기존 오버레이의 startTime, duration 보존 필수
-  2. CSS transform에서 회전과 위치 변환 조합 시 순서 중요
-  3. 실시간 업데이트로 과도한 로그 출력 금지
-  4. TestOverlayPage는 currentTime 업데이트가 필수 (TextOverlay 필터링용)
-  5. 편집 중 실시간 반영을 위해 useEffect 의존성 배열 정확히 설정
-  6. 전체화면 시 aspectRatio: '16/9' 유지로 화면 비율 왜곡 방지
-  7. 전체화면 진입/종료 시 playerContainerRef DOM 요소 필수
-  8. 좌표 입력은 0-100 범위로 제한, 백분율 기반 위치 계산
-  9. 탭 설정 모달은 현재 임시 비활성화 상태 (화면 크래시 방지)
-  10. 전체화면 시 버튼 크기 확대로 YouTube 컨트롤과 겹침 방지 필수
-  11. 전체화면에서 screenScale 무시하여 일관된 텍스트 크기 유지 (화면 비율 변경 영향 차단)
-  12. 텍스트 자동 줄바꿈 방지로 의도하지 않은 줄바꿈 차단 (width: max-content 적용)
+  1. 시간 입력은 4자리 분해 방식 (tens/ones/tenths/hundredths)으로 관리
+  2. getTimeInSeconds() 함수로 4자리 값을 초 단위로 변환 필수
+  3. 노트 적용 시 현재 영상 시간 기반으로 자동 시간 설정
+  4. 편집 모드 진입 시 시간 분해 로직과 editingId 설정 필수
+  5. localStorage는 비디오 ID별로 분리 저장 (overlays_${videoId})
+  6. 실시간 업데이트는 0.5초 디바운싱으로 과도한 저장 방지
+  7. CSS transform에서 회전과 위치 변환 조합 시 순서 중요
+  8. TestOverlayPage는 currentTime 업데이트가 필수 (TextOverlay 필터링용)
+  9. 전체화면 시 aspectRatio: '16/9' 유지로 화면 비율 왜곡 방지
+  10. 전체화면 진입/종료 시 playerContainerRef DOM 요소 필수
+  11. 좌표 입력은 0-100 범위로 제한, 백분율 기반 위치 계산
+  12. 전체화면에서 screenScale 무시하여 일관된 텍스트 크기 유지
+  13. 텍스트 자동 줄바꿈 방지로 의도하지 않은 줄바꿈 차단 (width: max-content 적용)
+  14. 탭 설정 모달 복구 완료 (모바일 안정성 확보)
 
 🎬 영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가
