@@ -427,8 +427,16 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       case 'overlayText':
         return (
           <div key={featureId} className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium">텍스트 입력</h4>
+            {/* 텍스트 영역을 맨 위로 */}
+            <textarea
+              value={overlayText}
+              onChange={(e) => setOverlayText(e.target.value)}
+              placeholder="💡 팁: 노트 영역을 화면 중앙에 위치시킨 후 클릭하면 영상이 덜 밀려남"
+              className="w-full h-32 p-3 border rounded-lg resize-none"
+              rows={4}
+            />
+            {/* 노트 적용 버튼 */}
+            <div className="flex justify-end">
               <button
                 onClick={() => {
                   if (!overlayText.trim()) {
@@ -507,13 +515,6 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                 노트 적용
               </button>
             </div>
-            <textarea
-              value={overlayText}
-              onChange={(e) => setOverlayText(e.target.value)}
-              placeholder="화면에 표시할 텍스트를 입력하세요"
-              className="w-full h-32 p-3 border rounded-lg resize-none"
-              rows={4}
-            />
           </div>
         );
 
@@ -988,7 +989,6 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">{currentTab.name}</h3>
         {/* 탭에 설정된 기능들을 순서대로 렌더링 */}
         {currentTab.features.map((featureId) => renderFeature(featureId))}
       </div>
@@ -1005,7 +1005,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
               텍스트 오버레이 테스트 - 테탐 스타일 레이아웃
             </h1>
             <p className="text-sm text-gray-600 mt-1">
-              영상 위, 노트/설정 영역 아래 + 우측 탭 구조
+              제목 아래 가로 탭, 비디오 플레이어, 설정 영역 순서 배치
             </p>
           </div>
 
@@ -1026,6 +1026,41 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
           </div>
         </div>
       </div>
+
+      {/* 가로 탭 네비게이션 - 제목 아래 배치 */}
+      {!isFullscreen && (
+        <div className="bg-white border-b">
+          <div className="flex items-center overflow-x-auto">
+            {/* 설정 탭 (별도) */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex flex-col items-center justify-center px-4 py-4 text-xs transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-800 border-b-2 border-transparent hover:border-gray-300 whitespace-nowrap min-w-[80px]"
+            >
+              <Settings className="w-6 h-6 mb-2" />
+              <span>설정</span>
+            </button>
+
+            {/* 일반 탭들 */}
+            {tabConfig.filter(tab => tab.visible).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex flex-col items-center justify-center px-4 py-4 text-xs transition-colors border-b-2 whitespace-nowrap min-w-[80px] ${
+                  activeTab === tab.id
+                    ? 'bg-blue-50 text-blue-600 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800 border-transparent hover:border-gray-300'
+                }`}
+              >
+                {tab.id === 'note' && <Type className="w-6 h-6 mb-2" />}
+                {tab.id === 'size' && <Sliders className="w-6 h-6 mb-2" />}
+                {tab.id === 'color' && <Palette className="w-6 h-6 mb-2" />}
+                {tab.id === 'time' && <Clock className="w-6 h-6 mb-2" />}
+                <span>{tab.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 영상 검색 및 YouTube 플레이어 영역 */}
       <div className="relative bg-black flex justify-center">
@@ -1115,45 +1150,12 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
       </div>
 
-      {/* 하단 노트/설정 영역 + 탭 - 전체화면에서는 숨김 */}
-      {!isFullscreen && <div className="flex flex-1">
-        {/* 노트/설정 작업 영역 (90%) */}
+      {/* 하단 노트/설정 영역 - 전체화면에서는 숨김 */}
+      {!isFullscreen && (
         <div className="flex-1 p-4 bg-white overflow-y-auto">
           {renderTabContent()}
         </div>
-
-        {/* 우측 탭 버튼들 (10%) */}
-        <div className="w-20 bg-gray-800 flex flex-col">
-          {/* 설정 탭 (별도) */}
-          <button
-            onClick={() => setShowSettings(true)}
-            className="flex flex-col items-center justify-center py-4 text-xs transition-colors text-gray-300 hover:bg-gray-700 hover:text-white"
-          >
-            <Settings className="w-6 h-6 mb-1" />
-            <span>설정</span>
-          </button>
-
-          {/* 일반 탭들 */}
-          {tabConfig.filter(tab => tab.visible).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex flex-col items-center justify-center py-4 text-xs transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-700 hover:text-white'
-              }`}
-            >
-              {tab.id === 'note' && <Type className="w-6 h-6 mb-1" />}
-              {tab.id === 'size' && <Sliders className="w-6 h-6 mb-1" />}
-              {tab.id === 'color' && <Palette className="w-6 h-6 mb-1" />}
-              {tab.id === 'time' && <Clock className="w-6 h-6 mb-1" />}
-              <span>{tab.name}</span>
-            </button>
-          ))}
-        </div>
-
-      </div>}
+      )}
 
       {/* 탭 설정 모달 */}
       <TabLayoutSettings
