@@ -356,7 +356,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
       player.seekTo(overlay.startTime);
     }
 
-    setActiveTab('note');
+    // setActiveTab('note'); // 편집 시 탭 이동하지 않음
   };
 
   // 오버레이 삭제
@@ -951,7 +951,14 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                   <div key={overlay.id} className="p-2 bg-gray-50 rounded text-sm">
                     <div className="font-medium truncate">{overlay.text}</div>
                     <div className="text-xs text-gray-500">
-                      {overlay.startTime.toFixed(2)}초 → {(overlay.startTime + overlay.duration).toFixed(2)}초
+                      {overlay.startTime.toFixed(2)}초 → {(overlay.startTime + overlay.duration).toFixed(2)}초 | <span className="bg-gray-200 px-1 rounded text-gray-800">좌표값 ({(overlay.coordinates?.x || 50).toFixed(2)}%, {(overlay.coordinates?.y || 90).toFixed(2)}%)</span> | {overlay.style?.textAlign || 'left'}_정렬 | 불투명도({(() => {
+                        const bgColor = overlay.style?.backgroundColor || '#00000080';
+                        if (bgColor.length === 9) {
+                          const alpha = parseInt(bgColor.slice(7, 9), 16);
+                          return Math.round((alpha / 255) * 100);
+                        }
+                        return 0;
+                      })()}%)
                     </div>
                     <div className="flex gap-1 mt-1">
                       <button
