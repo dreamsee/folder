@@ -551,41 +551,208 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
         );
 
       case 'coordinateInput':
-        return (
-          <div key={featureId} className="space-y-3">
-            <h4 className="font-medium">좌표 직접 입력</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  X 좌표 (0-100%)
-                </label>
-                <input
-                  type="number"
-                  value={coordinates.x}
-                  onChange={(e) => setCoordinates({ ...coordinates, x: Number(e.target.value) })}
-                  min={0}
-                  max={100}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="50"
-                />
+        // 좌표 입력 컴포넌트 (시간 입력과 유사한 구조)
+        const CoordinateInput = ({
+          label,
+          value,
+          onChange,
+          axis
+        }: {
+          label: string;
+          value: number;
+          onChange: (newValue: number) => void;
+          axis: 'x' | 'y';
+        }) => {
+          // 좌표를 xx.yy 형태로 분해 (소수점 2자리)
+          const tens = Math.floor(value / 10) % 10;
+          const ones = Math.floor(value) % 10;
+          const tenths = Math.floor((value % 1) * 10);
+          const hundredths = Math.floor(((value % 1) * 100) % 10);
+
+          const handleChange = (field: 'tens' | 'ones' | 'tenths' | 'hundredths', newValue: number) => {
+            let newCoordinate = value;
+
+            switch (field) {
+              case 'tens':
+                newCoordinate = (newValue * 10) + ones + (tenths * 0.1) + (hundredths * 0.01);
+                break;
+              case 'ones':
+                newCoordinate = (tens * 10) + newValue + (tenths * 0.1) + (hundredths * 0.01);
+                break;
+              case 'tenths':
+                newCoordinate = (tens * 10) + ones + (newValue * 0.1) + (hundredths * 0.01);
+                break;
+              case 'hundredths':
+                newCoordinate = (tens * 10) + ones + (tenths * 0.1) + (newValue * 0.01);
+                break;
+            }
+
+            // 0-100 범위 제한
+            newCoordinate = Math.max(0, Math.min(100, newCoordinate));
+            onChange(newCoordinate);
+          };
+
+          const handleIncrement = (field: 'tens' | 'ones' | 'tenths' | 'hundredths', max: number) => {
+            const currentValues = { tens, ones, tenths, hundredths };
+            const currentValue = currentValues[field];
+            const newValue = currentValue >= max ? 0 : currentValue + 1;
+            handleChange(field, newValue);
+          };
+
+          const handleDecrement = (field: 'tens' | 'ones' | 'tenths' | 'hundredths', max: number) => {
+            const currentValues = { tens, ones, tenths, hundredths };
+            const currentValue = currentValues[field];
+            const newValue = currentValue <= 0 ? max : currentValue - 1;
+            handleChange(field, newValue);
+          };
+
+          // 8가지 다른 화살표 스타일 (X, Y 모두 동일한 스타일)
+          const arrowStyles = {
+            x: {
+              tens: { up: '▲', down: '▼' },      // 1. 기본 삼각형
+              ones: { up: '↑', down: '↓' },      // 2. 일반 화살표
+              tenths: { up: '⬆', down: '⬇' },   // 3. 굵은 화살표
+              hundredths: { up: '🔺', down: '🔻' } // 4. 이모지 삼각형
+            },
+            y: {
+              tens: { up: '⬆', down: '⬇' },     // 10의자리: 굵은 화살표
+              ones: { up: '🔺', down: '🔻' },    // 1의자리: 이모지
+              tenths: { up: '▲', down: '▼' },   // 소수1자리: 기본 삼각형
+              hundredths: { up: '↑', down: '↓' } // 소수2자리: 일반 화살표
+            }
+          };
+
+          const currentArrows = arrowStyles[axis];
+
+          return (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{label}</span>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Y 좌표 (0-100%)
-                </label>
-                <input
-                  type="number"
-                  value={coordinates.y}
-                  onChange={(e) => setCoordinates({ ...coordinates, y: Number(e.target.value) })}
-                  min={0}
-                  max={100}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="90"
-                />
+              <div className="flex items-center gap-1">
+                {/* 10의 자리 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('tens', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.tens.up}
+                  </button>
+                  <input
+                    type="number"
+                    value={tens}
+                    onChange={(e) => handleChange('tens', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('tens', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.tens.down}
+                  </button>
+                </div>
+
+                {/* 1의 자리 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('ones', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.ones.up}
+                  </button>
+                  <input
+                    type="number"
+                    value={ones}
+                    onChange={(e) => handleChange('ones', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('ones', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.ones.down}
+                  </button>
+                </div>
+
+                <span className="font-bold">.</span>
+
+                {/* 0.1의 자리 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('tenths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.tenths.up}
+                  </button>
+                  <input
+                    type="number"
+                    value={tenths}
+                    onChange={(e) => handleChange('tenths', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('tenths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.tenths.down}
+                  </button>
+                </div>
+
+                {/* 0.01의 자리 */}
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={() => handleIncrement('hundredths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.hundredths.up}
+                  </button>
+                  <input
+                    type="number"
+                    value={hundredths}
+                    onChange={(e) => handleChange('hundredths', Math.min(9, Math.max(0, parseInt(e.target.value) || 0)))}
+                    className="w-8 h-8 text-center border rounded"
+                    min="0"
+                    max="9"
+                  />
+                  <button
+                    onClick={() => handleDecrement('hundredths', 9)}
+                    className="w-8 h-6 text-xs bg-gray-200 hover:bg-gray-300 rounded"
+                  >
+                    {currentArrows.hundredths.down}
+                  </button>
+                </div>
+
+                <span className="text-sm ml-2">% = {value.toFixed(2)}%</span>
               </div>
             </div>
-            <div className="text-xs text-gray-500">
-              현재 위치: ({coordinates.x}%, {coordinates.y}%)
+          );
+        };
+
+        return (
+          <div key={featureId} className="space-y-4">
+            <h4 className="font-medium">좌표 직접 입력</h4>
+            <div className="flex flex-wrap gap-6">
+              <CoordinateInput
+                label="X 좌표 (0-100%)"
+                value={coordinates.x}
+                onChange={(newValue) => setCoordinates({ ...coordinates, x: newValue })}
+                axis="x"
+              />
+              <CoordinateInput
+                label="Y 좌표 (0-100%)"
+                value={coordinates.y}
+                onChange={(newValue) => setCoordinates({ ...coordinates, y: newValue })}
+                axis="y"
+              />
+            </div>
+            <div className="text-sm text-gray-600 text-center">
+              현재 위치: ({coordinates.x.toFixed(2)}%, {coordinates.y.toFixed(2)}%)
             </div>
           </div>
         );
@@ -928,8 +1095,11 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
         return (
           <div key={featureId} className="space-y-4">
-            <TimeInput label="시작 시간" time={startTime} setTime={setStartTime} />
-            <TimeInput label="종료 시간" time={endTime} setTime={setEndTime} />
+            {/* 좌우 배치된 시간 입력 */}
+            <div className="flex flex-wrap gap-6">
+              <TimeInput label="시작 시간" time={startTime} setTime={setStartTime} />
+              <TimeInput label="종료 시간" time={endTime} setTime={setEndTime} />
+            </div>
 
             <div className="text-sm text-gray-600">
               <p>현재 시간: {formatTime(currentTime)}</p>
@@ -951,7 +1121,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
                   <div key={overlay.id} className="p-2 bg-gray-50 rounded text-sm">
                     <div className="font-medium truncate">{overlay.text}</div>
                     <div className="text-xs text-gray-500">
-                      {overlay.startTime.toFixed(2)}초 → {(overlay.startTime + overlay.duration).toFixed(2)}초 | <span className="bg-gray-200 px-1 rounded text-gray-800">좌표값 ({(overlay.coordinates?.x || 50).toFixed(2)}%, {(overlay.coordinates?.y || 90).toFixed(2)}%)</span> | {overlay.style?.textAlign || 'left'}_정렬 | 불투명도({(() => {
+                      {overlay.startTime.toFixed(2)}초 → {(overlay.startTime + overlay.duration).toFixed(2)}초 | <span className="bg-gray-200 px-1 rounded text-gray-800">좌표값 ({(overlay.coordinates?.x || 50).toFixed(2)}%, {(overlay.coordinates?.y || 90).toFixed(2)}%)</span> | {overlay.style?.textAlign || 'left'}_정렬 • 불투명도({(() => {
                         const bgColor = overlay.style?.backgroundColor || '#00000080';
                         if (bgColor.length === 9) {
                           const alpha = parseInt(bgColor.slice(7, 9), 16);
