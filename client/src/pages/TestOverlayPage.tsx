@@ -6,6 +6,7 @@ import YouTubePlayer from '../components/YouTubePlayer';
 import { OverlayData } from '../components/TextOverlay';
 import TextOverlay from '../components/TextOverlay';
 import TabLayoutSettings from '../components/TabLayoutSettings';
+import SimpleTabSettings from '../components/SimpleTabSettings';
 import { formatTime } from '../lib/youtubeUtils';
 import { Type, Palette, Clock, Sliders, Settings, Maximize, Minimize } from 'lucide-react';
 
@@ -88,6 +89,17 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   ]);
   const [activeTab, setActiveTab] = useState('settings');
   const [showSettings, setShowSettings] = useState(false);
+  const [tabPosition, setTabPosition] = useState<'top' | 'right'>(() => {
+    // localStorage에서 탭 위치 불러오기
+    const saved = localStorage.getItem('overlayTabPosition');
+    return (saved === 'right' ? 'right' : 'top') as 'top' | 'right';
+  });
+
+  // 탭 위치 변경 핸들러
+  const handleTabPositionChange = (position: 'top' | 'right') => {
+    setTabPosition(position);
+    localStorage.setItem('overlayTabPosition', position);
+  };
 
   // 화면 크기 조절
   const [screenScale, setScreenScale] = useState(100);
@@ -1204,8 +1216,8 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
         </div>
       </div>
 
-      {/* 가로 탭 네비게이션 - 제목 아래 배치 */}
-      {!isFullscreen && (
+      {/* 탭 네비게이션 - 위치에 따라 상단 또는 오른쪽 배치 */}
+      {!isFullscreen && tabPosition === 'top' && (
         <div className="bg-white border-b">
           <div className="flex items-center overflow-x-auto">
             {/* 설정 탭 (별도) */}
@@ -1327,19 +1339,61 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
       </div>
 
-      {/* 하단 노트/설정 영역 - 전체화면에서는 숨김 */}
-      {!isFullscreen && (
+      {/* 메인 컨텐츠 영역 - 탭 위치에 따라 레이아웃 변경 */}
+      {!isFullscreen && tabPosition === 'right' ? (
+        // 오른쪽 탭 레이아웃
+        <div className="flex-1 flex">
+          {/* 왼쪽: 컨텐츠 영역 */}
+          <div className="flex-1 p-4 bg-white overflow-y-auto">
+            {renderTabContent()}
+          </div>
+
+          {/* 오른쪽: 세로 탭 메뉴 */}
+          <div className="w-20 bg-gray-50 border-l flex flex-col">
+            {/* 설정 탭 */}
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex flex-col items-center justify-center py-4 text-xs transition-colors text-gray-600 hover:bg-gray-100 hover:text-gray-800 border-l-2 border-transparent hover:border-gray-300"
+            >
+              <Settings className="w-6 h-6 mb-1" />
+              <span>설정</span>
+            </button>
+
+            {/* 일반 탭들 */}
+            {tabConfig.filter(tab => tab.visible).map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex flex-col items-center justify-center py-4 text-xs transition-colors border-l-2 ${
+                  activeTab === tab.id
+                    ? 'bg-blue-50 text-blue-600 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800 border-transparent hover:border-gray-300'
+                }`}
+              >
+                {tab.id === 'note' && <Type className="w-6 h-6 mb-1" />}
+                {tab.id === 'size' && <Sliders className="w-6 h-6 mb-1" />}
+                {tab.id === 'color' && <Palette className="w-6 h-6 mb-1" />}
+                {tab.id === 'time' && <Clock className="w-6 h-6 mb-1" />}
+                <span>{tab.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : tabPosition === 'top' ? (
+        // 상단 탭 레이아웃 (기본)
         <div className="flex-1 p-4 bg-white overflow-y-auto">
           {renderTabContent()}
         </div>
-      )}
+      ) : null}
 
-      {/* 탭 설정 모달 */}
-      <TabLayoutSettings
+      {/* 탭 설정 모달 - SimpleTabSettings로 변경 */}
+      <SimpleTabSettings
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
+        currentConfig={tabConfig}  // prop 이름 통일
         onSave={handleTabConfigSave}
-        currentConfig={tabConfig}
+        tabPosition={tabPosition}
+        onPositionChange={handleTabPositionChange}
       />
     </div>
   );

@@ -28,6 +28,7 @@ UI 컴포넌트:
 - client/src/components/CoordinateInput.tsx: 좌표 입력
 - client/src/components/PositionGrid.tsx: 위치 그리드
 - client/src/components/TabLayoutSettings.tsx: 탭 레이아웃 설정 모달 (기능 재배치, 탭명 변경, 표시/숨김)
+- client/src/components/SimpleTabSettings.tsx: 간단한 탭 설정 모달 (탭 위치 상/우, 기능 순서 변경)
 
 녹화 기능:
 - client/src/components/RecordingMode.tsx: 녹화 모드
@@ -113,6 +114,14 @@ UI 컴포넌트:
 - TextOverlay.tsx:268 텍스트 자동 줄바꿈 방지 (width: max-content로 텍스트 길이에 맞춰 자동 폭 조정)
 - TestOverlayPage.tsx:747-763 커스텀 진행바 (클릭 탐색, 전체화면 지원)
 - TabLayoutSettings.tsx:전체컴포넌트 탭 커스터마이징 모달 (기능 재배치, 탭명 변경, 표시/숨김)
+- SimpleTabSettings.tsx:전체컴포넌트 간단한 탭 설정 모달 (탭 위치 상/우, 기능 순서 변경)
+- SimpleTabSettings.tsx:71-73 탭 위치 설정 버튼 (상단/오른쪽)
+- SimpleTabSettings.tsx:37-61 기능 위/아래/다른 탭으로 이동 함수
+- SimpleTabSettings.tsx:99-117 기능 이름 매핑 (실제 UI 제목과 일치)
+- TestOverlayPage.tsx:92-97 탭 위치 상태 관리 (localStorage 저장/복원)
+- TestOverlayPage.tsx:1220-1252 상단 탭 레이아웃 (tabPosition === 'top')
+- TestOverlayPage.tsx:1343-1387 오른쪽 탭 레이아웃 (tabPosition === 'right')
+- TestOverlayPage.tsx:1390-1396 SimpleTabSettings 컴포넌트 연결
 → 수정 시 주의:
   1. 시간 입력은 4자리 분해 방식 (tens/ones/tenths/hundredths)으로 관리
   2. getTimeInSeconds() 함수로 4자리 값을 초 단위로 변환 필수
@@ -128,6 +137,8 @@ UI 컴포넌트:
   12. 전체화면에서 screenScale 무시하여 일관된 텍스트 크기 유지
   13. 텍스트 자동 줄바꿈 방지로 의도하지 않은 줄바꿈 차단 (width: max-content 적용)
   14. 탭 설정 모달 복구 완료 (모바일 안정성 확보)
+  15. SimpleTabSettings와 TabLayoutSettings는 동일한 prop 인터페이스 사용 (currentConfig, onSave)
+  16. 탭 위치는 localStorage에 'overlayTabPosition'으로 저장 (top/right)
 
 🎬 영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가
