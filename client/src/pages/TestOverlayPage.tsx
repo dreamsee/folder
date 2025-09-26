@@ -110,7 +110,7 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
   const [fontSize, setFontSize] = useState(20);
   const [textColor, setTextColor] = useState("#FFFFFF");
   const [bgColor, setBgColor] = useState("#000000");
-  const [bgOpacity, setBgOpacity] = useState(80);
+  const [bgOpacity, setBgOpacity] = useState(0);
   const [padding, setPadding] = useState(10);
   const [overlayDuration, setOverlayDuration] = useState(5);
   const [rotation, setRotation] = useState(0);
@@ -322,7 +322,6 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
 
     // 입력 필드 초기화
     setOverlayText("");
-    setActiveTab('note');
   };
 
   // 오버레이 편집
@@ -386,10 +385,9 @@ const TestOverlayPage: React.FC<TestOverlayPageProps> = () => {
     setOverlayText("");
     setCoordinates({ x: 50, y: 90, unit: "%" });
     setBgColor("#000000");
-    setBgOpacity(80);
+    setBgOpacity(0);
     setTextAlign('left');
     setRotation(0);
-    setActiveTab('note');
   };
 
   // localStorage에서 탭 설정 로드
