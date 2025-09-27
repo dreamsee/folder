@@ -291,7 +291,7 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
     scale: 2,
     startTime: 0,
     endTime: 10,
-    border: { enabled: true, width: 2, color: '#FF0000' },
+    border: { enabled: true, width: 2, color: '#FF0000' }, // 항상 테두리 활성화
     isActive: true
   });
 
@@ -343,9 +343,10 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
           setIsZoomActive(false);
         }
       } else if (showPanel) {
-        // 패널이 열려있으면 자동 줌 비활성화
+        // 패널이 열려있을 때는 자동 줌 설정을 비활성화하지만
+        // 수동으로 체크한 화면 확대는 유지
         setActiveZoomConfig(null);
-        setIsZoomActive(false);
+        // setIsZoomActive(false); // 이 줄 제거하여 수동 확대는 유지
       }
     }, 100);
 
@@ -359,9 +360,20 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
       if (player && isPlaying) {
         player.pauseVideo();
       }
-      setPreviewActive(true);
+
+      // 현재 재생 시간을 시작 시간으로, +1초를 종료 시간으로 설정
+      const current = player ? player.getCurrentTime() : 0;
+      setCurrentConfig(prev => ({
+        ...prev,
+        startTime: current,
+        endTime: current + 1
+      }));
+
+      setPreviewActive(false);  // 패널 열 때는 화면 확대 체크 해제
+      setIsZoomActive(false);    // 확대도 해제
     } else {
       setPreviewActive(false);
+      setIsZoomActive(false);
     }
     setShowPanel(!showPanel);
   };
@@ -443,37 +455,6 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
     );
   };
 
-  // 줌 영역 표시 (편집 모드 시) - 네모 영역으로 표시
-  const renderZoomArea = () => {
-    if (!showPanel) return null;
-
-    // 줌 배율에 반비례하는 영역 크기 계산
-    // 플레이어 실제 크기를 동적으로 가져오거나 기본값 사용
-    const containerRect = playerContainerRef.current?.getBoundingClientRect();
-    const baseWidth = containerRect?.width || 800;
-    const baseHeight = containerRect?.height || 450;
-    const scale = currentConfig.scale;
-
-    // 줌 배율에 반비례하는 크기 (2배 줌이면 절반 크기, 8배 줌이면 1/8 크기)
-    const areaWidth = baseWidth / scale;
-    const areaHeight = baseHeight / scale;
-
-    return (
-      <div
-        style={{
-          position: 'absolute',
-          left: `${currentConfig.centerPoint.x}px`, // 좌상단 모서리가 좌표 위치
-          top: `${currentConfig.centerPoint.y}px`,   // 좌상단 모서리가 좌표 위치
-          width: `${areaWidth}px`,
-          height: `${areaHeight}px`,
-          border: '2px solid #FF0000',
-          backgroundColor: 'rgba(255, 0, 0, 0.1)',
-          pointerEvents: 'none',
-          zIndex: 10
-        }}
-      />
-    );
-  };
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
@@ -506,8 +487,6 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
             바설정={{ 커스텀바: false, 챕터바: false }}
           />
 
-          {/* 줌 영역 표시 (편집 모드) */}
-          {renderZoomArea()}
 
           {/* 좌측 하단 컨트롤 버튼 */}
           <button
@@ -619,24 +598,52 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
             <CoordinateArrowControl
               x={currentConfig.centerPoint.x}
               y={currentConfig.centerPoint.y}
-              onXChange={(x) => setCurrentConfig(prev => ({
-                ...prev,
-                centerPoint: { ...prev.centerPoint, x }
-              }))}
-              onYChange={(y) => setCurrentConfig(prev => ({
-                ...prev,
-                centerPoint: { ...prev.centerPoint, y }
-              }))}
+              onXChange={(x) => {
+                setCurrentConfig(prev => ({
+                  ...prev,
+                  centerPoint: { ...prev.centerPoint, x }
+                }));
+                // 화면 확대가 체크되어 있으면 즉시 반영
+                if (previewActive) {
+                  setZoomTransform(prev => ({
+                    ...prev,
+                    originX: x
+                  }));
+                }
+              }}
+              onYChange={(y) => {
+                setCurrentConfig(prev => ({
+                  ...prev,
+                  centerPoint: { ...prev.centerPoint, y }
+                }));
+                // 화면 확대가 체크되어 있으면 즉시 반영
+                if (previewActive) {
+                  setZoomTransform(prev => ({
+                    ...prev,
+                    originY: y
+                  }));
+                }
+              }}
               maxX={800}
               maxY={450}
             />
 
             <select
               value={currentConfig.scale}
-              onChange={(e) => setCurrentConfig(prev => ({
-                ...prev,
-                scale: Number(e.target.value)
-              }))}
+              onChange={(e) => {
+                const newScale = Number(e.target.value);
+                setCurrentConfig(prev => ({
+                  ...prev,
+                  scale: newScale
+                }));
+                // 화면 확대가 체크되어 있으면 즉시 반영
+                if (previewActive) {
+                  setZoomTransform(prev => ({
+                    ...prev,
+                    scale: newScale
+                  }));
+                }
+              }}
               className="w-full px-2 py-1 border rounded text-sm"
             >
               <option value="1.5">1.5x</option>
@@ -656,14 +663,27 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                checked={currentConfig.border.enabled}
-                onChange={(e) => setCurrentConfig(prev => ({
-                  ...prev,
-                  border: { ...prev.border, enabled: e.target.checked }
-                }))}
+                checked={previewActive}
+                onChange={(e) => {
+                  const isChecked = e.target.checked;
+                  setPreviewActive(isChecked);
+
+                  if (isChecked) {
+                    // 체크 시 즉시 화면 확대 적용
+                    setZoomTransform({
+                      scale: currentConfig.scale,
+                      originX: currentConfig.centerPoint.x,
+                      originY: currentConfig.centerPoint.y
+                    });
+                    setIsZoomActive(true);
+                  } else {
+                    // 체크 해제 시 원래 크기로 복귀
+                    setIsZoomActive(false);
+                  }
+                }}
                 className="rounded"
               />
-              테두리
+              <span className="text-sm">화면 확대</span>
             </label>
           </div>
 
@@ -680,13 +700,22 @@ const TestZoomPage: React.FC<TestZoomPageProps> = () => {
                 );
 
                 if (existingIndex !== -1) {
-                  // 기존 설정 덮어쓰기
+                  // 기존 설정 덮어쓰기 (테두리 항상 활성화)
                   setSavedConfigs(prev => prev.map((config, index) =>
-                    index === existingIndex ? { ...currentConfig, id: config.id } : config
+                    index === existingIndex ? {
+                      ...currentConfig,
+                      id: config.id,
+                      border: { ...currentConfig.border, enabled: true }
+                    } : config
                   ));
                 } else {
-                  // 새 설정 추가
-                  setSavedConfigs(prev => [...prev, { ...currentConfig, id: Date.now().toString(), isActive: true }]);
+                  // 새 설정 추가 (테두리 항상 활성화)
+                  setSavedConfigs(prev => [...prev, {
+                    ...currentConfig,
+                    id: Date.now().toString(),
+                    isActive: true,
+                    border: { ...currentConfig.border, enabled: true }
+                  }]);
                 }
 
                 togglePanel();

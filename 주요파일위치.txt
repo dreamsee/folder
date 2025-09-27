@@ -49,6 +49,7 @@ UI 컴포넌트:
 - client/src/pages/TestSharePage.tsx: 댓글 시스템 테스트 페이지
 - client/src/pages/TestTimestampPage.tsx: 타임스탬프 기능 테스트 페이지
 - client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 고급 테스트 페이지 (좌표 입력, 정렬, 전체화면, 커스텀 진행바)
+- client/src/pages/TestZoomPage.tsx: 화면 확대 테스트 페이지 (CSS transform 기반 줌)
 
 서버:
 - server/index.ts: Express 서버 메인
@@ -204,6 +205,31 @@ UI 컴포넌트:
 - NoteArea.tsx:lastActiveIndex lastActiveIndex 상태 (타임스탬프 우선순위)
 - NoteArea.tsx:우선순위검색로직 우선순위 기반 타임스탬프 검색
 - NoteArea.tsx:수동이동시우선순위재설정 수동 이동시 우선순위 재설정
+
+🔍 화면 확대 시스템:
+- TestZoomPage.tsx:전체컴포넌트 CSS transform 기반 화면 확대 테스트
+- TestZoomPage.tsx:287-296 초기 확대 설정 상태 (centerPoint, scale, startTime, endTime)
+- TestZoomPage.tsx:357-379 togglePanel() 패널 열기/닫기 (현재 시간을 시작시간으로 자동 설정)
+- TestZoomPage.tsx:365-369 패널 열 때 현재 시간 → 시작시간, +1초 → 종료시간
+- TestZoomPage.tsx:586-617 CoordinateArrowControl 좌표 실시간 변경 (화면 확대 체크시 즉시 반영)
+- TestZoomPage.tsx:619-641 배율 선택 드롭다운 (1.5x, 2x, 3x, 4x)
+- TestZoomPage.tsx:623-646 화면 확대 체크박스 (체크시 실시간 확대/축소)
+- TestZoomPage.tsx:631-638 체크시 현재 설정으로 즉시 확대 적용
+- TestZoomPage.tsx:640-641 체크 해제시 원래 크기로 복귀
+- TestZoomPage.tsx:402-444 generateZoomStyle() CSS transform 스타일 생성
+- TestZoomPage.tsx:422-424 iframe에 scale과 transform-origin 적용
+- TestZoomPage.tsx:310-350 시간 기반 자동 확대 시스템 (저장된 설정)
+- TestZoomPage.tsx:345-349 패널 열려있을 때 자동 확대 비활성화 (수동 확대는 유지)
+- TestZoomPage.tsx:19-113 TimeArrowControl 컴포넌트 (분/초 화살표 입력)
+- TestZoomPage.tsx:125-245 CoordinateArrowControl 컴포넌트 (X/Y 좌표 화살표 입력)
+- TestZoomPage.tsx:248-266 ZoomConfig 인터페이스 (확대 설정 데이터 구조)
+→ 수정 시 주의:
+  1. 패널 열 때 현재 재생 시간이 자동으로 시작 시간이 됨
+  2. 화면 확대 체크박스로 실시간 미리보기 가능
+  3. 좌표나 배율 변경시 체크된 상태면 즉시 반영
+  4. 패널이 열려있어도 수동 확대는 유지됨
+  5. CSS transform-origin으로 확대 중심점 설정
+  6. 저장된 설정은 패널이 닫혀있을 때만 자동 적용
 
 === 3. 댓글 시스템 기능별 코드 위치 ===
 
