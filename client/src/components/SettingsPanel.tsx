@@ -25,6 +25,7 @@ export interface UISettings {
   };
   재생컨트롤: {
     전체표시: boolean;
+    플레이어내장: boolean;
     볼륨: boolean;
     속도: boolean;
     녹화: boolean;
@@ -200,7 +201,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
     검색창: { 유지: true, 목록유지: false },
     바설정: { 커스텀바: true, 챕터바: true },
-    재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
+    재생컨트롤: { 전체표시: true, 플레이어내장: false, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
@@ -637,14 +638,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <div className="space-y-3">
             <div className="flex justify-between items-center pb-2">
               <div className="flex flex-col">
-                <h3 className="text-sm font-medium">재생 컨트롤</h3>
-                <span className="text-xs text-gray-500">(영상 건너뛰기)</span>
+                <h3 className="text-sm font-medium">
+                  {settings.재생컨트롤.전체표시 ? "재생 컨트롤" : "플레이어 내장"}
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {settings.재생컨트롤.전체표시 ? "(영상 건너뛰기)" : "버튼 클릭으로 컨트롤 표시"}
+                </span>
               </div>
               <Switch
                 checked={settings.재생컨트롤.전체표시}
                 onCheckedChange={(값) => 설정업데이트("재생컨트롤", "전체표시", 값)}
               />
             </div>
+
+
             {settings.재생컨트롤.전체표시 && (
               <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4">
                 <div className="flex justify-around items-start">

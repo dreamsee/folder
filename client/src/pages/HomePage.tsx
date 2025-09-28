@@ -322,6 +322,7 @@ const HomePage = () => {
           setCurrentRate={setCurrentRate}
           바설정={uiSettings.바설정}
           currentTime={currentPlayTime}
+          uiSettings={uiSettings}
         />
       </div>
 

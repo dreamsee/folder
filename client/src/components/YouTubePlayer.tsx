@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Maximize2, Minimize2, Settings2, Play, Pause, Volume2, RotateCw, Mic } from "lucide-react";
 import TextOverlay, { OverlayData, Coordinates } from "./TextOverlay";
 import ChapterBar from "./ChapterBar";
 import { parseChapters, parseDuration, Chapter } from "@/utils/chapterParser";
@@ -27,6 +29,12 @@ interface YouTubePlayerProps {
     챕터바: boolean;
   };
   currentTime?: number; // 현재 재생 시간 (HomePage에서 전달)
+  uiSettings?: {
+    재생컨트롤: {
+      전체표시: boolean;
+      플레이어내장: boolean;
+    };
+  };
 }
 
 const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
@@ -44,6 +52,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   magnifierSettings = { enabled: true, zoom: 2.0, size: 2 },
   바설정 = { 커스텀바: true, 챕터바: true },
   currentTime: propCurrentTime = 0, // 외부에서 전달된 현재 시간
+  uiSettings
 }) => {
   const [availableRates, setAvailableRates] = useState<number[]>([]);
   const [currentRate, setCurrentRate] = useState(1);
@@ -54,13 +63,84 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  
+
+  // 전체화면 상태
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // 재생 컨트롤 모달 상태
+  const [isControlsModalOpen, setIsControlsModalOpen] = useState(false);
+
+  // 컨트롤 패널의 볼륨과 속도 상태
+  const [currentVolume, setCurrentVolume] = useState(100);
+  const [currentSpeed, setCurrentSpeed] = useState(1.0);
+
   // 터치 홀드 확대 상태
   const [isTouchHolding, setIsTouchHolding] = useState(false);
   const [touchPosition, setTouchPosition] = useState({ x: 0, y: 0 });
   const [isMobile, setIsMobile] = useState(false);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
+
+  // 전체화면 토글 함수
+  const toggleFullscreen = async () => {
+    if (!playerContainerRef.current) return;
+
+    try {
+      if (!isFullscreen) {
+        // 전체화면 진입
+        if (playerContainerRef.current.requestFullscreen) {
+          await playerContainerRef.current.requestFullscreen();
+        } else if ((playerContainerRef.current as any).webkitRequestFullscreen) {
+          await (playerContainerRef.current as any).webkitRequestFullscreen();
+        } else if ((playerContainerRef.current as any).mozRequestFullScreen) {
+          await (playerContainerRef.current as any).mozRequestFullScreen();
+        } else if ((playerContainerRef.current as any).msRequestFullscreen) {
+          await (playerContainerRef.current as any).msRequestFullscreen();
+        }
+      } else {
+        // 전체화면 종료
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if ((document as any).webkitExitFullscreen) {
+          await (document as any).webkitExitFullscreen();
+        } else if ((document as any).mozCancelFullScreen) {
+          await (document as any).mozCancelFullScreen();
+        } else if ((document as any).msExitFullscreen) {
+          await (document as any).msExitFullscreen();
+        }
+      }
+    } catch (error) {
+      console.error('전체화면 토글 실패:', error);
+      showNotification('전체화면 전환에 실패했습니다.', 'error');
+    }
+  };
+
+  // 전체화면 상태 변화 감지
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!(
+        document.fullscreenElement ||
+        (document as any).webkitFullscreenElement ||
+        (document as any).mozFullScreenElement ||
+        (document as any).msFullscreenElement
+      );
+      setIsFullscreen(isCurrentlyFullscreen);
+    };
+
+    // 전체화면 변화 이벤트 리스너 등록
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+    return () => {
+      // 정리
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+      document.removeEventListener('MSFullscreenChange', handleFullscreenChange);
+    };
+  }, []);
 
   // 재생/일시정지 토글 함수
   const togglePlayPause = () => {
@@ -447,10 +527,40 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       )}
 
       <div>
-        <div 
+        <div
           ref={playerContainerRef}
           className="relative w-full aspect-video bg-black youtube-player-container"
         >
+          {/* 재생 컨트롤 버튼 (좌측 하단) - 재생컨트롤.전체표시가 false일 때만 표시 */}
+          {!isLocked && !uiSettings?.재생컨트롤?.전체표시 && (
+            <Button
+              onClick={() => setIsControlsModalOpen(true)}
+              className="absolute bottom-4 left-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-20"
+              size="sm"
+              variant="ghost"
+              title="재생 컨트롤"
+            >
+              <Settings2 className="w-5 h-5" />
+            </Button>
+          )}
+
+          {/* 전체화면 버튼 */}
+          {!isLocked && (
+            <Button
+              onClick={toggleFullscreen}
+              className="absolute bottom-4 right-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-20"
+              size="sm"
+              variant="ghost"
+              title={isFullscreen ? "전체화면 종료" : "전체화면"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-5 h-5" />
+              ) : (
+                <Maximize2 className="w-5 h-5" />
+              )}
+            </Button>
+          )}
+
           <div id="player" className="w-full h-full">
             <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">
               <p>동영상을 검색해 주세요</p>
@@ -465,14 +575,97 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           />
           {/* 영상 잠금 오버레이 */}
           {isLocked && (
-            <div 
+            <div
               className="absolute inset-0 z-30 cursor-default"
-              style={{ 
+              style={{
                 pointerEvents: 'auto',
                 touchAction: 'none'
               }}
               title="화면이 잠금되었습니다"
             />
+          )}
+
+          {/* 컴팩트 재생 컨트롤 - 플레이어 내부에서 버튼 기준 위치 */}
+          {isControlsModalOpen && (
+            <div className="absolute bottom-2 left-2 z-30">
+              <div className="bg-black bg-opacity-80 text-white rounded-lg p-3 w-48 shadow-lg backdrop-blur-sm">
+
+                {/* 볼륨 조절 */}
+                <div className="flex items-center mb-2">
+                  <Volume2 className="w-4 h-4 mr-2" />
+                  <div className="flex-1 relative">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={currentVolume}
+                      className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      onChange={(e) => {
+                        const newVolume = parseInt(e.target.value);
+                        setCurrentVolume(newVolume);
+                        if (player && isPlayerReady) {
+                          player.setVolume(newVolume);
+                        }
+                      }}
+                      disabled={!player || !isPlayerReady}
+                    />
+                  </div>
+                  <span className="text-xs ml-2 w-10 text-right">{currentVolume}%</span>
+                </div>
+
+                {/* 속도 조절 */}
+                <div className="flex items-center mb-2">
+                  <RotateCw className="w-4 h-4 mr-2" />
+                  <div className="flex-1 relative">
+                    <input
+                      type="range"
+                      min="0.25"
+                      max="2.0"
+                      step="0.05"
+                      value={currentSpeed}
+                      className="w-full h-2 bg-gray-600 rounded-lg appearance-none cursor-pointer"
+                      onChange={(e) => {
+                        const newSpeed = parseFloat(e.target.value);
+                        setCurrentSpeed(newSpeed);
+                        if (player && isPlayerReady) {
+                          player.setPlaybackRate(newSpeed);
+                          setCurrentRate(newSpeed);
+                        }
+                      }}
+                      disabled={!player || !isPlayerReady}
+                    />
+                  </div>
+                  <span className="text-xs ml-2 w-12 text-right">{currentSpeed.toFixed(2)}x</span>
+                </div>
+
+                {/* 재생/일시정지 */}
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={togglePlayPause}
+                    disabled={!player || !isPlayerReady}
+                    className="flex items-center space-x-2 bg-white text-black px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    {isPlaying ? (
+                      <Pause className="w-4 h-4" />
+                    ) : (
+                      <Play className="w-4 h-4" />
+                    )}
+                    <span className="text-sm font-medium">
+                      {isPlaying ? '일시정지' : '재생'}
+                    </span>
+                  </button>
+
+                  {/* 닫기 버튼 */}
+                  <button
+                    onClick={() => setIsControlsModalOpen(false)}
+                    className="p-2 hover:bg-gray-600 rounded-lg transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       
@@ -554,6 +747,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           />
         </div>
       )}
+
       </div>
     </>
   );
