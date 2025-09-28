@@ -500,11 +500,16 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
   return (
     <>
-      {/* 전체 화면 확대 효과 */}
+      {/* 전체 화면 확대 효과 - 플레이어 컨테이너 iframe 타겟 */}
       {isMobile && isLocked && (
         <style>
           {`
-            body {
+            .youtube-player-container {
+              overflow: hidden;
+              position: relative;
+            }
+
+            .youtube-player-container iframe {
               transform: scale(${isTouchHolding ? magnifierSettings.zoom : 1});
               transform-origin: ${touchPosition.x}px ${touchPosition.y}px;
               transition: transform ${isTouchHolding ? '0.3s' : '0.2s'} ease-out;
@@ -532,10 +537,10 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           className="relative w-full aspect-video bg-black youtube-player-container"
         >
           {/* 재생 컨트롤 버튼 (좌측 하단) - 재생컨트롤.전체표시가 false일 때만 표시 */}
-          {!isLocked && !uiSettings?.재생컨트롤?.전체표시 && (
+          {uiSettings && !uiSettings.재생컨트롤?.전체표시 && (
             <Button
               onClick={() => setIsControlsModalOpen(true)}
-              className="absolute bottom-4 left-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-20"
+              className="absolute bottom-4 left-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40"
               size="sm"
               variant="ghost"
               title="재생 컨트롤"
@@ -545,21 +550,19 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           )}
 
           {/* 전체화면 버튼 */}
-          {!isLocked && (
-            <Button
-              onClick={toggleFullscreen}
-              className="absolute bottom-4 right-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-20"
-              size="sm"
-              variant="ghost"
-              title={isFullscreen ? "전체화면 종료" : "전체화면"}
-            >
-              {isFullscreen ? (
-                <Minimize2 className="w-5 h-5" />
-              ) : (
-                <Maximize2 className="w-5 h-5" />
-              )}
-            </Button>
-          )}
+          <Button
+            onClick={toggleFullscreen}
+            className="absolute bottom-4 right-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40"
+            size="sm"
+            variant="ghost"
+            title={isFullscreen ? "전체화면 종료" : "전체화면"}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="w-5 h-5" />
+            ) : (
+              <Maximize2 className="w-5 h-5" />
+            )}
+          </Button>
 
           <div id="player" className="w-full h-full">
             <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">
@@ -587,7 +590,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
           {/* 컴팩트 재생 컨트롤 - 플레이어 내부에서 버튼 기준 위치 */}
           {isControlsModalOpen && (
-            <div className="absolute bottom-2 left-2 z-30">
+            <div className="absolute bottom-2 left-2 z-50">
               <div className="bg-black bg-opacity-80 text-white rounded-lg p-3 w-48 shadow-lg backdrop-blur-sm">
 
                 {/* 볼륨 조절 */}
