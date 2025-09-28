@@ -76,7 +76,8 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
   // 터치 홀드 확대 상태
   const [isTouchHolding, setIsTouchHolding] = useState(false);
-  const [touchPosition, setTouchPosition] = useState({ x: 0, y: 0 });
+  const [touchPosition, setTouchPosition] = useState({ x: 0, y: 0 }); // 컨테이너 기준 상대 좌표 (iframe용)
+  const [overlayPosition, setOverlayPosition] = useState({ x: 0, y: 0 }); // 화면 기준 절대 좌표 (오버레이용)
   const [isMobile, setIsMobile] = useState(false);
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -388,16 +389,29 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
     const handleTouchStart = (e: TouchEvent) => {
       // 단일 터치만 처리
       if (e.touches.length !== 1) return;
-      
+
+      // 터치 타겟이 컨트롤 패널이나 버튼 요소인지 확인
+      const target = e.target as HTMLElement;
+      const isControlElement = target.closest('[data-control-panel="true"]') || // 컨트롤 패널
+                               target.closest('button') || // 버튼들
+                               target.closest('input'); // 슬라이더
+
+      // 컨트롤 요소면 터치홀드 스킵
+      if (isControlElement) return;
+
       const touch = e.touches[0];
       const rect = container.getBoundingClientRect();
-      
+
       // 터치가 영상 영역 안에서만 발생했는지 확인
       if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
           touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-        
-        setTouchPosition({ x: touch.clientX, y: touch.clientY });
-        
+
+        // 컨테이너 기준 상대 좌표로 변환 (iframe transform-origin용)
+        const relativeX = touch.clientX - rect.left;
+        const relativeY = touch.clientY - rect.top;
+        setTouchPosition({ x: relativeX, y: relativeY });
+        setOverlayPosition({ x: touch.clientX, y: touch.clientY });
+
         // 300ms 후 확대 시작
         touchTimerRef.current = setTimeout(() => {
           setIsTouchHolding(true);
@@ -414,11 +428,16 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         clearTimeout(touchTimerRef.current);
         touchTimerRef.current = null;
       }
-      
+
       // 이미 확대 중이면 터치 위치 업데이트
       if (isTouchHolding && e.touches.length === 1) {
         const touch = e.touches[0];
-        setTouchPosition({ x: touch.clientX, y: touch.clientY });
+        const rect = container.getBoundingClientRect();
+        // 컨테이너 기준 상대 좌표로 변환
+        const relativeX = touch.clientX - rect.left;
+        const relativeY = touch.clientY - rect.top;
+        setTouchPosition({ x: relativeX, y: relativeY });
+        setOverlayPosition({ x: touch.clientX, y: touch.clientY });
       }
     };
 
@@ -444,7 +463,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       container.removeEventListener('touchend', handleTouchEnd);
       container.removeEventListener('touchcancel', handleTouchEnd);
     };
-  }, [isMobile, isLocked, isTouchHolding]);
+  }, [isMobile, isLocked, isTouchHolding, isControlsModalOpen]);
 
   // 영상 변경 시 챕터 정보 가져오기
   useEffect(() => {
@@ -521,10 +540,10 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       {/* 터치 홀드 오버레이 효과 */}
       {isMobile && isLocked && isTouchHolding && (
         <>
-          <div 
+          <div
             className="fixed inset-0 pointer-events-none z-[9998]"
             style={{
-              background: `radial-gradient(circle at ${touchPosition.x}px ${touchPosition.y}px, transparent 100px, rgba(0, 0, 0, 0.3) 200px)`,
+              background: `radial-gradient(circle at ${overlayPosition.x}px ${overlayPosition.y}px, transparent 100px, rgba(0, 0, 0, 0.3) 200px)`,
               transition: 'background 0.3s ease-out',
             }}
           />
@@ -539,7 +558,14 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           {/* 재생 컨트롤 버튼 (좌측 하단) - 재생컨트롤.전체표시가 false일 때만 표시 */}
           {uiSettings && !uiSettings.재생컨트롤?.전체표시 && (
             <Button
-              onClick={() => setIsControlsModalOpen(true)}
+              onClick={() => {
+                // 패널 열 때 현재 플레이어 볼륨/속도 가져오기
+                if (player && isPlayerReady) {
+                  setCurrentVolume(player.getVolume());
+                  setCurrentSpeed(player.getPlaybackRate());
+                }
+                setIsControlsModalOpen(true);
+              }}
               className="absolute bottom-4 left-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40"
               size="sm"
               variant="ghost"
@@ -590,7 +616,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
           {/* 컴팩트 재생 컨트롤 - 플레이어 내부에서 버튼 기준 위치 */}
           {isControlsModalOpen && (
-            <div className="absolute bottom-2 left-2 z-50">
+            <div className="absolute bottom-2 left-2 z-50" data-control-panel="true">
               <div className="bg-black bg-opacity-80 text-white rounded-lg p-3 w-48 shadow-lg backdrop-blur-sm">
 
                 {/* 볼륨 조절 */}
