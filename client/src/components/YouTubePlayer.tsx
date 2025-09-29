@@ -555,8 +555,8 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           ref={playerContainerRef}
           className="relative w-full aspect-video bg-black youtube-player-container"
         >
-          {/* 재생 컨트롤 버튼 (좌측 하단) - 재생컨트롤.전체표시가 false일 때만 표시 */}
-          {uiSettings && !uiSettings.재생컨트롤?.전체표시 && (
+          {/* 재생 컨트롤 버튼 (좌측 하단) - 재생컨트롤.전체표시가 false이고 패널이 닫혀있을 때만 표시 */}
+          {uiSettings && !uiSettings.재생컨트롤?.전체표시 && !isControlsModalOpen && (
             <Button
               onClick={() => {
                 // 패널 열 때 현재 플레이어 볼륨/속도 가져오기
