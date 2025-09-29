@@ -11,6 +11,8 @@ import RecordingSessionList from "./RecordingSessionList";
 import TimestampEditModal from "./TimestampEditModal";
 import TimeSkipControls from "./TimeSkipControls";
 import { UISettings } from "./SettingsPanel";
+import { NoteTabs } from "./NoteTabs";
+import { NotePage, NotePageState, PAGE_COLORS, DEFAULT_EMOJIS, SPECIAL_PAGES } from "../types/NotePage";
 
 // 녹화 관련 인터페이스
 export interface RawTimestamp {
@@ -57,6 +59,9 @@ export interface NoteAreaProps {
   onApplyRecordingToNote: (session: any) => void;
   uiSettings: UISettings;
   onSettingsChange: (settings: UISettings) => void;
+  // 다중 페이지 시스템 props
+  pageState: NotePageState;
+  onPageStateChange: (pageState: NotePageState) => void;
 }
 
 const NoteArea: React.FC<NoteAreaProps> = ({
@@ -83,7 +88,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   onCopyRecordingSession,
   onApplyRecordingToNote,
   uiSettings,
-  onSettingsChange
+  onSettingsChange,
+  pageState,
+  onPageStateChange
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const queryClient = useQueryClient();
@@ -111,6 +118,25 @@ const NoteArea: React.FC<NoteAreaProps> = ({
     volume: 100,
     speed: 1.0
   });
+
+  // 페이지 탭 선택기 상태 - 선택된 페이지 ID 저장
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [showColorPicker, setShowColorPicker] = useState<string | null>(null);
+
+  // 탭 컨테이너 위치 참조
+  const noteTabsRef = useRef<HTMLDivElement>(null);
+
+  // 무한루프 방지를 위한 업데이트 상태 추적
+  const isUpdatingContentRef = useRef(false);
+
+  // 타임스탬프 가져오기 UI 상태
+  const [showTimestampImporter, setShowTimestampImporter] = useState(false);
+  const [selectedPages, setSelectedPages] = useState<string[]>([]);
+
+  // 상태 변화 추적
+  useEffect(() => {
+    console.log('showTimestampImporter 상태 변경됨:', showTimestampImporter);
+  }, [showTimestampImporter]);
   
   // 원본 사용자 설정을 보존하기 위한 ref (더블클릭 contamination 방지)
   const originalUserSettingsRef = useRef<{volume: number, speed: number} | null>(null);
@@ -165,6 +191,246 @@ const NoteArea: React.FC<NoteAreaProps> = ({
     }
   };
 
+  // 다중 페이지 시스템 핸들러 함수들
+  // 페이지 변경 핸들러
+  const handlePageChange = (index: number) => {
+    const newPageState = { ...pageState, activePageIndex: index };
+    onPageStateChange(newPageState);
+  };
+
+  // 페이지 업데이트 핸들러
+  const handlePageUpdate = (pageId: string, updates: Partial<NotePage>) => {
+    const updatedPages = pageState.pages.map(page =>
+      page.id === pageId ? { ...page, ...updates, updatedAt: Date.now() } : page
+    );
+    onPageStateChange({ ...pageState, pages: updatedPages });
+  };
+
+  // 새 페이지 추가 핸들러
+  const handlePageAdd = () => {
+    const newPage: NotePage = {
+      id: `page-${Date.now()}`,
+      name: `페이지 ${pageState.pages.filter(p => !p.isSpecial).length + 1}`,
+      emoji: DEFAULT_EMOJIS[Math.floor(Math.random() * DEFAULT_EMOJIS.length)],
+      content: '',
+      color: PAGE_COLORS[Math.floor(Math.random() * PAGE_COLORS.length)],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const newPages = [...pageState.pages, newPage];
+    const newActiveIndex = newPages.length - 1;
+
+    onPageStateChange({
+      pages: newPages,
+      activePageIndex: newActiveIndex
+    });
+  };
+
+  // 페이지 삭제 핸들러
+  const handlePageDelete = (pageId: string) => {
+    const pageIndex = pageState.pages.findIndex(p => p.id === pageId);
+    if (pageIndex === -1) return;
+
+    const filteredPages = pageState.pages.filter(p => p.id !== pageId);
+    let newActiveIndex = pageState.activePageIndex;
+
+    // 삭제된 페이지가 현재 활성 페이지인 경우
+    if (pageIndex === pageState.activePageIndex) {
+      // 마지막 페이지가 삭제된 경우 이전 페이지로
+      if (pageIndex === pageState.pages.length - 1) {
+        newActiveIndex = Math.max(0, pageIndex - 1);
+      }
+      // 그 외의 경우 그대로 유지 (다음 페이지가 올라옴)
+    } else if (pageIndex < pageState.activePageIndex) {
+      // 활성 페이지보다 앞의 페이지가 삭제된 경우 인덱스 조정
+      newActiveIndex = pageState.activePageIndex - 1;
+    }
+
+    onPageStateChange({
+      pages: filteredPages,
+      activePageIndex: newActiveIndex
+    });
+  };
+
+  // 페이지 순서 변경 핸들러 (드래그앤드롭)
+  const handlePageReorder = (fromIndex: number, toIndex: number) => {
+    const newPages = [...pageState.pages];
+    const [movedPage] = newPages.splice(fromIndex, 1);
+    newPages.splice(toIndex, 0, movedPage);
+
+    // 현재 활성 페이지의 새로운 인덱스 계산
+    let newActiveIndex = pageState.activePageIndex;
+    if (pageState.activePageIndex === fromIndex) {
+      newActiveIndex = toIndex;
+    } else if (fromIndex < pageState.activePageIndex && toIndex >= pageState.activePageIndex) {
+      newActiveIndex = pageState.activePageIndex - 1;
+    } else if (fromIndex > pageState.activePageIndex && toIndex <= pageState.activePageIndex) {
+      newActiveIndex = pageState.activePageIndex + 1;
+    }
+
+    onPageStateChange({
+      pages: newPages,
+      activePageIndex: newActiveIndex
+    });
+  };
+
+  // 현재 활성 페이지 가져오기
+  const getCurrentPage = () => {
+    return pageState.pages[pageState.activePageIndex] || null;
+  };
+
+  // 페이지 내용 자동 저장
+  const handleContentChange = (content: string) => {
+    const currentPage = getCurrentPage();
+    if (currentPage && !currentPage.isSpecial) {
+      handlePageUpdate(currentPage.id, { content });
+    }
+  };
+
+  // 통합 타임스탬프 페이지에서 모든 페이지의 타임스탬프 수집
+  const getAllTimestamps = () => {
+    const allTimestamps: any[] = [];
+
+    pageState.pages.forEach(page => {
+      if (!page.isSpecial && page.content) {
+        const pageTimestamps = parseTimestamps(page.content);
+        pageTimestamps.forEach(timestamp => {
+          allTimestamps.push({
+            ...timestamp,
+            pageId: page.id,
+            pageName: page.name,
+            pageEmoji: page.emoji
+          });
+        });
+      }
+    });
+
+    // 시작시간 순으로 정렬
+    return allTimestamps.sort((a, b) => a.startTime - b.startTime);
+  };
+
+  // 선택기 핸들러들
+  const handleEmojiClick = (pageId: string) => {
+    setShowEmojiPicker(showEmojiPicker === pageId ? null : pageId);
+    setShowColorPicker(null);
+  };
+
+  const handleColorClick = (pageId: string) => {
+    setShowColorPicker(showColorPicker === pageId ? null : pageId);
+    setShowEmojiPicker(null);
+  };
+
+  const handleEmojiSelect = (pageId: string, emoji: string) => {
+    handlePageUpdate(pageId, { emoji });
+    setShowEmojiPicker(null);
+  };
+
+  const handleColorSelect = (pageId: string, color: string) => {
+    handlePageUpdate(pageId, { color });
+    setShowColorPicker(null);
+  };
+
+  // 선택기 외부 클릭시 닫기
+  const handleOutsideClick = () => {
+    setShowEmojiPicker(null);
+    setShowColorPicker(null);
+    setShowTimestampImporter(false);
+  };
+
+  // 타임스탬프 가져오기 기능
+  const handleImportTimestamps = () => {
+    if (selectedPages.length === 0) {
+      showNotification('가져올 페이지를 선택해주세요', 'warning');
+      return;
+    }
+
+    const importedTimestamps: any[] = [];
+
+    selectedPages.forEach(pageId => {
+      const page = pageState.pages.find(p => p.id === pageId);
+      if (page && !page.isSpecial && page.content) {
+        const pageTimestamps = parseTimestamps(page.content);
+        pageTimestamps.forEach(timestamp => {
+          importedTimestamps.push({
+            ...timestamp,
+            pageId: page.id,
+            pageName: page.name,
+            pageEmoji: page.emoji
+          });
+        });
+      }
+    });
+
+    // 시간순으로 정렬
+    importedTimestamps.sort((a, b) => a.startTime - b.startTime);
+
+    // 형식화된 텍스트 생성 - 각 타임스탬프와 연관된 텍스트 찾기
+    const formattedContent = importedTimestamps.map(ts => {
+      const page = pageState.pages.find(p => p.id === ts.pageId);
+      if (!page) return ts.raw;
+
+      // 페이지 내용에서 해당 타임스탬프 다음에 오는 텍스트 찾기
+      const content = page.content || '';
+      const timestampIndex = content.indexOf(ts.raw);
+
+      if (timestampIndex === -1) return ts.raw;
+
+      // 타임스탬프 이후의 텍스트 추출 - 다음 엔터까지만
+      const afterTimestamp = content.slice(timestampIndex + ts.raw.length);
+      const nextLineBreakIndex = afterTimestamp.indexOf('\n');
+      const endIndex = nextLineBreakIndex !== -1 ? nextLineBreakIndex : afterTimestamp.length;
+
+      let associatedText = afterTimestamp.slice(0, endIndex).trim();
+
+      // 불필요한 문자 제거 및 정리
+      associatedText = associatedText
+        .replace(/^\s+/, '') // 시작 공백 제거
+        .replace(/\s+$/, '') // 끝 공백 제거
+        .trim();
+
+      return associatedText ? `${ts.raw}     ${associatedText}` : ts.raw;
+    }).join('\n');
+
+    // 현재 전체 페이지 내용에 추가
+    const currentContent = noteText || '';
+    const newContent = currentContent ? `${currentContent}\n\n${formattedContent}` : formattedContent;
+
+    setNoteText(newContent);
+    setShowTimestampImporter(false);
+    setSelectedPages([]);
+
+    showNotification(`${importedTimestamps.length}개의 타임스탬프를 가져왔습니다`, 'success');
+  };
+
+  // 페이지 선택 토글
+  const togglePageSelection = (pageId: string) => {
+    setSelectedPages(prev =>
+      prev.includes(pageId)
+        ? prev.filter(id => id !== pageId)
+        : [...prev, pageId]
+    );
+  };
+
+  // 탭 위치에 따른 선택기 위치 계산
+  const getSelectionUIPosition = (isColorPicker: boolean = false) => {
+    if (!noteTabsRef.current) return { bottom: '100%', left: '0' };
+
+    const tabsRect = noteTabsRef.current.getBoundingClientRect();
+    const containerRect = noteTabsRef.current.offsetParent?.getBoundingClientRect();
+
+    if (!containerRect) return { bottom: '100%', left: '0' };
+
+    // 탭 상단에서 약간 위로 위치시키기
+    const bottomOffset = containerRect.bottom - tabsRect.top + 8;
+
+    return {
+      bottom: `${bottomOffset}px`,
+      left: isColorPicker ? '200px' : '0px', // 색상 선택기도 왼쪽으로, 이모지 옆에 배치
+      right: 'auto'
+    };
+  };
+
   // 사용자 볼륨 변경 핸들러
   const handleVolumeChange = (newVolume: number) => {
     setUserSettings(prev => ({ ...prev, volume: newVolume }));
@@ -210,6 +476,37 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   
   // 노트 텍스트 상태 (localStorage 연동)
   const [noteText, setNoteText] = useState("");
+
+  // 현재 활성 페이지와 noteText 동기화 (모든 페이지 포함)
+  useEffect(() => {
+    if (isUpdatingContentRef.current) return; // 업데이트 중이면 스킵
+
+    const currentPage = getCurrentPage();
+    if (currentPage) {
+      // 모든 페이지 타입에 대해 저장된 내용 불러오기
+      isUpdatingContentRef.current = true;
+      setNoteText(currentPage.content || '');
+
+      // 짧은 지연 후 플래그 해제
+      setTimeout(() => {
+        isUpdatingContentRef.current = false;
+      }, 50);
+    }
+  }, [pageState.activePageIndex]); // 페이지 전환시에만 동기화
+
+  // noteText 변경 시 현재 페이지에 저장 (모든 페이지 포함)
+  useEffect(() => {
+    if (isUpdatingContentRef.current) return; // 업데이트 중이면 스킵
+
+    const currentPage = getCurrentPage();
+    if (currentPage) {
+      // 내용이 실제로 다를 때만 업데이트 (무한루프 방지)
+      if (currentPage.content !== noteText) {
+        // 일반 페이지와 특수 페이지 모두 저장
+        handlePageUpdate(currentPage.id, { content: noteText });
+      }
+    }
+  }, [noteText]); // noteText만 의존성으로 설정
 
   // 즐겨찾기 상태
   const [favorites, setFavorites] = useState<string[]>([]);
@@ -1463,9 +1760,8 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   };
 
   return (
-    <Card className="h-full">
+    <Card className="h-full" onClick={handleOutsideClick}>
       <CardContent className="p-4 h-full flex flex-col">
-
         {/* 재생 컨트롤 섹션 (uiSettings에 따라 표시) */}
         {uiSettings?.재생컨트롤?.전체표시 !== false && (
           <div className="mb-4 space-y-2">
@@ -1681,6 +1977,28 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           {uiSettings?.노트영역?.표시 !== false && (
             <div className="flex-1 flex flex-col">
               <div className="flex-1">
+                {/* 전체 페이지 전용: 타임스탬프 가져오기 버튼 */}
+                {getCurrentPage()?.isSpecial && (
+                  <div className="mb-2 flex gap-2">
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation(); // 이벤트 버블링 방지
+                        console.log('타임스탬프 가져오기 버튼 클릭됨');
+                        console.log('현재 상태:', showTimestampImporter);
+                        const newState = !showTimestampImporter;
+                        console.log('새로운 상태로 설정:', newState);
+                        setShowTimestampImporter(newState);
+                        console.log('setShowTimestampImporter 호출 완료');
+                      }}
+                      size="sm"
+                      variant="outline"
+                      className="text-xs"
+                    >
+                      📋 타임스탬프 가져오기
+                    </Button>
+                  </div>
+                )}
+
                 <Textarea
                   ref={textareaRef}
                   value={noteText}
@@ -1704,10 +2022,179 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                   }}
                 />
                 
-                <div className="flex justify-between mt-2">
-                  <p className="text-xs text-gray-500 flex items-center">
-                    <InfoIcon className="h-3 w-3 mr-1" /> 도장 형식: [HH:MM:SS.sss, 100%, 1.00x]
-                  </p>
+                {/* 다중 페이지 탭 시스템 - 노트 영역과 연결된 위치 */}
+                <div ref={noteTabsRef} style={{ marginTop: '4px' }}>
+                  <NoteTabs
+                    pageState={pageState}
+                    onPageChange={handlePageChange}
+                    onPageUpdate={handlePageUpdate}
+                    onPageAdd={handlePageAdd}
+                    onPageDelete={handlePageDelete}
+                    onPageReorder={handlePageReorder}
+                    onEmojiClick={handleEmojiClick}
+                    onColorClick={handleColorClick}
+                  />
+                </div>
+
+                {/* 이모지 선택기 - 탭 근처에 위치 */}
+                {showEmojiPicker && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      ...getSelectionUIPosition(),
+                      background: 'white',
+                      border: '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 9999,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(4, 1fr)',
+                      gap: '6px',
+                      maxWidth: '280px'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {DEFAULT_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          border: 'none',
+                          background: 'transparent',
+                          fontSize: '16px',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          transition: 'background-color 0.2s'
+                        }}
+                        onClick={() => handleEmojiSelect(showEmojiPicker, emoji)}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* 색상 선택기 - 탭 근처 우측에 위치 */}
+                {showColorPicker && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      ...getSelectionUIPosition(true),
+                      background: 'white',
+                      border: '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 9999,
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '8px',
+                      maxWidth: '200px'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {PAGE_COLORS.map((color) => (
+                      <button
+                        key={color}
+                        style={{
+                          width: '32px',
+                          height: '32px',
+                          backgroundColor: color,
+                          border: '2px solid rgba(0,0,0,0.2)',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          transition: 'transform 0.2s'
+                        }}
+                        onClick={() => handleColorSelect(showColorPicker, color)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.1)';
+                          e.currentTarget.style.borderColor = '#007acc';
+                          e.currentTarget.style.borderWidth = '3px';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.borderColor = 'rgba(0,0,0,0.2)';
+                          e.currentTarget.style.borderWidth = '2px';
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* 타임스탬프 가져오기 페이지 선택 UI */}
+                {showTimestampImporter && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '120px',
+                      left: '0px',
+                      background: 'white',
+                      border: '1px solid #ddd',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      zIndex: 9999,
+                      maxWidth: '400px',
+                      width: '100%'
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h4 className="text-sm font-semibold mb-3">페이지 선택</h4>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {pageState.pages.filter(page => !page.isSpecial).map(page => (
+                        <label key={page.id} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedPages.includes(page.id)}
+                            onChange={() => togglePageSelection(page.id)}
+                            className="rounded"
+                          />
+                          <span className="text-sm">
+                            {page.emoji} {page.name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            ({parseTimestamps(page.content || '').length}개)
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3 flex gap-2 justify-between">
+                      <button
+                        onClick={() => {
+                          const allPageIds = pageState.pages.filter(p => !p.isSpecial).map(p => p.id);
+                          const isAllSelected = allPageIds.length > 0 && allPageIds.every(id => selectedPages.includes(id));
+                          setSelectedPages(isAllSelected ? [] : allPageIds);
+                        }}
+                        className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200"
+                      >
+                        {(() => {
+                          const allPageIds = pageState.pages.filter(p => !p.isSpecial).map(p => p.id);
+                          const isAllSelected = allPageIds.length > 0 && allPageIds.every(id => selectedPages.includes(id));
+                          return isAllSelected ? '전체 해제' : '전체 선택';
+                        })()}
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleImportTimestamps();
+                        }}
+                        disabled={selectedPages.length === 0}
+                        className={`text-xs px-3 py-1 rounded ${
+                          selectedPages.length === 0
+                            ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
+                        }`}
+                      >
+                        가져오기 ({selectedPages.length}개)
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex justify-end mt-2">
                   <div>
                     {녹화중 && (
                       <span className="text-xs text-red-500 animate-pulse">● 녹화 중</span>

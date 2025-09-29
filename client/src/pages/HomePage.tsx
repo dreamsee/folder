@@ -15,6 +15,7 @@ import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import { OverlayData, OverlayPosition } from "@/components/TextOverlay";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
+import { NotePageState, NotePage, PAGE_COLORS, DEFAULT_EMOJIS, SPECIAL_PAGES } from "@/types/NotePage";
 
 const HomePage = () => {
   const [player, setPlayer] = useState<any | null>(null);
@@ -33,6 +34,33 @@ const HomePage = () => {
   const [recordingSessions, setRecordingSessions] = useState<RecordingSession[]>([]); // 녹화 세션 목록
   const [sessionToApply, setSessionToApply] = useState<RecordingSession | null>(null); // 노트에 적용할 세션
   const [currentPlayTime, setCurrentPlayTime] = useState(0); // 현재 재생 시간
+
+  // 다중 페이지 시스템 상태
+  const [pageState, setPageState] = useState<NotePageState>(() => {
+    // 초기 페이지 설정: 기본 페이지 + 통합 타임스탬프 페이지
+    const defaultPage: NotePage = {
+      id: 'page-default',
+      name: '메인',
+      emoji: '📝',
+      content: '',
+      color: PAGE_COLORS[0],
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    const unifiedPage: NotePage = {
+      ...SPECIAL_PAGES.UNIFIED_TIMESTAMPS,
+      content: '', // 동적으로 생성됨
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    };
+
+    return {
+      pages: [unifiedPage, defaultPage], // 전체 페이지를 맨 앞으로 이동
+      activePageIndex: 0 // 전체 페이지가 기본 활성 페이지
+    };
+  });
+
   // const { toast } = useToast(); // 토스트 비활성화
   const { isKeyboardVisible, keyboardHeight } = useVirtualKeyboard();
 
@@ -360,6 +388,8 @@ const HomePage = () => {
           onApplyRecordingToNote={handleApplyToNote}
           uiSettings={uiSettings}
           onSettingsChange={handleSettingsChange}
+          pageState={pageState}
+          onPageStateChange={setPageState}
         />
 
       <Notification />
