@@ -17,6 +17,7 @@
 13. 검색 시스템 및 영상 로딩 로직
 14. 전체화면 및 고급 위치 제어 시스템 (TestOverlayPage)
 15. 화면 확대 시스템 (TestZoomPage)
+16. 신규 타임스탬프 시스템 (TimestampProcessor + useTimestampSystem)
 
 ==========================================
 
@@ -832,8 +833,179 @@ CSS transform을 사용한 YouTube iframe 확대/축소 시스템
 3. 수동 확대는 자동 확대와 독립적으로 작동
 4. CSS transition으로 부드러운 확대/축소
 
+16. 신규 타임스탬프 시스템 (TimestampProcessor + useTimestampSystem)
+==========================================
+
+[시스템 개요]
+TimestampProcessor는 기존 NoteArea 타임스탬프 로직을 순수 TypeScript 클래스로 분리하여
+재사용성과 테스트 용이성을 높인 새로운 타임스탬프 자동 실행 시스템입니다.
+
+[아키텍처 구성]
+
+1. 핵심 클래스: TimestampProcessor.ts
+   - 순수 TypeScript 클래스 (React 의존성 없음)
+   - 6단계 파이프라인 완전 구현
+   - PlayerInterface를 통한 플레이어 추상화
+   - 상태와 로직의 완전 분리
+
+2. React 연결: useTimestampSystem.ts
+   - React Hook 형태로 TimestampProcessor 래핑
+   - 컴포넌트 상태와 TimestampProcessor 동기화
+   - useEffect 기반 자동 감지 시스템
+   - 수명 주기 관리 및 정리
+
+3. 테스트 환경: TestTimestampPage.tsx
+   - TimestampProcessor 독립 테스트 환경
+   - SimpleNoteArea와 YouTubePlayer 통합 테스트
+   - 실시간 디버깅 정보 표시
+
+[TimestampProcessor 6단계 파이프라인]
+
+단계 1: 파싱 (parseTimestamps)
+- 정규식: /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g
+- 노트 순서(index) 기준 정렬 (시간순 아님)
+- ParsedTimestamp 인터페이스로 구조화
+- 시간을 초 단위로 변환 (시*3600 + 분*60 + 초)
+
+단계 2: 감지 (detectActiveTimestamp)
+- 현재 재생 시간에서 활성화될 타임스탬프 찾기
+- 노트 순서 우선순위 시스템 (lastActiveIndex + 1 이후만)
+- 0.01초 허용 오차 (TIME_MARGIN = 0.01)
+- activeTimestamp가 있으면 해당 구간 내 위치만 확인
+
+단계 3: 진입 (processEntry)
+- 조건: detectedTimestamp && !activeTimestamp
+- isProcessingEntry 플래그로 중복 실행 방지
+- originalSettings 백업 (현재 볼륨/속도 저장)
+- 정지 액션(|숫자)은 진입과 동시에 즉시 실행
+- 타임스탬프 설정 적용 후 executeAction 호출
+
+단계 4: 이탈 (processExit)
+- 조건: !detectedTimestamp && activeTimestamp
+- isProcessingExit 플래그로 중복 실행 방지
+- 자동점프(->)가 있으면 타이머 유지, 없으면 타이머 취소
+- originalSettings로 설정 복원
+- 자동점프가 없는 경우에만 activeTimestamp 초기화
+
+단계 5: 자동점프 (executeAutoJump)
+- -> 액션 타임스탬프에서 구간 종료시 실행
+- 속도 보정 계산: (timeToEnd / speed) * 1000
+- setTimeout으로 정확한 타이밍 제어
+- 다음 타임스탬프 검색 (노트 순서 기준)
+- 다음이 없으면 정지 및 알림
+
+단계 6: 정지 액션 처리
+- |숫자 액션: 진입시 즉시 pauseVideo()
+- setTimeout으로 지정 시간 후 자동 재생
+- 알림 시스템과 연동하여 상태 안내
+
+[액션별 상세 동작]
+
+정지 액션 (|3):
+1. processEntry에서 즉시 player.pauseVideo() 실행
+2. setTimeout(pauseSeconds * 1000)로 지연 재생
+3. 디버깅 로그: "[즉시정지]", "[정지대기]", "[재생]"
+
+자동점프 액션 (->):
+1. 현재 시간에서 구간 종료까지 시간 계산
+2. 속도 보정 적용 (실제 재생 속도 고려)
+3. autoJumpInfo 상태 설정 (isWaiting, targetIndex, remainingSeconds)
+4. 타이머 종료시 executeAutoJump 호출
+5. 다음 타임스탬프로 player.seekTo() 실행
+
+[useTimestampSystem Hook 동작]
+
+상태 관리:
+- timestamps: ParsedTimestamp[]
+- activeTimestamp: ParsedTimestamp | null
+- lastActiveIndex: number
+- isProcessing: boolean
+- autoJumpInfo: 자동점프 상태 정보
+
+useEffect 자동 감지:
+- 재생 중(playerState === 1)일 때만 500ms 간격 실행
+- 수동 이동 감지: 2초 이상 점프시 handleManualSeek 호출
+- TimestampProcessor.process() 메인 루프 실행
+- 상태 동기화: React 상태 ← TimestampProcessor 상태
+
+더블클릭 처리:
+- findTimestampAtPosition()으로 클릭 위치 타임스탬프 찾기
+- 대시(-) 위치 기준으로 시작/종료시간 구분
+- TimestampProcessor.handleDoubleClick() 위임
+
+[수동 이동 처리]
+
+handleManualSeek 로직:
+1. 기존 자동점프 타이머와 상태 초기화
+2. 가장 가까운 타임스탬프 찾기 (시작시간 기준)
+3. closestTimestamp.index - 1로 lastActiveIndex 설정
+4. 우선순위 재설정으로 정상적인 순차 실행 보장
+
+[TestTimestampPage 테스트 환경]
+
+테스트 비디오:
+- 'dQw4w9WgXcQ': Rick Astley - Never Gonna Give You Up
+- 'kJQP7kiw5Fk': Luis Fonsi - Despacito ft. Daddy Yankee
+- '9bZkp7q19f0': PSY - GANGNAM STYLE(강남스타일) M/V
+
+파싱 및 변환:
+- noteText 변경시 parseTimestamps() 실행
+- YouTubePlayer 형식으로 변환: {timeInSeconds, duration, volume, playbackRate, timeFormatted}
+- 커스텀바 하이라이트 연동
+
+디버깅 정보:
+- 타임스탬프 개수 실시간 표시
+- 플레이어 상태 정보 (준비됨/재생/일시정지/버퍼링)
+- 현재 시간과 총 길이 표시
+- 타임스탬프 분석 버튼으로 정규식 매칭 확인
+
+[핵심 차이점: 기존 vs 신규 시스템]
+
+기존 (NoteArea 내장):
+- React 컴포넌트와 강결합
+- 상태와 로직이 혼재
+- 테스트와 재사용이 어려움
+- requestAnimationFrame 사용
+
+신규 (TimestampProcessor 분리):
+- 순수 TypeScript 클래스
+- 상태와 로직 완전 분리
+- 독립적 테스트 가능
+- setInterval 기반 (500ms)
+
+[주의사항]
+
+1. 노트 순서 우선순위 시스템:
+   - lastActiveIndex + 1 체크 로직 절대 변경 금지
+   - 시간 순서가 아닌 노트 작성 순서 기준
+
+2. 정지 액션 즉시 실행:
+   - processEntry에서 즉시 pauseVideo() 실행
+   - 지연 없이 정지해야 정확한 타이밍 보장
+
+3. 자동점프 속도 보정:
+   - 실제 재생 속도를 고려한 타이밍 계산
+   - (timeToEnd / speed) * 1000 공식 사용
+
+4. 상태 동기화:
+   - React 상태와 TimestampProcessor 상태 일치 필수
+   - useEffect에서 매 루프마다 동기화
+
+5. 메모리 관리:
+   - useEffect cleanup에서 interval 정리
+   - 컴포넌트 언마운트시 TimestampProcessor.reset() 호출
+
+[확장성]
+
+모듈화된 설계로 다음 확장 가능:
+- 다른 플레이어 시스템 연동 (PlayerInterface 구현)
+- 웹 워커에서 실행 (UI 블로킹 방지)
+- 타임스탬프 형식 확장 (정규식과 파싱 로직만 수정)
+- 다양한 React Hook 형태로 래핑
+
 ==========================================
 
 이 문서는 타임스탬프 시스템, 댓글 시스템, 오버레이 패널 시스템,
-화면 텍스트 오버레이 시스템, 검색 시스템, 전체화면 및 고급 위치 제어 시스템, 화면 확대 시스템의 완전한 작동 원리를 담고 있으며,
+화면 텍스트 오버레이 시스템, 검색 시스템, 전체화면 및 고급 위치 제어 시스템, 화면 확대 시스템,
+신규 타임스탬프 시스템(TimestampProcessor)의 완전한 작동 원리를 담고 있으며,
 새로운 기능 추가나 버그 수정시 필수 참고 자료입니다.

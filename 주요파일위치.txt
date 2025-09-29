@@ -45,6 +45,10 @@ UI 컴포넌트:
 - client/src/lib/youtubeUtils.ts: YouTube 유틸리티 (formatTime 등)
 - client/src/utils/chapterParser.ts: 챕터 파싱
 
+타임스탬프 자동 실행 시스템 (신규):
+- client/src/lib/TimestampProcessor.ts: 타임스탬프 자동 실행 핵심 로직 클래스
+- client/src/hooks/useTimestampSystem.ts: React Hook 형태의 타임스탬프 시스템 연결
+
 테스트 페이지:
 - client/src/pages/TestSharePage.tsx: 댓글 시스템 테스트 페이지
 - client/src/pages/TestTimestampPage.tsx: 타임스탬프 기능 테스트 페이지
@@ -57,26 +61,34 @@ UI 컴포넌트:
 
 === 2. 기능별 코드 위치 매핑 ===
 
-🎯 타임스탬프 자동 실행 시스템:
-- NoteArea.tsx:570-607 requestAnimationFrame 기반 고정밀 추적 시스템
-- NoteArea.tsx:281-567 processTimestamps() 통합 타임스탬프 처리 함수
-- NoteArea.tsx:233-278 detectManualMove() 수동 이동 감지
-- NoteArea.tsx:295-306 우선순위 기반 타임스탬프 찾기 (lastActiveIndex + 1부터 체크)
-- NoteArea.tsx:334-491 타임스탬프 진입 처리 (currentStamp && isDifferentTimestamp)
-- NoteArea.tsx:494-563 타임스탬프 이탈 처리 (!currentStamp && activeTimestamp)
-- NoteArea.tsx:1180-1360 더블클릭 핸들러 (handleNoteClick 내부)
-- NoteArea.tsx:1282-1283 더블클릭시 lastActiveIndex 설정 (clickedIndex - 1로 설정 필수)
-- NoteArea.tsx:1234-1250 더블클릭시 타임스탬프 설정 즉시 적용
-- NoteArea.tsx:1308-1323 더블클릭시 정지 액션 즉시 실행
-- NoteArea.tsx:855 addTimestamp() 도장 버튼 함수
-- NoteArea.tsx:945 openTimestampModal() 편집 버튼
-- YouTubePlayer.tsx:커스텀바렌더링 커스텀 진행바 하이라이트
-- HomePage.tsx:timestamps상태 timestamps 상태 관리
+🎯 타임스탬프 자동 실행 시스템 (신규 - TimestampProcessor 기반):
+- TimestampProcessor.ts:전체클래스 6단계 파이프라인 구현 (파싱→감지→진입→이탈→자동점프→사용자설정관리)
+- TimestampProcessor.ts:104-146 parseTimestamps() 노트 텍스트에서 타임스탬프 추출 및 노트 순서로 정렬
+- TimestampProcessor.ts:160-187 detectActiveTimestamp() 현재 재생 시간에서 활성화될 타임스탬프 찾기 (노트 순서 우선순위)
+- TimestampProcessor.ts:193-228 processEntry() 타임스탬프 구간 진입시 설정 적용 (즉시 정지 액션 포함)
+- TimestampProcessor.ts:234-271 processExit() 타임스탬프 구간 이탈시 설정 복원 (자동점프 상태 유지)
+- TimestampProcessor.ts:277-314 executeAction() 액션 실행 (자동점프 -> 액션, 정지 |숫자 액션)
+- TimestampProcessor.ts:318-344 executeAutoJump() 다음 타임스탬프로 자동 점프 실행 (노트 순서 기반)
+- TimestampProcessor.ts:350-379 handleManualSeek() 수동 이동 감지 및 우선순위 재설정
+- TimestampProcessor.ts:384-401 handleDoubleClick() 더블클릭 처리 (시작/종료시간 구분)
+- TimestampProcessor.ts:407-427 process() 메인 처리 함수 (0.5초마다 호출)
+- useTimestampSystem.ts:전체Hook React 컴포넌트에서 TimestampProcessor 사용을 위한 커스텀 Hook
+- useTimestampSystem.ts:64-72 updateNoteText() 노트 텍스트 파싱 및 상태 업데이트
+- useTimestampSystem.ts:75-120 타임스탬프 자동 감지 useEffect (재생 중일 때만 500ms 간격으로 실행)
+- useTimestampSystem.ts:86-91 수동 이동 감지 (2초 이상 점프시 handleManualSeek 호출)
+- useTimestampSystem.ts:123-144 handleDoubleClick() 클릭 위치에서 타임스탬프 찾기 및 시작/종료시간 구분
+- useTimestampSystem.ts:182-196 findTimestampAtPosition() 클릭 위치에 해당하는 타임스탬프 찾기
+- TestTimestampPage.tsx:63-89 타임스탬프 파싱 및 YouTubePlayer 형식 변환
+- SimpleNoteArea.tsx:전체컴포넌트 타임스탬프 로직 참고용 (기존 방식 보존)
 → 수정 시 주의:
-  1. lastActiveIndex + 1 체크 로직 절대 변경 금지
-  2. 더블클릭시 clickedIndex - 1 설정 필수
-  3. 타임스탬프 설정 즉시 적용 필수
-  4. 이탈시 재생 기본값 복원 변경 금지
+  1. 노트 순서 우선순위 시스템 (시간순 아님, lastActiveIndex + 1부터 체크)
+  2. 정지 액션은 진입과 동시에 즉시 실행 (지연 방지)
+  3. 자동점프는 속도 보정 계산 적용 (실제 재생 속도 고려)
+  4. 더블클릭시 시작/종료시간 구분 처리 (activeTimestamp 설정 여부)
+  5. 설정 복원은 originalSettings 백업을 통해 처리
+  6. TimestampProcessor는 순수 TypeScript 클래스 (React 의존성 없음)
+  7. useTimestampSystem Hook을 통해 React 컴포넌트와 연결
+  8. 재생 중일 때만 감지 시스템 작동 (playerState === 1)
 
 📱 화면 오버레이 시스템:
 - TextOverlay.tsx:전체컴포넌트 텍스트 표시 로직 (회전 기능 포함)

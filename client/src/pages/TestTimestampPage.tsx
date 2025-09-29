@@ -43,6 +43,7 @@ const TestTimestampPage: React.FC = () => {
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [isBuffering, setIsBuffering] = useState(false);
+  const [timestamps, setTimestamps] = useState<any[]>([]);
   const [notification, setNotification] = useState<{
     message: string;
     type: "info" | "success" | "warning" | "error";
@@ -57,6 +58,35 @@ const TestTimestampPage: React.FC = () => {
       setNotification(null);
     }, 3000);
   };
+
+  // 노트 텍스트 변경시 타임스탬프 파싱 및 YouTubePlayer 형식 변환
+  useEffect(() => {
+    // 타임스탬프 정규식 (TimestampProcessor와 동일)
+    const timestampRegex = /\[(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?)-(\d{1,2}):(\d{2}):(\d{1,2}(?:\.\d{1,3})?),\s*(\d+)%,\s*([\d.]+)x(?:,\s*(->|\|\d+))?\]/g;
+
+    const parsedTimestamps = [];
+    let match;
+
+    while ((match = timestampRegex.exec(noteText)) !== null) {
+      // 시간을 초 단위로 변환
+      const startTime = parseInt(match[1]) * 3600 + parseInt(match[2]) * 60 + parseFloat(match[3]);
+      const endTime = parseInt(match[4]) * 3600 + parseInt(match[5]) * 60 + parseFloat(match[6]);
+      const volume = parseInt(match[7]);
+      const speed = parseFloat(match[8]);
+
+      // YouTubePlayer 형식으로 변환
+      parsedTimestamps.push({
+        timeInSeconds: startTime,
+        duration: endTime - startTime,
+        volume: volume,
+        playbackRate: speed,
+        timeFormatted: formatTime(startTime)
+      });
+    }
+
+    setTimestamps(parsedTimestamps);
+    console.log(`[TestTimestampPage] 파싱된 타임스탬프: ${parsedTimestamps.length}개`);
+  }, [noteText]);
 
   // 플레이어 준비 완료 핸들러
   const handlePlayerReady = (playerInstance: any) => {
@@ -138,6 +168,7 @@ const TestTimestampPage: React.FC = () => {
                       currentVideoId={testVideoId}
                       setPlayerState={setPlayerState}
                       showNotification={showNotification}
+                      timestamps={timestamps}
                       className="w-full h-64"
                     />
                   </div>
@@ -181,6 +212,7 @@ const TestTimestampPage: React.FC = () => {
                   <SimpleNoteArea
                     player={player}
                     isPlayerReady={isPlayerReady}
+                    playerState={playerState}
                     showNotification={showNotification}
                     overlayMode={overlayMode}
                     onOverlayOpen={() => setIsOverlayOpen(true)}

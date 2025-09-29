@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { formatTime } from "@/lib/youtubeUtils";
-import { Clock, InfoIcon, Type, FileText, Circle, Square, Star } from "lucide-react";
+import { Clock, Circle, Square } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { OverlayData } from "./TextOverlay";
 import OverlayInput from "./OverlayInput";
@@ -12,7 +12,7 @@ import TimestampEditModal from "./TimestampEditModal";
 import TimeSkipControls from "./TimeSkipControls";
 import { UISettings } from "./SettingsPanel";
 import { NoteTabs } from "./NoteTabs";
-import { NotePage, NotePageState, PAGE_COLORS, DEFAULT_EMOJIS, SPECIAL_PAGES } from "../types/NotePage";
+import { NotePage, NotePageState, PAGE_COLORS, DEFAULT_EMOJIS } from "../types/NotePage";
 
 // 녹화 관련 인터페이스
 export interface RawTimestamp {
@@ -135,7 +135,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
 
   // 상태 변화 추적
   useEffect(() => {
-    console.log('showTimestampImporter 상태 변경됨:', showTimestampImporter);
+    // 타임스탬프 가져오기 모달 상태 변화 처리
   }, [showTimestampImporter]);
   
   // 원본 사용자 설정을 보존하기 위한 ref (더블클릭 contamination 방지)
@@ -144,8 +144,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
   // 타임스탬프 자동 실행 관련 상태 변수들
   const [activeTimestamp, setActiveTimestamp] = useState<any>(null);
   const [originalSettings, setOriginalSettings] = useState<{volume: number, speed: number} | null>(null);
-  
+
   // 타임스탬프 우선순위 관리 (마지막 활성화된 타임스탬프의 인덱스)
+  // 중요: -1로 초기화하여 모든 타임스탬프가 처음부터 활성화 가능하도록 함
   const [lastActiveIndex, setLastActiveIndex] = useState<number>(-1);
   
   // 중복 실행 방지 플래그들 (useRef로 지속 상태 유지)
@@ -184,7 +185,18 @@ const NoteArea: React.FC<NoteAreaProps> = ({
         });
       }
 
-      return stamps.sort((a, b) => a.index - b.index);
+      // 중요: 노트 작성 순서 유지 - 시간순 정렬 금지
+      // 텍스트에서 나타나는 순서 = 노트 작성 순서 = 우선순위 순서
+
+      // 디버깅: 파싱된 타임스탬프 순서 확인
+      if (stamps.length > 0) {
+        console.log('[파싱] 타임스탬프 순서 (노트 작성 순서):');
+        stamps.forEach((stamp, i) => {
+          console.log(`  ${i}: ${stamp.startTime.toFixed(2)}-${stamp.endTime.toFixed(2)} ${stamp.action || ''}`);
+        });
+      }
+
+      return stamps;
     } catch (error) {
       console.error('parseTimestamps 오류:', error);
       return [];
@@ -528,6 +540,36 @@ const NoteArea: React.FC<NoteAreaProps> = ({
     }
   }, []);
 
+  // 영상 변경시 타임스탬프 상태 초기화
+  // 중요: 새 영상 재생시 모든 타임스탬프가 순서대로 활성화될 수 있도록 초기화
+  useEffect(() => {
+    if (currentVideoId) {
+      // 새 영상 로드시 타임스탬프 상태 초기화
+
+      // 타임스탬프 우선순위 초기화
+      setLastActiveIndex(-1);
+
+      // 활성 타임스탬프 초기화
+      setActiveTimestamp(null);
+      setOriginalSettings(null);
+
+      // 처리 플래그 초기화
+      processingEntryRef.current = false;
+      processingExitRef.current = false;
+
+      // 자동점프 타이머 취소
+      if (autoJumpTimeoutRef.current) {
+        clearTimeout(autoJumpTimeoutRef.current);
+        autoJumpTimeoutRef.current = null;
+      }
+
+      // 수동이동 감지 참조 초기화
+      lastTimeRef.current = 0;
+      ignoreManualMoveRef.current = false;
+      originalUserSettingsRef.current = null;
+    }
+  }, [currentVideoId]);
+
   // 수동 이동 감지 함수
   const detectManualMove = useCallback((currentTime: number) => {
     // 더블클릭 직후에는 수동이동 감지 무시
@@ -540,35 +582,47 @@ const NoteArea: React.FC<NoteAreaProps> = ({
     const timeDiff = Math.abs(currentTime - lastTime);
 
     if (timeDiff > 2.0) {
-      console.log(`[수동이동] 감지: ${timeDiff.toFixed(1)}초 점프 (재생상태: ${playerState})`);
+      // 수동이동 감지 및 상태 초기화
 
-      // 수동이동 시 가장 가까운 타임스탬프 찾기
+      // 수동이동 시 스마트 인덱스 설정 (중첩 상황 고려)
       const timestamps = parseTimestamps(noteText);
       if (timestamps.length > 0) {
-        let closestIndex = -1;
-        let closestDistance = Infinity;
+        let targetIndex = -1;
 
+        // 현재 시간이 어떤 타임스탬프 구간에 있는지 먼저 확인
         for (let i = 0; i < timestamps.length; i++) {
           const stamp = timestamps[i];
-          // 시작시간까지의 거리 계산
-          const distance = Math.abs(currentTime - stamp.startTime);
-          if (distance < closestDistance) {
-            closestDistance = distance;
-            closestIndex = i;
+          if (currentTime >= stamp.startTime - 0.01 && currentTime <= stamp.endTime + 0.01) {
+            // 현재 구간에 있다면 해당 타임스탬프의 이전 인덱스로 설정
+            targetIndex = Math.max(-1, i - 1);
+            break;
           }
         }
 
-        // 가장 가까운 타임스탬프의 이전 인덱스를 설정 (해당 타임스탬프부터 활성화 가능하도록)
-        const newActiveIndex = Math.max(-1, closestIndex - 1);
-        setLastActiveIndex(newActiveIndex);
-        console.log(`[수동이동] 우선순위 재설정: ${newActiveIndex} (가장 가까운 타임스탬프: ${closestIndex})`);
+        // 구간에 없다면 가장 가까운 타임스탬프 찾기
+        if (targetIndex === -1) {
+          let closestIndex = -1;
+          let closestDistance = Infinity;
+
+          for (let i = 0; i < timestamps.length; i++) {
+            const stamp = timestamps[i];
+            const distance = Math.abs(currentTime - stamp.startTime);
+            if (distance < closestDistance) {
+              closestDistance = distance;
+              closestIndex = i;
+            }
+          }
+
+          targetIndex = Math.max(-1, closestIndex - 1);
+        }
+
+        setLastActiveIndex(targetIndex);
       }
 
       // 자동점프 타이머 취소
       if (autoJumpTimeoutRef.current) {
         clearTimeout(autoJumpTimeoutRef.current);
         autoJumpTimeoutRef.current = null;
-        console.log('[수동이동] 자동점프 타이머 취소됨!');
       }
 
       // 처리 플래그 초기화 (새로운 진입/이탈 처리를 위해)
@@ -578,12 +632,18 @@ const NoteArea: React.FC<NoteAreaProps> = ({
       // 수동 이동 후 저장된 원래 설정 초기화
       originalUserSettingsRef.current = null;
 
-      console.log('[수동이동] 타임스탬프 상태 초기화 완료');
+      // activeTimestamp 초기화 (새로운 타임스탬프 진입 가능하도록)
+      setActiveTimestamp(null);
+      setOriginalSettings(null);
     }
     lastTimeRef.current = currentTime;
   }, [playerState, noteText]);
 
-  // 통합 타임스탬프 처리 함수 (고정밀)
+  // 파싱된 타임스탬프 캐시
+  const parsedTimestampsRef = useRef<any[] | null>(null);
+  const lastNoteTextRef = useRef<string>('');
+
+  // 통합 타임스탬프 처리 함수 (고정밀, 최적화됨)
   const processTimestamps = useCallback((currentTime: number) => {
     try {
       // 수동 이동 감지 먼저 실행
@@ -592,67 +652,62 @@ const NoteArea: React.FC<NoteAreaProps> = ({
       // 현재 시간 업데이트
       setCurrentTime(currentTime);
 
-      const timestamps = parseTimestamps(noteText);
+      // 타임스탬프 캐싱으로 성능 최적화
+      let timestamps;
+      if (lastNoteTextRef.current !== noteText) {
+        timestamps = parseTimestamps(noteText);
+        parsedTimestampsRef.current = timestamps;
+        lastNoteTextRef.current = noteText;
+      } else {
+        timestamps = parsedTimestampsRef.current || [];
+      }
+
       if (timestamps.length === 0) return;
 
-        // 타임스탬프 찾기 (현재 activeTimestamp가 있으면 우선순위 무시하고 모든 타임스탬프 체크)
-        let currentStamp = null;
-        let candidateIndex = -1;
+      // 타임스탬프 찾기 (최적화된 검색)
+      let currentStamp = null;
+      let candidateIndex = -1;
+      const timeMargin = 0.01; // 감지 오차 10ms (소수점 2자리 충분)
 
-        if (activeTimestamp) {
-          // 현재 activeTimestamp가 있을 때: 모든 타임스탬프 체크 (우선순위 무시)
-          // 중요: 타임스탬프 진입 후 lastActiveIndex 업데이트로 인해 현재 타임스탬프를 못 찾는 문제 방지
-          for (let i = 0; i < timestamps.length; i++) {
-            const stamp = timestamps[i];
-            if (currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001) {
+      if (activeTimestamp) {
+        // 현재 activeTimestamp가 있을 때: 전체 검색 (우선순위 무시)
+        for (let i = 0; i < timestamps.length; i++) {
+          const stamp = timestamps[i];
+          if (currentTime >= stamp.startTime - timeMargin && currentTime <= stamp.endTime + timeMargin) {
+            currentStamp = stamp;
+            candidateIndex = i;
+            break;
+          }
+        }
+      } else {
+        // activeTimestamp가 없을 때: 노트 순서 우선순위 (전체 검색)
+        // 노트 작성 순서대로 첫 번째 매치되는 타임스탬프 실행
+        for (let i = 0; i < timestamps.length; i++) {
+          const stamp = timestamps[i];
+          if (currentTime >= stamp.startTime - timeMargin && currentTime <= stamp.endTime + timeMargin) {
+            // 이미 실행된 타임스탬프는 건너뛰기 (중복 실행 방지)
+            if (i > lastActiveIndex) {
               currentStamp = stamp;
               candidateIndex = i;
               break;
             }
           }
-        } else {
-          // activeTimestamp가 없을 때: 우선순위 기반 검색
-          // lastActiveIndex 이후의 타임스탬프들만 검사하여 순차 실행 보장
-          for (let i = lastActiveIndex + 1; i < timestamps.length; i++) {
-            const stamp = timestamps[i];
-            // 소수점 3자리 정밀도에 맞는 감지 오차 (1ms = 0.001초)
-            if (currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001) {
-              currentStamp = stamp;
-              candidateIndex = i;
-              break; // 첫 번째 매치되는 것(가장 앞선 순서)을 사용
-            }
-          }
         }
+      }
         
-        // 모든 타임스탬프 체크 상황 로그 (5초마다 한번씩)
-        if (Math.floor(currentTime) % 5 === 0 && Math.floor(currentTime * 10) % 50 === 0) {
-          console.log(`[디버그] 현재 상황 - 시간: ${currentTime.toFixed(3)}, activeTimestamp: ${activeTimestamp ? `${activeTimestamp.startTime}-${activeTimestamp.endTime}` : '없음'}, currentStamp: ${currentStamp ? `${currentStamp.startTime}-${currentStamp.endTime}` : '없음'}`);
-          if (timestamps.length > 0) {
-            timestamps.forEach((stamp, i) => {
-              const inRange = currentTime >= stamp.startTime - 0.001 && currentTime <= stamp.endTime + 0.001;
-              console.log(`  타임스탬프${i}: ${stamp.startTime}-${stamp.endTime}, 범위안: ${inRange}`);
-            });
-          }
-        }
-        
-        // 디버깅: 이탈 조건 확인
-        if (activeTimestamp && !currentStamp) {
-          console.log(`[디버그] 이탈 조건 확인: activeTimestamp=${activeTimestamp ? '있음' : '없음'}, currentStamp=${currentStamp ? '있음' : '없음'}, processingExitRef=${processingExitRef.current}`);
-          console.log(`[디버그] 현재 시간: ${currentTime.toFixed(3)}, 활성 타임스탬프: ${activeTimestamp.startTime}-${activeTimestamp.endTime}`);
-        }
 
-        // 타임스탬프 진입 처리 (중복 방지)
-        // 조건: 1) 새 타임스탬프가 있고, 2) 현재 활성 타임스탬프와 완전히 다른 타임스탬프이고, 3) 진입 처리 중이 아님
-        const isDifferentTimestamp = !activeTimestamp || 
-          (activeTimestamp.startTime !== currentStamp?.startTime || 
-           activeTimestamp.endTime !== currentStamp?.endTime ||
-           activeTimestamp.volume !== currentStamp?.volume ||
-           activeTimestamp.speed !== currentStamp?.speed ||
-           activeTimestamp.action !== currentStamp?.action);
+      // 타임스탬프 진입 처리 (중복 방지, 소수점 비교 개선)
+      // 조건: 1) 새 타임스탬프가 있고, 2) 현재 활성 타임스탬프와 완전히 다른 타임스탬프이고, 3) 진입 처리 중이 아님
+      const isDifferentTimestamp = !activeTimestamp ||
+        (Math.abs(activeTimestamp.startTime - (currentStamp?.startTime || 0)) > 0.01 ||
+         Math.abs(activeTimestamp.endTime - (currentStamp?.endTime || 0)) > 0.01 ||
+         activeTimestamp.volume !== currentStamp?.volume ||
+         Math.abs(activeTimestamp.speed - (currentStamp?.speed || 0)) > 0.01 ||
+         activeTimestamp.action !== currentStamp?.action);
 
         if (currentStamp && isDifferentTimestamp && !processingEntryRef.current) {
           processingEntryRef.current = true;
-          console.log(`[타임스탬프] 구간 진입 감지 (영상시간: ${currentTime.toFixed(3)}초, 인덱스: ${candidateIndex}):`, currentStamp);
+          console.log(`[진입] 타임스탬프 ${candidateIndex}: ${currentStamp.startTime.toFixed(2)}-${currentStamp.endTime.toFixed(2)}, lastActiveIndex: ${lastActiveIndex}`);
           
           // 활성 타임스탬프 인덱스 업데이트
           setLastActiveIndex(candidateIndex);
@@ -666,7 +721,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               volume: currentPlayerVolume,
               speed: currentPlayerSpeed
             };
-            console.log(`[자동점프] 원래 사용자 설정 저장:`, originalUserSettingsRef.current);
+            // 원래 사용자 설정 저장 완료
           }
           
           // 현재 플레이어의 실제 값을 백업 (타임스탬프 진입 전 상태)
@@ -678,14 +733,15 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             speed: currentPlayerSpeed
           });
           
-          console.log(`진입 전 상태 백업 - 볼륨: ${currentPlayerVolume}%, 속도: ${currentPlayerSpeed}x`);
+          // 진입 전 상태 백업 완료
           
           // 타임스탬프 설정 적용
           if (player.setVolume) player.setVolume(currentStamp.volume);
           if (player.setPlaybackRate) player.setPlaybackRate(currentStamp.speed);
-          
-          setActiveTimestamp(currentStamp);
-          
+
+          // activeTimestamp에 현재 인덱스 정보도 함께 저장 (자동점프시 사용)
+          setActiveTimestamp({ ...currentStamp, currentIndex: candidateIndex });
+
           // UI 상태 동기화
           setCurrentVolume(currentStamp.volume);
           setCurrentPlaybackRate(currentStamp.speed);
@@ -700,7 +756,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             if (currentStamp.action.startsWith('|')) {
               // 정지 기능 - 진입 즉시 실행
               const pauseSeconds = parseInt(currentStamp.action.substring(1));
-              console.log(`[정지액션] 자동 실행 정지 기능 (영상시간: ${currentTime.toFixed(3)}초): ${pauseSeconds}초 정지`);
+              // 정지 액션 실행
               
               // 기존 방식: 실제 정지
               player.pauseVideo();
@@ -709,7 +765,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               // 지정된 시간 후 재생 재개
               setTimeout(() => {
                 const resumeTime = player.getCurrentTime ? player.getCurrentTime() : 0;
-                console.log(`[정지액션] 정지 시간 종료 - 재생 재개 (영상시간: ${resumeTime.toFixed(3)}초)`);
+                // 정지 시간 종료 - 재생 재개
                 try {
                   player.playVideo();
                   showNotification('재생 재개', 'success');
@@ -719,86 +775,85 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               }, pauseSeconds * 1000);
               
             } else if (currentStamp.action === '->') {
-              // 자동 점프 설정 (재생 속도 고려)
+              // 자동 점프 설정 (단순화된 로직)
               const timeToEnd = currentStamp.endTime - currentTime;
-              const realTimeToEnd = (timeToEnd / currentStamp.speed) * 1000;
-              console.log(`[자동점프] 타이머 설정: ${timeToEnd.toFixed(4)}초 후 이동 (${realTimeToEnd.toFixed(1)}ms)`);
-              
+              const realTimeToEnd = Math.max(100, (timeToEnd / currentStamp.speed) * 1000); // 최소 100ms 보장
+
               // 기존 타이머 취소
               if (autoJumpTimeoutRef.current) {
                 clearTimeout(autoJumpTimeoutRef.current);
-                console.log('[자동점프] 기존 타이머 취소');
+                autoJumpTimeoutRef.current = null;
               }
-              
+
               autoJumpTimeoutRef.current = setTimeout(() => {
-                console.log('[자동점프] 타이머 실행됨! 다음 타임스탬프 찾는 중...');
-                const timestamps = parseTimestamps(noteText);
-                const currentIndex = timestamps.findIndex(s => 
-                  s.startTime === currentStamp.startTime && 
-                  s.endTime === currentStamp.endTime &&
-                  s.volume === currentStamp.volume &&
-                  s.speed === currentStamp.speed
-                );
-                const nextStamp = timestamps[currentIndex + 1];
-                console.log(`[자동점프] 현재 타임스탬프 인덱스: ${currentIndex}, 다음 타임스탬프:`, nextStamp);
-                
-                if (nextStamp) {
-                  // 현재 타임스탬프 종료 처리 (다음 타임스탬프가 있을 때만)
-                  console.log('[자동점프] 현재 타임스탬프 종료 처리');
+                try {
+                  const timestamps = parseTimestamps(noteText);
+                  const nextStamp = timestamps[candidateIndex + 1];
+
+                  if (nextStamp) {
+                    // 상태 정리
+                    setActiveTimestamp(null);
+                    setOriginalSettings(null);
+                    processingEntryRef.current = false;
+                    processingExitRef.current = false;
+
+                    // 스마트 거리 기반 점프 (로딩 최소화)
+                    const jumpCurrentTime = player.getCurrentTime();
+                    const distance = Math.abs(nextStamp.startTime - jumpCurrentTime);
+
+                    // 3초 이내: allowSeekAhead = false (즉시 점프, 로딩 없음)
+                    // 3-10초: allowSeekAhead = false (빠른 점프)
+                    // 10초 이상: allowSeekAhead = true (버퍼링 허용)
+                    const allowSeekAhead = distance > 10;
+                    const useBuffer = distance <= 3 ? false : allowSeekAhead;
+
+                    // 중첩된 타임스탬프도 무조건 점프 (사용자 의도 존중)
+                    console.log(`[자동점프] ${candidateIndex} → ${candidateIndex + 1}: ${nextStamp.startTime.toFixed(2)}-${nextStamp.endTime.toFixed(2)}`);
+                    player.seekTo(nextStamp.startTime, useBuffer);
+                    showNotification(`자동 점프: ${formatTime(nextStamp.startTime)}로 이동 (거리: ${distance.toFixed(1)}초)`, 'success');
+
+                    // lastActiveIndex 업데이트 (다음 타임스탬프가 활성화되도록)
+                    setLastActiveIndex(candidateIndex);
+                    console.log(`[자동점프] lastActiveIndex 업데이트: ${candidateIndex}`);
+
+                    // 원래 설정 복원 (단순화)
+                    setTimeout(() => {
+                      const restoreSettings = originalUserSettingsRef.current || userSettings;
+                      if (player.setVolume) player.setVolume(restoreSettings.volume);
+                      if (player.setPlaybackRate) player.setPlaybackRate(restoreSettings.speed);
+
+                      setCurrentVolume(restoreSettings.volume);
+                      setCurrentPlaybackRate(restoreSettings.speed);
+                      setVolume(restoreSettings.volume);
+                      setPlaybackRate(restoreSettings.speed);
+                      setCurrentRate(restoreSettings.speed);
+                      setUserSettings(restoreSettings);
+
+                      showNotification(`설정 복원: 볼륨 ${restoreSettings.volume}%, 속도 ${restoreSettings.speed}x`, 'success');
+                    }, 100);
+                  } else {
+                    // 마지막 타임스탬프 - 기본값으로 복원
+                    if (player.setVolume) player.setVolume(userSettings.volume);
+                    if (player.setPlaybackRate) player.setPlaybackRate(userSettings.speed);
+
+                    setCurrentVolume(userSettings.volume);
+                    setCurrentPlaybackRate(userSettings.speed);
+                    setVolume(userSettings.volume);
+                    setPlaybackRate(userSettings.speed);
+                    setCurrentRate(userSettings.speed);
+
+                    showNotification(`설정 복원: 볼륨 ${userSettings.volume}%, 속도 ${userSettings.speed}x`, 'info');
+                  }
+                } catch (error) {
+                  // 자동 점프 오류시 조용히 무시하고 상태만 정리
                   setActiveTimestamp(null);
                   setOriginalSettings(null);
-                  
-                  // 처리 플래그 리셋 (새로운 진입/이탈 처리를 위해)
                   processingEntryRef.current = false;
                   processingExitRef.current = false;
-                  console.log('[자동점프] 다음 타임스탬프로 이동:', nextStamp);
-                  
-                  // 현재 시간과 다음 타임스탬프 간의 거리 계산
-                  const jumpCurrentTime = player.getCurrentTime();
-                  const distance = Math.abs(nextStamp.startTime - jumpCurrentTime);
-                  
-                  // 10초 이내면 버퍼링 방지를 위해 재로드 안함
-                  const allowSeekAhead = distance > 10;
-                  console.log(`[자동점프] 거리: ${distance.toFixed(1)}초, 재로드: ${allowSeekAhead ? 'YES' : 'NO'}`);
-                  
-                  player.seekTo(nextStamp.startTime, allowSeekAhead);
-                  showNotification(`자동 점프: ${formatTime(nextStamp.startTime)}로 이동`, 'success');
-                  
-                  // 100ms 후 원래 사용자 설정으로 복원
-                  setTimeout(() => {
-                    if (originalUserSettingsRef.current) {
-                      console.log(`[자동점프] 원래 사용자 설정으로 복원:`, originalUserSettingsRef.current);
-                      if (player.setVolume) player.setVolume(originalUserSettingsRef.current.volume);
-                      if (player.setPlaybackRate) player.setPlaybackRate(originalUserSettingsRef.current.speed);
-                      
-                      setCurrentVolume(originalUserSettingsRef.current.volume);
-                      setCurrentPlaybackRate(originalUserSettingsRef.current.speed);
-                      setVolume(originalUserSettingsRef.current.volume);
-                      setPlaybackRate(originalUserSettingsRef.current.speed);
-                      setCurrentRate(originalUserSettingsRef.current.speed);
-                      setUserSettings({
-                        volume: originalUserSettingsRef.current.volume,
-                        speed: originalUserSettingsRef.current.speed
-                      });
-                      
-                      showNotification(`원래 설정 복원: 볼륨 ${originalUserSettingsRef.current.volume}%, 속도 ${originalUserSettingsRef.current.speed}x`, 'success');
-                    }
-                  }, 100);
-                } else {
-                  console.log('[자동점프] 마지막 타임스탬프 - 사용자 설정 복원');
-                  
-                  // 마지막 타임스탬프면 사용자 설정으로 복원
-                  if (player.setVolume) player.setVolume(userSettings.volume);
-                  if (player.setPlaybackRate) player.setPlaybackRate(userSettings.speed);
-                  
-                  setCurrentVolume(userSettings.volume);
-                  setCurrentPlaybackRate(userSettings.speed);
-                  setVolume(userSettings.volume);
-                  setPlaybackRate(userSettings.speed);
-                  setCurrentRate(userSettings.speed);
-                  
-                  showNotification(`설정 복원: 볼륨 ${userSettings.volume}%, 속도 ${userSettings.speed}x`, 'info');
                 }
+
+                // 타이머 정리
+                autoJumpTimeoutRef.current = null;
               }, realTimeToEnd);
             }
           }
@@ -813,14 +868,12 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           // 이탈 조건: 현재 위치가 타임스탬프 구간 밖이고 activeTimestamp가 있을 때
           // 중요: 이 로직은 더블클릭 종료시간 이동시에도 실행되어 재생 기본값으로 복원함
           processingExitRef.current = true;
-          console.log(`[이탈] 타임스탬프 구간 이탈 감지 (영상시간: ${currentTime.toFixed(3)}초)`);
-          console.log(`  이탈한 타임스탬프: ${activeTimestamp.startTime.toFixed(3)}-${activeTimestamp.endTime.toFixed(3)}`);
-          console.log(`  현재 시간: ${currentTime.toFixed(3)}`);
+          console.log(`[이탈] 타임스탬프 구간 이탈: ${activeTimestamp.startTime.toFixed(2)}-${activeTimestamp.endTime.toFixed(2)}, 현재시간: ${currentTime.toFixed(2)}`);
 
           // 우측 패널의 재생 기본값으로 복원 (originalSettings 무시)
           // 타임스탬프 이탈 시에는 항상 재생 기본값으로 복원하여 일관성 유지
           // 절대 변경 금지: 이것을 변경하면 타임스탬프 종료시 설정이 남아있게 됨
-          console.log('재생 기본값으로 복원 (우측 패널 설정) - originalSettings 무시');
+          // 재생 기본값으로 복원 (originalSettings 무시)
 
           // 우측 패널 설정에서 재생 기본값 가져오기
           const defaultVolume = uiSettings?.재생기본값?.defaultVolume ?? 100;
@@ -841,39 +894,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
             speed: defaultSpeed
           });
 
-          console.log(`재생 기본값 복원 - 볼륨: ${defaultVolume}%, 속도: ${defaultSpeed}x`);
           showNotification(`재생 기본값으로 복원: 볼륨 ${defaultVolume}%, 속도 ${defaultSpeed}x`, 'info');
-
-          // 기존 로직 제거: originalSettings를 더 이상 참조하지 않음
-          if (false) {
-            // 우측 패널의 재생 기본값으로 복원
-            // 더블클릭으로 진입한 경우 originalUserSettingsRef가 있지만 무시하고 재생 기본값 사용
-            console.log('재생 기본값으로 복원 (우측 패널 설정)');
-
-            // 우측 패널 설정에서 재생 기본값 가져오기
-            const defaultVolume = uiSettings?.재생기본값?.defaultVolume ?? 100;
-            const defaultSpeed = uiSettings?.재생기본값?.defaultPlaybackRate ?? 1.0;
-
-            if (player.setVolume) player.setVolume(defaultVolume);
-            if (player.setPlaybackRate) player.setPlaybackRate(defaultSpeed);
-
-            setCurrentVolume(defaultVolume);
-            setCurrentPlaybackRate(defaultSpeed);
-            setVolume(defaultVolume);
-            setPlaybackRate(defaultSpeed);
-            setCurrentRate(defaultSpeed);
-
-            // userSettings도 재생 기본값으로 업데이트
-            setUserSettings({
-              volume: defaultVolume,
-              speed: defaultSpeed
-            });
-
-            showNotification(`재생 기본값으로 복원: 볼륨 ${defaultVolume}%, 속도 ${defaultSpeed}x`, 'info');
-
-            // 백업 클리어 (다음 타임스탬프를 위해)
-            originalUserSettingsRef.current = null;
-          }
           
           setActiveTimestamp(null);
           setOriginalSettings(null);
@@ -884,7 +905,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           }, 100);
         }
     } catch (error) {
-      console.error('타임스탬프 감지 오류:', error);
+      // 타임스탬프 감지 오류 발생시 조용히 무시
     }
   }, [isPlayerReady, player, playerState, noteText, activeTimestamp, originalSettings, userSettings, detectManualMove]);
 
@@ -907,7 +928,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           processTimestamps(currentTime);
         }
       } catch (error) {
-        console.error('requestAnimationFrame 추적 오류:', error);
+        // requestAnimationFrame 추적 오류 발생시 조용히 무시
       }
 
       // 재생 중이면 계속 추적
@@ -950,7 +971,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
       const defaultVolume = uiSettings?.재생기본값?.defaultVolume || 100;
       const defaultSpeed = uiSettings?.재생기본값?.defaultPlaybackRate || 1.0;
       
-      console.log(`[영상변경] 기본값 적용: 볼륨 ${defaultVolume}%, 속도 ${defaultSpeed}x`);
+      // 새 영상 로드시 기본값 적용
       
       // 플레이어에 기본값 적용
       if (player.setVolume) player.setVolume(defaultVolume);
@@ -1572,7 +1593,7 @@ const NoteArea: React.FC<NoteAreaProps> = ({
           setCurrentRate(timestampSpeed);
           
           // 클릭 위치에 따라 시작시간/종료시간 결정
-          const timestampStart = clickedMatch.index;
+          const timestampStart = clickedMatch?.index || 0;
           const dashPos = clickedTimestamp.indexOf('-');
           const isEndTimeClick = clickPosition > (timestampStart + dashPos);
           const targetTime = isEndTimeClick ? endTime : startTime;
