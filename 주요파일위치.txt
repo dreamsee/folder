@@ -164,10 +164,16 @@ UI 컴포넌트:
 - HomePage.tsx:currentVideoId currentVideoId 상태 관리
 
 ⚙️ 설정 관리:
-- SettingsPanel.tsx:전체컴포넌트 모든 설정 UI
+- SettingsPanel.tsx:전체컴포넌트 2단계 탭 구조 설정 UI
 - SettingsPanel.tsx:18-21 UISettings 인터페이스 정의 (검색창.목록유지 포함)
 - SettingsPanel.tsx:577-600 검색창 유지 설정 및 하위 "목록 열어두기" 토글
 - SettingsPanel.tsx:589-600 목록유지 토글 (검색창 유지가 ON일 때만 표시)
+- SettingsPanel.tsx:693-722 상단 탭 그룹 (빠른설정/재생기본값)
+- SettingsPanel.tsx:724-772 하단 탭 그룹 (노트영역/화면텍스트/돋보기)
+- SettingsPanel.tsx:775-826 노트영역 탭 (노트 영역 표시 토글)
+- SettingsPanel.tsx:829-892 화면텍스트 탭 (기존 모든 화면텍스트 설정 포함)
+- SettingsPanel.tsx:895-915 돋보기 탭 (화면 확대 기능, TestZoomPage 연결 준비)
+- SettingsPanel.tsx:734-771 자동 스크롤 기능 (모든 탭에 100ms 지연 후 scrollIntoView 적용)
 - SettingsPanel.tsx:783-790 지속시간 토글 (스타일설정 섹션 맨 아래)
 - SettingsPanel.tsx:1080-1170 프리셋 설정 저장 로직 (최소모드/노트모드)
 - SettingsPanel.tsx:1200-1270 실시간 프리셋 업데이트 (handleSettingChange)
@@ -176,6 +182,12 @@ UI 컴포넌트:
 - HomePage.tsx:279 keepSearchResults prop 전달 (목록유지 설정 연결)
 - NoteArea.tsx:재생기본값적용 새 영상 로드시 기본값 적용
 - YouTubePlayer.tsx:설정동기화 플레이어 설정 동기화
+→ 수정 시 주의:
+  1. 탭 구조: 상단(빠른설정/재생기본값) + 하단(노트영역/화면텍스트/돋보기) 완전 분리
+  2. 자동 스크롤: 하단 탭 전환시 content-tabs-section으로 스크롤 (UI 잘림 방지)
+  3. 기존 기능 보존: 화면텍스트 하위 모든 설정 유지 (토글 상태에 따른 표시/숨김)
+  4. 돋보기 탭: TestZoomPage 화면 확대 기능 연결 예정
+  5. 탭 전환시 100ms 지연: DOM 렌더링 완료 후 스크롤 실행
 
 🎵 볼륨/속도 제어:
 - NoteArea.tsx:1362-1377 handleVolumeChange 볼륨 슬라이더

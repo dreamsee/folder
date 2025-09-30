@@ -196,21 +196,23 @@ export class TimestampProcessor {
     this.state.isProcessingEntry = true;
 
     try {
-      // 정지 액션은 진입과 동시에 즉시 실행 (지연 방지)
-      if (timestamp.action?.startsWith('|')) {
-        this.player.pauseVideo();
-        this.log(`[즉시정지] 타임스탬프 ${timestamp.index} 진입과 동시에 정지`);
-      }
-
       // originalSettings 백업 (현재 설정 저장)
       this.state.originalSettings = {
         volume: this.player.getVolume(),
         speed: this.player.getPlaybackRate()
       };
 
-      // 타임스탬프 설정 적용
-      this.player.setVolume(timestamp.volume);
-      this.player.setPlaybackRate(timestamp.speed);
+      // 정지 액션이 있는 경우: 우선 0.25x 속도로 느리게 재생 (부드러운 전환 효과)
+      if (timestamp.action?.startsWith('|')) {
+        // 먼저 0.25x 속도로 설정하여 느린 재생 (소리 최소화, 멈춰가는 느낌)
+        this.player.setVolume(timestamp.volume);
+        this.player.setPlaybackRate(0.25);
+        this.log(`[정지전환] 타임스탬프 ${timestamp.index} 0.25x 속도로 전환 (부드러운 정지 준비)`);
+      } else {
+        // 일반 타임스탬프 또는 자동점프: 원래 설정대로 적용
+        this.player.setVolume(timestamp.volume);
+        this.player.setPlaybackRate(timestamp.speed);
+      }
 
       // activeTimestamp 설정
       this.state.activeTimestamp = timestamp;
@@ -301,15 +303,26 @@ export class TimestampProcessor {
       this.log(`[자동점프] 속도보정: ${timeToEnd.toFixed(2)}초 구간, ${timestamp.speed}x 속도 → 실제 ${(realTimeToEnd/1000).toFixed(2)}초 후 점프 → #${nextTimestamp?.index || '없음'}`);
 
     } else if (timestamp.action.startsWith('|')) {
-      // 정지 액션: |3 = 3초간 정지 (이미 processEntry에서 즉시 정지 처리됨)
+      // 정지 액션: |3 = 3초간 정지
       const pauseSeconds = parseInt(timestamp.action.substring(1));
+
+      // 0.25x 재생 중 약간의 지연 후 정지 (부드러운 전환)
+      setTimeout(() => {
+        this.player?.pauseVideo();
+        this.log(`[정지] 0.25x에서 완전 정지로 전환`);
+      }, 300); // 0.3초 후 정지 (느린 재생 효과)
 
       this.log(`[정지대기] ${pauseSeconds}초 대기 후 자동 재생 예약`);
 
+      // 정지 시간 후 재생 재개 및 원래 속도 복원
       setTimeout(() => {
-        this.player?.playVideo();
-        this.log(`[재생] ${pauseSeconds}초 정지 후 재생 재개`);
-      }, pauseSeconds * 1000);
+        if (this.player && this.state.activeTimestamp) {
+          // 원래 설정된 속도로 복원
+          this.player.setPlaybackRate(this.state.activeTimestamp.speed);
+          this.player.playVideo();
+          this.log(`[재생] ${pauseSeconds}초 정지 후 ${this.state.activeTimestamp.speed}x 속도로 재생 재개`);
+        }
+      }, (pauseSeconds * 1000) + 300); // 정지 시간 + 0.3초 (정지 전환 시간 포함)
     }
   }
 
