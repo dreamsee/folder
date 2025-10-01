@@ -202,12 +202,14 @@ export class TimestampProcessor {
         speed: this.player.getPlaybackRate()
       };
 
-      // 정지 액션이 있는 경우: 우선 0.25x 속도로 느리게 재생 (부드러운 전환 효과)
+      // 정지 액션이 있는 경우: 감지 지연 상쇄를 위해 0.5초 앞으로 점프 후 0.25x 속도 재생
       if (timestamp.action?.startsWith('|')) {
-        // 먼저 0.25x 속도로 설정하여 느린 재생 (소리 최소화, 멈춰가는 느낌)
+        // 감지 지연 0.5초를 상쇄하기 위해 0.5초 앞으로 점프
+        const jumpPosition = Math.max(0, timestamp.startTime - 0.5);
+        this.player.seekTo(jumpPosition);
         this.player.setVolume(timestamp.volume);
         this.player.setPlaybackRate(0.25);
-        this.log(`[정지전환] 타임스탬프 ${timestamp.index} 0.25x 속도로 전환 (부드러운 정지 준비)`);
+        this.log(`[정지전환] 타임스탬프 ${timestamp.index} ${this.formatTime(jumpPosition)}로 점프 후 0.25x 속도 (지연 상쇄)`);
       } else {
         // 일반 타임스탬프 또는 자동점프: 원래 설정대로 적용
         this.player.setVolume(timestamp.volume);
@@ -525,7 +527,11 @@ export class TimestampProcessor {
 
   private log(message: string): void {
     console.log(`[TimestampProcessor] ${message}`);
-    if (this.showNotification) {
+
+    // 정지 관련 로그는 알림 표시하지 않음 (재생 지연 방지)
+    const isPauseRelated = message.includes('[정지') || message.includes('[재생]');
+
+    if (this.showNotification && !isPauseRelated) {
       this.showNotification(message, 'info');
     }
   }

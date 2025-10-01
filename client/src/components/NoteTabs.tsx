@@ -34,6 +34,12 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
+  // 탭 포커스 상태 (포스트잇 vs 책갈피 효과)
+  const [isTabsFocused, setIsTabsFocused] = useState(false);
+
+  // 마지막 포커스 획득 시간 추적 (클릭으로 인한 포커스인지 구분)
+  const [lastFocusTime, setLastFocusTime] = useState(0);
+
   const editInputRef = useRef<HTMLInputElement>(null);
 
   // 편집 모드 진입 시 입력 필드 포커스
@@ -44,12 +50,22 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
     }
   }, [editingPageId]);
 
-  // 탭 클릭 핸들러 - 선택된 탭 재클릭시 편집 모드
+  // 탭 클릭 핸들러 - 최소화 상태에서는 포커스 우선, 확대 상태에서만 편집 모드
   const handleTabClick = (index: number, pageId: string) => {
     if (pageState.activePageIndex === index && !pageState.pages[index].isSpecial) {
-      // 선택된 탭 재클릭 -> 편집 모드
-      setEditingPageId(pageId);
-      setEditingName(pageState.pages[index].name);
+      // 선택된 탭 재클릭 시
+      const now = Date.now();
+      const wasJustFocused = now - lastFocusTime < 100; // 100ms 이내에 포커스된 경우
+
+      if (!isTabsFocused || wasJustFocused) {
+        // 최소화 상태이거나 방금 포커스된 경우: 포커스만 (편집 모드 안됨)
+        setIsTabsFocused(true);
+        setLastFocusTime(now);
+      } else {
+        // 이미 확대된 상태에서 클릭: 편집 모드 진입
+        setEditingPageId(pageId);
+        setEditingName(pageState.pages[index].name);
+      }
     } else {
       // 다른 탭 클릭 -> 페이지 전환
       onPageChange(index);
@@ -111,7 +127,15 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
   };
 
   return (
-    <div className="note-tabs-container">
+    <div
+      className={`note-tabs-container ${isTabsFocused ? 'focused' : 'minimized'}`}
+      onFocus={() => {
+        setIsTabsFocused(true);
+        setLastFocusTime(Date.now());
+      }}
+      onBlur={() => setIsTabsFocused(false)}
+      tabIndex={0}
+    >
       {/* 탭 목록 */}
       <div className="note-tabs-wrapper">
         <div className="note-tabs">
@@ -235,20 +259,50 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
           gap: 6px;
           min-width: 120px;
           max-width: 200px;
-          padding: 0 12px; /* 상하 패딩 0으로 설정 */
+          padding: 0 12px;
           background: #f8f9fa;
           border: 1px solid #ddd;
           border-top: none;
           border-radius: 0 0 8px 8px;
           cursor: pointer;
-          transition: all 0.2s ease;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+          transition: all 0.3s ease;
+          box-shadow: none;
           margin-top: 0;
+          height: 32px;
+          transform-origin: top;
+        }
+
+        /* 포커스 없을 때 - 책갈피 효과 (최소화) */
+        .note-tabs-container.minimized .note-tab {
+          height: 12px; /* 4px 늘려서 12px */
+          padding: 0 8px;
+          gap: 3px;
+          box-shadow: none;
+          opacity: 0.7;
+          transform: translateY(0); /* translateY 제거 - 상단 고정 */
+          font-size: 10px;
+          align-items: flex-start;
+        }
+
+        /* 최소화 상태에서 탭 내용 숨기기 */
+        .note-tabs-container.minimized .tab-name,
+        .note-tabs-container.minimized .tab-emoji,
+        .note-tabs-container.minimized .tab-delete-btn,
+        .note-tabs-container.minimized .tab-color-indicator {
+          display: none;
+        }
+
+        /* 포커스 있을 때 - 포스트잇 효과 (튀어나옴) */
+        .note-tabs-container.focused .note-tab {
+          height: 32px; /* 원래 크기 */
+          padding: 0 12px;
+          gap: 6px;
+          box-shadow: none;
+          opacity: 1;
+          transform: translateY(0); /* 원래 위치 */
         }
 
         .note-tab:hover {
-          transform: translateY(1px);
-          box-shadow: 0 3px 6px rgba(0,0,0,0.15);
           background: #fff;
         }
 
@@ -259,7 +313,7 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
           border-top: 2px solid #007acc;
           z-index: 10;
           transform: translateY(0);
-          box-shadow: 0 4px 8px rgba(0,123,204,0.2);
+          box-shadow: none;
         }
 
         .note-tab.special {
@@ -350,7 +404,7 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
 
         .add-page-btn {
           min-width: 40px;
-          height: 38px; /* 탭과 같은 높이로 안정감 확보 */
+          height: 24px; /* 높이 24로 변경 */
           border: 1px dashed #ccc;
           background: transparent;
           color: #666;

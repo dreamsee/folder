@@ -16,14 +16,14 @@ export interface NotePageState {
   activePageIndex: number;
 }
 
-// 페이지 색상 프리셋
+// 페이지 색상 프리셋 (구분 잘되는 파스텔 톤)
 export const PAGE_COLORS = [
-  '#fef3c7', // 노란색
-  '#fecaca', // 빨간색
-  '#c7d2fe', // 파란색
-  '#bbf7d0', // 초록색
-  '#fed7e2', // 분홍색
-  '#e5e7eb', // 회색
+  '#fef3c7', // 노란색 (버터)
+  '#fecaca', // 빨간색 (코랄)
+  '#bfdbfe', // 하늘색 (스카이)
+  '#bbf7d0', // 초록색 (민트)
+  '#e9d5ff', // 라벤더 (보라)
+  '#fed7d7', // 복숭아색 (피치)
 ] as const;
 
 // 기본 이모지 프리셋
