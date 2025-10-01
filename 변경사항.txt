@@ -1,6 +1,18 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-01: 왼쪽탭 레이아웃 시스템 구현 완료
+- LeftSidebarTabs.tsx: 왼쪽 세로 탭 컴포넌트 신규 생성 (노트/화면글자/돋보기 탭)
+- ZoomContent.tsx: 돋보기 탭 전용 컨텐츠 컴포넌트 신규 생성 (좌표입력/목록관리 하위 탭)
+- NoteArea.tsx: 왼쪽탭 레이아웃 조건부 렌더링 시스템 구현 (uiSettings?.왼쪽탭레이아웃?.사용 기반)
+- SettingsPanel.tsx: 왼쪽탭 레이아웃 토글 설정 추가 (재생컨트롤과 기능 탭 사이 위치)
+- HomePage.tsx: 왼쪽탭 레이아웃 기본값 설정 추가 (사용: false)
+- NoteTabs.tsx: 최소화 상태에서 스크롤바 숨김 처리 (overflow-x: hidden, scrollbar-width: none)
+- 디자인 시스템: 각 탭별 고유 색상 적용 (노트: #8b5cf6, 화면글자: #10b981, 돋보기: #f59e0b, opacity: 0.7)
+- 레이아웃 최적화: 탭 크기 27px×48px, 우측 컨텐츠 간격 4px, 폰트 9px, 라운드 처리
+→ 주의: 왼쪽탭 레이아웃 수정시 NoteArea.tsx, LeftSidebarTabs.tsx, SettingsPanel.tsx 연동 확인 필요
+→ 주요 성과: 세로 스크롤 문제 해결 및 컴팩트한 탭 기반 UI 전환 완료
+
 2025-09-19: TestOverlayPage 고급 위치 제어 및 전체화면 시스템 완성
 - TestOverlayPage.tsx: 좌표 직접 입력 기능 추가 (X, Y 숫자 입력으로 정밀 위치 조정)
 - TestOverlayPage.tsx: 텍스트 정렬 기능 추가 (좌측/중앙/우측 정렬 선택 버튼)

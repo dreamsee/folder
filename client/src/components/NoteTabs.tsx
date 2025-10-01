@@ -244,6 +244,16 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
           scrollbar-color: #ccc transparent;
         }
 
+        /* 최소화 상태에서 스크롤바 숨기기 */
+        .note-tabs-container.minimized .note-tabs-wrapper {
+          overflow-x: hidden;
+          scrollbar-width: none;
+        }
+
+        .note-tabs-container.minimized .note-tabs-wrapper::-webkit-scrollbar {
+          display: none;
+        }
+
         .note-tabs {
           display: flex;
           min-width: fit-content;
