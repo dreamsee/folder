@@ -2013,25 +2013,9 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               <div className="flex-1 flex flex-col ml-1">
                 {/* 노트 탭 */}
                 {activeMainTab === 'note' && uiSettings?.노트영역?.표시 !== false && (
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex-1">
-                      {/* 전체 페이지 전용: 타임스탬프 가져오기 버튼 */}
-                      {getCurrentPage()?.isSpecial && (
-                        <div className="mb-2 flex justify-end gap-2">
-                          <Button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowTimestampImporter(!showTimestampImporter);
-                            }}
-                            size="sm"
-                            variant="outline"
-                            className="text-xs"
-                          >
-                            📋 타임스탬프 가져오기
-                          </Button>
-                        </div>
-                      )}
-
+                  <div className="flex-1 flex">
+                    {/* 노트 영역 */}
+                    <div className="flex-1 flex flex-col">
                       <Textarea
                         ref={textareaRef}
                         value={noteText}
@@ -2054,21 +2038,46 @@ const NoteArea: React.FC<NoteAreaProps> = ({
                           msOverflowStyle: 'none'
                         }}
                       />
+
+                      {/* 페이지 탭 시스템 - 하단에 표시 */}
+                      <div ref={noteTabsRef} style={{ marginTop: '4px' }}>
+                        <NoteTabs
+                          pageState={pageState}
+                          onPageChange={handlePageChange}
+                          onPageUpdate={handlePageUpdate}
+                          onPageAdd={handlePageAdd}
+                          onPageDelete={handlePageDelete}
+                          onPageReorder={handlePageReorder}
+                          onEmojiClick={handleEmojiClick}
+                          onColorClick={handleColorClick}
+                        />
+                      </div>
                     </div>
 
-                    {/* 페이지 탭 시스템 - 우측 영역에만 표시 */}
-                    <div ref={noteTabsRef} style={{ marginTop: '4px' }}>
-                      <NoteTabs
-                        pageState={pageState}
-                        onPageChange={handlePageChange}
-                        onPageUpdate={handlePageUpdate}
-                        onPageAdd={handlePageAdd}
-                        onPageDelete={handlePageDelete}
-                        onPageReorder={handlePageReorder}
-                        onEmojiClick={handleEmojiClick}
-                        onColorClick={handleColorClick}
-                      />
-                    </div>
+                    {/* 전체 페이지 전용: 타임스탬프 가져오기 세로 버튼 */}
+                    {getCurrentPage()?.isSpecial && (
+                      <div className="ml-1 flex flex-col justify-start">
+                        <Button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowTimestampImporter(!showTimestampImporter);
+                          }}
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs px-1 py-8 writing-mode-vertical bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 hover:border-gray-300 transition-all duration-200"
+                          style={{
+                            writingMode: 'vertical-rl',
+                            textOrientation: 'mixed',
+                            height: '140px',
+                            width: '30px',
+                            fontWeight: '400'
+                          }}
+                        >
+                          전체 도장 가져오기
+                          <Clock className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
 

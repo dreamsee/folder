@@ -550,7 +550,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {/* 상단부 설정 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium pb-2">상단부</h3>
             <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm">제목 표시</span>
@@ -606,7 +605,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {/* 바 설정 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium pb-2">바 설정</h3>
             <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
               <div className="flex justify-between items-center">
                 <div className="flex flex-col">
@@ -725,80 +723,78 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
           {/* 왼쪽 탭 레이아웃 설정 */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium pb-2">레이아웃</h3>
-            <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4">
-              <div className="flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="text-sm">왼쪽 탭 레이아웃</span>
-                  <span className="text-xs text-gray-500">노트/화면텍스트/돋보기를 왼쪽 탭으로 구성</span>
-                </div>
-                <Switch
-                  checked={settings.왼쪽탭레이아웃?.사용 ?? false}
-                  onCheckedChange={(값) => handleSettingChange("왼쪽탭레이아웃", {
-                    ...settings.왼쪽탭레이아웃,
-                    사용: 값
-                  })}
-                />
+            <div className="flex justify-between items-center">
+              <div className="flex flex-col">
+                <span className="text-sm">왼쪽 탭</span>
+                <span className="text-xs text-gray-500">노트/화면글자/돋보기</span>
               </div>
+              <Switch
+                checked={settings.왼쪽탭레이아웃?.사용 ?? false}
+                onCheckedChange={(값) => handleSettingChange("왼쪽탭레이아웃", {
+                  ...settings.왼쪽탭레이아웃,
+                  사용: 값
+                })}
+              />
             </div>
           </div>
 
-          {/* 노트영역/화면텍스트/돋보기 탭 그룹 */}
+          {/* 노트/화면글자/돋보기 탭 그룹 */}
           <div className="space-y-3" id="content-tabs-section">
-            <Tabs defaultValue="노트영역" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 h-8">
-                <TabsTrigger
-                  value="노트영역"
-                  className="text-xs py-1 px-2"
-                  onClick={() => {
-                    // 탭 전환시 해당 섹션으로 스크롤
-                    setTimeout(() => {
-                      const element = document.getElementById('content-tabs-section');
-                      if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
-                    }, 100);
-                  }}
-                >
-                  노트영역
-                </TabsTrigger>
-                <TabsTrigger
-                  value="화면텍스트"
-                  className="text-xs py-1 px-2"
-                  onClick={() => {
-                    // 탭 전환시 해당 섹션으로 스크롤
-                    setTimeout(() => {
-                      const element = document.getElementById('content-tabs-section');
-                      if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
-                    }, 100);
-                  }}
-                >
-                  화면텍스트
-                </TabsTrigger>
-                <TabsTrigger
-                  value="돋보기"
-                  className="text-xs py-1 px-2"
-                  onClick={() => {
-                    // 탭 전환시 해당 섹션으로 스크롤
-                    setTimeout(() => {
-                      const element = document.getElementById('content-tabs-section');
-                      if (element) {
-                        element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }
-                    }, 100);
-                  }}
-                >
-                  돋보기
-                </TabsTrigger>
-              </TabsList>
+            <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-1">
+              <Tabs defaultValue="노트" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 h-8">
+                  <TabsTrigger
+                    value="노트"
+                    className="text-xs py-1 px-2"
+                    onClick={() => {
+                      // 탭 전환시 해당 섹션으로 스크롤
+                      setTimeout(() => {
+                        const element = document.getElementById('content-tabs-section');
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 100);
+                    }}
+                  >
+                    노트
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="화면글자"
+                    className="text-xs py-1 px-2"
+                    onClick={() => {
+                      // 탭 전환시 해당 섹션으로 스크롤
+                      setTimeout(() => {
+                        const element = document.getElementById('content-tabs-section');
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 100);
+                    }}
+                  >
+                    화면글자
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="돋보기"
+                    className="text-xs py-1 px-2"
+                    onClick={() => {
+                      // 탭 전환시 해당 섹션으로 스크롤
+                      setTimeout(() => {
+                        const element = document.getElementById('content-tabs-section');
+                        if (element) {
+                          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }
+                      }, 100);
+                    }}
+                  >
+                    돋보기
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* 노트영역 탭 */}
-              <TabsContent value="노트영역" className="mt-3">
+              {/* 노트 탭 */}
+              <TabsContent value="노트" className="mt-3">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <h3 className="text-sm font-medium">노트 영역 표시</h3>
+                    <h3 className="text-sm font-medium">노트 표시</h3>
                     <Switch
                       checked={settings.노트영역.표시}
                       onCheckedChange={(값) => 설정업데이트("노트영역", "표시", 값)}
@@ -807,11 +803,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 </div>
               </TabsContent>
 
-              {/* 화면텍스트 탭 */}
-              <TabsContent value="화면텍스트" className="mt-3">
+              {/* 화면글자 탭 */}
+              <TabsContent value="화면글자" className="mt-3">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center pb-2">
-                    <h3 className="text-sm font-medium">화면 텍스트 패널</h3>
+                    <h3 className="text-sm font-medium">화면 글자 패널</h3>
                     <Switch
                       checked={settings.화면텍스트.패널표시}
                       onCheckedChange={(값) => 설정업데이트("화면텍스트", "패널표시", 값)}
@@ -911,7 +907,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   </div>
                 </div>
               </TabsContent>
-            </Tabs>
+              </Tabs>
+            </div>
           </div>
         </CardContent>
         </div>

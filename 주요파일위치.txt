@@ -13,13 +13,16 @@ YouTube 노트 앱 주요 파일 위치 및 코드 매핑
 
 UI 컴포넌트:
 - client/src/components/SettingsPanel.tsx: 우측 설정 패널
-- client/src/components/NoteTabs.tsx: 노트 페이지 탭 시스템 (포커스 기반 최소화)
 - client/src/components/TextOverlay.tsx: 화면 텍스트 오버레이
 - client/src/components/OverlayInput.tsx: 오버레이 입력 패널
 - client/src/components/ChapterBar.tsx: YouTube 챕터 바
 - client/src/components/TimeSkipControls.tsx: 영상 건너뛰기
 - client/src/components/FavoriteManager.tsx: 즐겨찾기 관리
 - client/src/components/ScreenLock.tsx: 화면 잠금
+
+왼쪽탭 레이아웃:
+- client/src/components/LeftSidebarTabs.tsx: 왼쪽 세로 탭 컴포넌트 (노트/화면글자/돋보기)
+- client/src/components/ZoomContent.tsx: 돋보기(화면 확대) 탭 컨텐츠
 
 모달 및 입력:
 - client/src/components/TimestampEditModal.tsx: 타임스탬프 편집 모달
@@ -28,8 +31,10 @@ UI 컴포넌트:
 - client/src/components/FolderSelector.tsx: 폴더 선택기
 - client/src/components/CoordinateInput.tsx: 좌표 입력
 - client/src/components/PositionGrid.tsx: 위치 그리드
-- client/src/components/TabLayoutSettings.tsx: 탭 레이아웃 설정 모달 (기능 재배치, 탭명 변경, 표시/숨김)
-- client/src/components/SimpleTabSettings.tsx: 간단한 탭 설정 모달 (탭 위치 상/우, 기능 순서 변경)
+
+멀티페이지 노트:
+- client/src/components/NoteTabs.tsx: 북마크 스타일 탭 인터페이스
+- client/src/types/NotePage.ts: 멀티페이지 타입 정의
 
 녹화 기능:
 - client/src/components/RecordingMode.tsx: 녹화 모드
@@ -38,23 +43,11 @@ UI 컴포넌트:
 
 유틸리티:
 - client/src/components/SimpleNoteArea.tsx: 타임스탬프 로직 참고용
-- client/src/components/SimpleShareArea.tsx: 공유 노트 로직 참고용
-- client/src/components/NoteOverlayPanel.tsx: 오버레이 노트 입력 패널
 - client/src/components/ErrorBoundary.tsx: 에러 경계
 - client/src/components/Notification.tsx: 알림
 - client/src/components/DebugLogPanel.tsx: 모바일 디버그 로그
 - client/src/lib/youtubeUtils.ts: YouTube 유틸리티 (formatTime 등)
 - client/src/utils/chapterParser.ts: 챕터 파싱
-
-타임스탬프 자동 실행 시스템 (신규):
-- client/src/lib/TimestampProcessor.ts: 타임스탬프 자동 실행 핵심 로직 클래스
-- client/src/hooks/useTimestampSystem.ts: React Hook 형태의 타임스탬프 시스템 연결
-
-테스트 페이지:
-- client/src/pages/TestSharePage.tsx: 댓글 시스템 테스트 페이지
-- client/src/pages/TestTimestampPage.tsx: 타임스탬프 기능 테스트 페이지
-- client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 고급 테스트 페이지 (좌표 입력, 정렬, 전체화면, 커스텀 진행바)
-- client/src/pages/TestZoomPage.tsx: 화면 확대 테스트 페이지 (CSS transform 기반 줌)
 
 서버:
 - server/index.ts: Express 서버 메인
@@ -62,233 +55,170 @@ UI 컴포넌트:
 
 === 2. 기능별 코드 위치 매핑 ===
 
-🎯 타임스탬프 자동 실행 시스템 (신규 - TimestampProcessor 기반):
-- TimestampProcessor.ts:전체클래스 6단계 파이프라인 구현 (파싱→감지→진입→이탈→자동점프→사용자설정관리)
-- TimestampProcessor.ts:104-146 parseTimestamps() 노트 텍스트에서 타임스탬프 추출 및 노트 순서로 정렬
-- TimestampProcessor.ts:160-187 detectActiveTimestamp() 현재 재생 시간에서 활성화될 타임스탬프 찾기 (노트 순서 우선순위)
-- TimestampProcessor.ts:193-228 processEntry() 타임스탬프 구간 진입시 설정 적용 (즉시 정지 액션 포함)
-- TimestampProcessor.ts:232-235 processEntry() 정지 액션시 0.5초 이전 위치로 점프 (알림 지연 보정)
-- TimestampProcessor.ts:234-271 processExit() 타임스탬프 구간 이탈시 설정 복원 (자동점프 상태 유지)
-- TimestampProcessor.ts:277-314 executeAction() 액션 실행 (자동점프 -> 액션, 정지 |숫자 액션)
-- TimestampProcessor.ts:318-344 executeAutoJump() 다음 타임스탬프로 자동 점프 실행 (노트 순서 기반)
-- TimestampProcessor.ts:350-379 handleManualSeek() 수동 이동 감지 및 우선순위 재설정
-- TimestampProcessor.ts:384-401 handleDoubleClick() 더블클릭 처리 (시작/종료시간 구분)
-- TimestampProcessor.ts:407-427 process() 메인 처리 함수 (0.5초마다 호출)
-- TimestampProcessor.ts:59-65 log() 함수 정지 알림 제거 (pause 관련 showNotification 비활성화)
-- useTimestampSystem.ts:전체Hook React 컴포넌트에서 TimestampProcessor 사용을 위한 커스텀 Hook
-- useTimestampSystem.ts:64-72 updateNoteText() 노트 텍스트 파싱 및 상태 업데이트
-- useTimestampSystem.ts:75-120 타임스탬프 자동 감지 useEffect (재생 중일 때만 500ms 간격으로 실행)
-- useTimestampSystem.ts:86-91 수동 이동 감지 (2초 이상 점프시 handleManualSeek 호출)
-- useTimestampSystem.ts:123-144 handleDoubleClick() 클릭 위치에서 타임스탬프 찾기 및 시작/종료시간 구분
-- useTimestampSystem.ts:182-196 findTimestampAtPosition() 클릭 위치에 해당하는 타임스탬프 찾기
-- TestTimestampPage.tsx:63-89 타임스탬프 파싱 및 YouTubePlayer 형식 변환
-- SimpleNoteArea.tsx:전체컴포넌트 타임스탬프 로직 참고용 (기존 방식 보존)
-→ 수정 시 주의:
-  1. 노트 순서 우선순위 시스템 (시간순 아님, lastActiveIndex + 1부터 체크)
-  2. 정지 액션은 진입과 동시에 즉시 실행 (지연 방지)
-  3. 정지 알림 제거: log 함수에서 pause 관련 showNotification 비활성화로 UI 지연 해결
-  4. 정지 타이밍 보정: 타겟 시간보다 0.5초 이전 위치로 점프하여 감지 지연 보상
-  5. 자동점프는 속도 보정 계산 적용 (실제 재생 속도 고려)
-  6. 더블클릭시 시작/종료시간 구분 처리 (activeTimestamp 설정 여부)
-  7. 설정 복원은 originalSettings 백업을 통해 처리
-  8. TimestampProcessor는 순수 TypeScript 클래스 (React 의존성 없음)
-  9. useTimestampSystem Hook을 통해 React 컴포넌트와 연결
-  10. 재생 중일 때만 감지 시스템 작동 (playerState === 1)
+타임스탬프 자동 실행 시스템:
+- NoteArea.tsx:570-607 requestAnimationFrame 기반 고정밀 추적 시스템
+- NoteArea.tsx:281-567 processTimestamps() 통합 타임스탬프 처리 함수
+- NoteArea.tsx:233-278 detectManualMove() 수동 이동 감지
+- NoteArea.tsx:295-306 우선순위 기반 타임스탬프 찾기 (lastActiveIndex + 1부터 체크)
+- NoteArea.tsx:334-491 타임스탬프 진입 처리 (currentStamp && isDifferentTimestamp)
+- NoteArea.tsx:494-563 타임스탬프 이탈 처리 (!currentStamp && activeTimestamp)
+- NoteArea.tsx:1180-1360 더블클릭 핸들러 (handleNoteClick 내부)
+- NoteArea.tsx:1282-1283 더블클릭시 lastActiveIndex 설정 (clickedIndex - 1로 설정 필수)
+- NoteArea.tsx:1234-1250 더블클릭시 타임스탬프 설정 즉시 적용
+- NoteArea.tsx:1308-1323 더블클릭시 정지 액션 즉시 실행
+- NoteArea.tsx:855 addTimestamp() 도장 버튼 함수
+- NoteArea.tsx:945 openTimestampModal() 편집 버튼
+- NoteArea.tsx:2058-2078 전체 도장 가져오기 세로 버튼 (왼쪽탭 레이아웃 전용)
+- YouTubePlayer.tsx:커스텀바렌더링 커스텀 진행바 하이라이트
+- HomePage.tsx:timestamps상태 timestamps 상태 관리
 
-📱 화면 오버레이 시스템:
-- TextOverlay.tsx:전체컴포넌트 텍스트 표시 로직 (회전 기능 포함)
-- TextOverlay.tsx:57-64 시간 기반 오버레이 필터링
-- TextOverlay.tsx:125-177 getPositionStyle() 위치 및 회전 CSS 변환
-- OverlayInput.tsx:전체컴포넌트 입력 패널 로직 (타임스탬프+텍스트 추출 포함)
-- OverlayInput.tsx:77-110 updateExistingOverlay() 실시간 오버레이 업데이트 (시간 정보 보존)
-- OverlayInput.tsx:53 rotation 상태 (-180~180도 회전 각도)
-- OverlayInput.tsx:468-478 각도 슬라이더 UI (5도 단위)
-- OverlayInput.tsx:127-173 parseTimestamps() 타임스탬프+설명텍스트 파싱
-- OverlayInput.tsx:186-204 selectTimestamp() 설명텍스트 자동입력 & 실제지속시간 계산
-- OverlayInput.tsx:555-577 지속시간 표시 (정수/소수점 이중표시)
-- OverlayInput.tsx:590 "타임스탬프+텍스트 가져오기" 버튼
-- OverlayInput.tsx:625-643 타임스탬프 선택 모달 (설명텍스트 미리보기 포함)
-- NoteOverlayPanel.tsx:전체컴포넌트 오버레이 노트 입력 패널
+화면 오버레이 시스템:
+- TextOverlay.tsx:전체컴포넌트 텍스트 표시 로직
+- OverlayInput.tsx:전체컴포넌트 입력 패널 로직
 - SettingsPanel.tsx:화면텍스트섹션 오버레이 설정 UI
 - HomePage.tsx:오버레이상태들 오버레이 관련 상태 관리
-- TestOverlayPage.tsx:64-88 플레이어 시간 업데이트 useEffect (currentTime, duration, isPlaying)
-- TestOverlayPage.tsx:186-188 실시간 편집 업데이트 useEffect (설정값 변경시 즉시 반영)
-- TestOverlayPage.tsx:150-184 updateEditingOverlay() 편집 중 오버레이 실시간 수정 (시작/종료 시간 기반)
-- TestOverlayPage.tsx:479-485 노트 적용 버튼으로 즉시 편집 모드 진입 (현재 시간 + 1초)
-- TestOverlayPage.tsx:306-347 editOverlay() 기존 오버레이 편집 모드 진입 (시간 분해)
-- TestOverlayPage.tsx:30-55 localStorage 저장/로드 함수 (비디오별 오버레이 관리)
-- TestOverlayPage.tsx:218-220 getTimeInSeconds() 4자리 시간 계산 헬퍼 함수
-- TestOverlayPage.tsx:478-484 TextOverlay 컴포넌트 연동 (currentTime, isPlaying 전달)
-- TestOverlayPage.tsx:좌표입력섹션 coordinates 상태와 X,Y 숫자 입력 필드 (0-100 범위)
-- TestOverlayPage.tsx:정렬버튼섹션 textAlign 상태와 좌측/중앙/우측 선택 버튼 UI
-- TestOverlayPage.tsx:180-212 전체화면 토글 함수 (브라우저 Fullscreen API)
-- TestOverlayPage.tsx:774-790 전체화면 버튼 UI (영상 우측 하단 Maximize/Minimize)
-- TestOverlayPage.tsx:780-781 전체화면 시 버튼 크기 확대 (p-1.6, bottom-2으로 YouTube 버튼을 가림)
-- TestOverlayPage.tsx:656-660 글자 크기 범위 확장 (6-96px, 1px 단위 조정)
-- TestOverlayPage.tsx:674-678 여백 설정 (4-20px, 1px 단위 조정)
-- TestOverlayPage.tsx:756-922 4자리 시간 입력 컴포넌트 (10초/1초/0.1초/0.01초 단위별 조절)
-- TestOverlayPage.tsx:952-954 오버레이 목록에서 소수점 시간 표시 (toFixed(2))
-- TextOverlay.tsx:77-82 전체화면 스케일링 수정 (screenScale 무시, 실제 컨테이너 크기만 반영)
-- TextOverlay.tsx:268 텍스트 자동 줄바꿈 방지 (width: max-content로 텍스트 길이에 맞춰 자동 폭 조정)
-- TestOverlayPage.tsx:747-763 커스텀 진행바 (클릭 탐색, 전체화면 지원)
-- TabLayoutSettings.tsx:전체컴포넌트 탭 커스터마이징 모달 (기능 재배치, 탭명 변경, 표시/숨김)
-- SimpleTabSettings.tsx:전체컴포넌트 간단한 탭 설정 모달 (탭 위치 상/우, 기능 순서 변경)
-- SimpleTabSettings.tsx:71-73 탭 위치 설정 버튼 (상단/오른쪽)
-- SimpleTabSettings.tsx:37-61 기능 위/아래/다른 탭으로 이동 함수
-- SimpleTabSettings.tsx:99-117 기능 이름 매핑 (실제 UI 제목과 일치)
-- TestOverlayPage.tsx:92-97 탭 위치 상태 관리 (localStorage 저장/복원)
-- TestOverlayPage.tsx:1220-1252 상단 탭 레이아웃 (tabPosition === 'top')
-- TestOverlayPage.tsx:1343-1387 오른쪽 탭 레이아웃 (tabPosition === 'right')
-- TestOverlayPage.tsx:1390-1396 SimpleTabSettings 컴포넌트 연결
-→ 수정 시 주의:
-  1. 시간 입력은 4자리 분해 방식 (tens/ones/tenths/hundredths)으로 관리
-  2. getTimeInSeconds() 함수로 4자리 값을 초 단위로 변환 필수
-  3. 노트 적용 시 현재 영상 시간 기반으로 자동 시간 설정
-  4. 편집 모드 진입 시 시간 분해 로직과 editingId 설정 필수
-  5. localStorage는 비디오 ID별로 분리 저장 (overlays_${videoId})
-  6. 실시간 업데이트는 0.5초 디바운싱으로 과도한 저장 방지
-  7. CSS transform에서 회전과 위치 변환 조합 시 순서 중요
-  8. TestOverlayPage는 currentTime 업데이트가 필수 (TextOverlay 필터링용)
-  9. 전체화면 시 aspectRatio: '16/9' 유지로 화면 비율 왜곡 방지
-  10. 전체화면 진입/종료 시 playerContainerRef DOM 요소 필수
-  11. 좌표 입력은 0-100 범위로 제한, 백분율 기반 위치 계산
-  12. 전체화면에서 screenScale 무시하여 일관된 텍스트 크기 유지
-  13. 텍스트 자동 줄바꿈 방지로 의도하지 않은 줄바꿈 차단 (width: max-content 적용)
-  14. 탭 설정 모달 복구 완료 (모바일 안정성 확보)
-  15. SimpleTabSettings와 TabLayoutSettings는 동일한 prop 인터페이스 사용 (currentConfig, onSave)
-  16. 탭 위치는 localStorage에 'overlayTabPosition'으로 저장 (top/right)
 
-🎬 영상 로딩 및 재생:
+영상 로딩 및 재생:
 - VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가
-- VideoLoader.tsx:283-329 handleVideoSelect() 영상 선택 및 검색 결과 처리 로직
-- VideoLoader.tsx:114-120 videoId 필터링 (undefined 제거)
-- VideoLoader.tsx:310-320 keepSearchResults 설정에 따른 검색 결과 유지/닫기
 - YouTubePlayer.tsx:loadVideoById YouTube API 영상 로딩
 - YouTubePlayer.tsx:onPlayerStateChange 재생 상태 변화 처리
 - FavoriteManager.tsx:handleVideoPlay 즐겨찾기 영상 재생
 - HomePage.tsx:currentVideoId currentVideoId 상태 관리
 
-⚙️ 설정 관리:
-- SettingsPanel.tsx:전체컴포넌트 2단계 탭 구조 설정 UI
-- SettingsPanel.tsx:18-21 UISettings 인터페이스 정의 (검색창.목록유지 포함)
-- SettingsPanel.tsx:577-600 검색창 유지 설정 및 하위 "목록 열어두기" 토글
-- SettingsPanel.tsx:589-600 목록유지 토글 (검색창 유지가 ON일 때만 표시)
-- SettingsPanel.tsx:693-722 상단 탭 그룹 (빠른설정/재생기본값)
-- SettingsPanel.tsx:724-772 하단 탭 그룹 (노트영역/화면텍스트/돋보기)
-- SettingsPanel.tsx:775-826 노트영역 탭 (노트 영역 표시 토글)
-- SettingsPanel.tsx:829-892 화면텍스트 탭 (기존 모든 화면텍스트 설정 포함)
-- SettingsPanel.tsx:895-915 돋보기 탭 (화면 확대 기능, TestZoomPage 연결 준비)
-- SettingsPanel.tsx:734-771 자동 스크롤 기능 (모든 탭에 100ms 지연 후 scrollIntoView 적용)
-- SettingsPanel.tsx:783-790 지속시간 토글 (스타일설정 섹션 맨 아래)
-- SettingsPanel.tsx:1080-1170 프리셋 설정 저장 로직 (최소모드/노트모드)
-- SettingsPanel.tsx:1200-1270 실시간 프리셋 업데이트 (handleSettingChange)
-- SettingsPanel.tsx:savePresetSettings() 프리셋별 설정 저장 함수
+설정 관리:
+- SettingsPanel.tsx:전체컴포넌트 모든 설정 UI (총 843줄)
+- SettingsPanel.tsx:650-651 재생컨트롤.전체표시 토글 스위치
+- SettingsPanel.tsx:655-715 재생 컨트롤 하위 설정들 (볼륨/속도/녹화/도장/편집)
+- SettingsPanel.tsx:400-500 재생 기본값 설정 (기본 재생 속도)
+- SettingsPanel.tsx:12-50 UISettings 인터페이스 정의
 - HomePage.tsx:uiSettings UISettings 상태 관리
-- HomePage.tsx:279 keepSearchResults prop 전달 (목록유지 설정 연결)
 - NoteArea.tsx:재생기본값적용 새 영상 로드시 기본값 적용
 - YouTubePlayer.tsx:설정동기화 플레이어 설정 동기화
-→ 수정 시 주의:
-  1. 탭 구조: 상단(빠른설정/재생기본값) + 하단(노트영역/화면텍스트/돋보기) 완전 분리
-  2. 자동 스크롤: 하단 탭 전환시 content-tabs-section으로 스크롤 (UI 잘림 방지)
-  3. 기존 기능 보존: 화면텍스트 하위 모든 설정 유지 (토글 상태에 따른 표시/숨김)
-  4. 돋보기 탭: TestZoomPage 화면 확대 기능 연결 예정
-  5. 탭 전환시 100ms 지연: DOM 렌더링 완료 후 스크롤 실행
 
-🎵 볼륨/속도 제어:
-- NoteArea.tsx:1362-1377 handleVolumeChange 볼륨 슬라이더
-- NoteArea.tsx:1408-1421 handleSpeedChange 속도 슬라이더
-- NoteArea.tsx:109-111 userSettings 사용자 설정 상태
+볼륨/속도 제어:
+- NoteArea.tsx:1483-1485 현재 볼륨/속도 표시 UI ({Math.round(volume || 100)}%, {(currentRate || 1.0).toFixed(2)}x)
+- NoteArea.tsx:드래그컨트롤 드래그 기반 볼륨/속도 조정 (1490-1499줄 영역)
+- NoteArea.tsx:상태관리 사용자 설정 상태
 - NoteArea.tsx:플레이어동기화useEffect 플레이어와 UI 동기화
-→ 중복 주의: 볼륨/속도 변경이 여러 곳에서 발생하므로 동기화 확인 필수
 
-📊 챕터 및 네비게이션:
+챕터 및 네비게이션:
 - ChapterBar.tsx:전체컴포넌트 챕터 표시 및 페이지네이션
 - chapterParser.ts:전체파일 챕터 파싱 로직
 - YouTubePlayer.tsx:챕터연동 챕터 데이터 처리
 
-🎥 녹화 시스템:
-- RecordingMode.tsx:녹화토글 녹화 시작/중지
+녹화 시스템:
+- NoteArea.tsx:851-872 녹화토글() 녹화 시작/중지 함수
+- NoteArea.tsx:874-879 수동타임스탬프추가() 수동 타임스탬프 추가
+- NoteArea.tsx:1712-1715 녹화 중 표시 UI (● 녹화 중)
+- NoteArea.tsx:1737-1745 RecordingSessionList 컴포넌트 렌더링
 - RecordingSessionList.tsx:전체컴포넌트 세션 목록 관리
 - RecordingSessionCard.tsx:전체컴포넌트 개별 세션 카드
 - HomePage.tsx:녹화상태 녹화 관련 상태
 
-🔧 타임스탬프 생성 및 편집:
-- NoteArea.tsx:855 addTimestamp() 도장 버튼으로 타임스탬프 생성
-- NoteArea.tsx:1425-1449 지속시간 입력 컨트롤
-- TimestampEditModal.tsx:994 addTimestampFromModal() 편집 모달에서 생성
+타임스탬프 생성 및 편집:
+- NoteArea.tsx:874-879 수동타임스탬프추가() 수동 타임스탬프 생성 (녹화 모드)
+- NoteArea.tsx:1709 도장 형식 안내 UI ([HH:MM:SS.sss, 100%, 1.00x])
+- NoteArea.tsx:1748-1749 TimestampEditModal 렌더링
 - TimestampEditModal.tsx:전체컴포넌트 타임스탬프 편집 UI
 
-📝 노트 영역 UI:
-- NoteArea.tsx:1682-1703 노트 영역 Textarea 컴포넌트
-- NoteArea.tsx:1697-1702 스크롤 관련 스타일 (scrollbar-hide, WebkitOverflowScrolling)
+멀티페이지 노트 시스템:
+- HomePage.tsx:페이지상태 pageState (pages, activePageIndex) 관리
+- NoteTabs.tsx:전체컴포넌트 탭 인터페이스 (편집, 드래그앤드롭, 이모지/색상 선택)
+- NoteTabs.tsx:48-57 탭 클릭 핸들러 (재클릭시 편집 모드)
+- NoteTabs.tsx:75-103 드래그앤드롭 정렬 (특수 페이지 제외)
+- NoteTabs.tsx:187 삭제 조건 (특수 페이지가 아니고 일반 페이지가 2개 이상일 때)
+- NoteArea.tsx:350-405 handleImportTimestamps() 타임스탬프 가져오기 기능
+- NoteArea.tsx:379-390 타임스탬프 다음 첫 줄바꿈까지 텍스트 추출
+- NoteArea.tsx:175-242 타임스탬프 가져오기 UI (전체 페이지 전용)
+- NotePage.ts:14-17 NotePageState 인터페이스 (pages, activePageIndex)
+- NotePage.ts:36-44 SPECIAL_PAGES 설정 (전체 타임스탬프 페이지)
+
+노트 영역 UI:
+- NoteArea.tsx:1684-1705 노트 영역 Textarea 컴포넌트 (총 1765줄)
+- NoteArea.tsx:1700-1704 스크롤 관련 스타일 (WebkitOverflowScrolling, scrollbar-hide)
+- NoteArea.tsx:1721-1734 OverlayInput 컴포넌트 렌더링 (화면텍스트 패널)
+- NoteTabs.tsx:250-255 탭 컨테이너 스크롤바 숨김 (webkit-scrollbar: none)
 - index.css:118-129 스크롤바 숨기기 유틸리티 클래스 (.scrollbar-hide)
-→ 수정 시 주의: 터치 스크롤 기능은 유지하면서 스크롤바만 숨김
 
-🎮 재생 컨트롤:
-- NoteArea.tsx:1453-1474 녹화 버튼
-- NoteArea.tsx:1477-1488 도장 버튼
-- NoteArea.tsx:1490-1500 편집 버튼
-- NoteArea.tsx:재생컨트롤UI 볼륨/속도 슬라이더 UI
+재생 컨트롤 (하단 패널):
+- NoteArea.tsx:1469-1470 재생 컨트롤 섹션 조건부 렌더링
+- NoteArea.tsx:1475-1486 메인 드래그 컨트롤 헤더 (모드 전환 버튼, 볼륨/속도 표시)
+- NoteArea.tsx:1490-1499 일반 모드: 드래그 컨트롤 영역
+- NoteArea.tsx:851-872 녹화토글() 녹화 시작/중지 함수
+- NoteArea.tsx:874-879 수동타임스탬프추가() 수동 타임스탬프 함수
+- NoteArea.tsx:1712-1715 녹화 중 표시 UI
 
-🔍 우선순위 및 순차 실행:
+플레이어 내장 컨트롤 시스템:
+- YouTubePlayer.tsx:558-576 재생 컨트롤 버튼 (좌측 하단, Settings2 아이콘, z-40)
+- YouTubePlayer.tsx:559 버튼 조건: !uiSettings.재생컨트롤?.전체표시 && !isControlsModalOpen
+- YouTubePlayer.tsx:617-620 컴팩트 재생 컨트롤 패널 컨테이너 (z-50, data-control-panel="true")
+- YouTubePlayer.tsx:622-643 볼륨 조절 슬라이더 (0-100%, 5단위, 실시간 표시)
+- YouTubePlayer.tsx:645-668 속도 조절 슬라이더 (0.25x-2.0x, 0.05단위, 실시간 표시)
+- YouTubePlayer.tsx:670-689 재생/일시정지 버튼 및 닫기 버튼
+- YouTubePlayer.tsx:74-75 currentVolume, currentSpeed 상태 관리
+- YouTubePlayer.tsx:71 isControlsModalOpen 패널 열림/닫힘 상태
+- YouTubePlayer.tsx:561-568 패널 열 때 플레이어 현재값 동기화 (getVolume/getPlaybackRate)
+- YouTubePlayer.tsx:147-160 togglePlayPause() 재생/일시정지 토글 함수
+- SettingsPanel.tsx:재생컨트롤설정 재생컨트롤.전체표시 토글 (false일 때 플레이어 내장 모드)
+- HomePage.tsx:uiSettings uiSettings 상태를 YouTubePlayer에 전달
+
+우선순위 및 순차 실행:
 - NoteArea.tsx:lastActiveIndex lastActiveIndex 상태 (타임스탬프 우선순위)
 - NoteArea.tsx:우선순위검색로직 우선순위 기반 타임스탬프 검색
 - NoteArea.tsx:수동이동시우선순위재설정 수동 이동시 우선순위 재설정
 
-🔍 화면 확대 시스템:
-- TestZoomPage.tsx:전체컴포넌트 CSS transform 기반 화면 확대 테스트
-- TestZoomPage.tsx:287-296 초기 확대 설정 상태 (centerPoint, scale, startTime, endTime)
-- TestZoomPage.tsx:357-379 togglePanel() 패널 열기/닫기 (현재 시간을 시작시간으로 자동 설정)
-- TestZoomPage.tsx:365-369 패널 열 때 현재 시간 → 시작시간, +1초 → 종료시간
-- TestZoomPage.tsx:586-617 CoordinateArrowControl 좌표 실시간 변경 (화면 확대 체크시 즉시 반영)
-- TestZoomPage.tsx:619-641 배율 선택 드롭다운 (1.5x, 2x, 3x, 4x)
-- TestZoomPage.tsx:623-646 화면 확대 체크박스 (체크시 실시간 확대/축소)
-- TestZoomPage.tsx:631-638 체크시 현재 설정으로 즉시 확대 적용
-- TestZoomPage.tsx:640-641 체크 해제시 원래 크기로 복귀
-- TestZoomPage.tsx:402-444 generateZoomStyle() CSS transform 스타일 생성
-- TestZoomPage.tsx:422-424 iframe에 scale과 transform-origin 적용
-- TestZoomPage.tsx:310-350 시간 기반 자동 확대 시스템 (저장된 설정)
-- TestZoomPage.tsx:345-349 패널 열려있을 때 자동 확대 비활성화 (수동 확대는 유지)
-- TestZoomPage.tsx:19-113 TimeArrowControl 컴포넌트 (분/초 화살표 입력)
-- TestZoomPage.tsx:125-245 CoordinateArrowControl 컴포넌트 (X/Y 좌표 화살표 입력)
-- TestZoomPage.tsx:248-266 ZoomConfig 인터페이스 (확대 설정 데이터 구조)
-→ 수정 시 주의:
-  1. 패널 열 때 현재 재생 시간이 자동으로 시작 시간이 됨
-  2. 화면 확대 체크박스로 실시간 미리보기 가능
-  3. 좌표나 배율 변경시 체크된 상태면 즉시 반영
-  4. 패널이 열려있어도 수동 확대는 유지됨
-  5. CSS transform-origin으로 확대 중심점 설정
-  6. 저장된 설정은 패널이 닫혀있을 때만 자동 적용
+왼쪽탭 레이아웃 시스템:
+- LeftSidebarTabs.tsx:9-17 탭 정의 (노트/화면글자/돋보기)
+- LeftSidebarTabs.tsx:19-102 세로 탭 UI 컴포넌트 (27px 폭, 48px 높이)
+- LeftSidebarTabs.tsx:40-84 탭별 활성화 색상 (노트:보라, 화면글자:초록, 돋보기:주황)
+- ZoomContent.tsx:8-22 확대 설정 데이터 타입 (중심점, 배율, 시간, 테두리)
+- ZoomContent.tsx:70-86 확대 설정 저장/삭제 기능
+- ZoomContent.tsx:88-105 좌표/시간 변경 핸들러
+- ZoomContent.tsx:115-380 확대 설정 UI (좌표입력/목록관리 탭)
+- NoteArea.tsx:16 LeftSidebarTabs import 구문
+- NoteArea.tsx:140 activeMainTab 상태 관리 ('note' | 'overlay' | 'zoom')
+- NoteArea.tsx:2007-2008 LeftSidebarTabs 컴포넌트 렌더링
+- NoteArea.tsx:2015 노트 탭 컨텐츠 조건부 렌더링 (activeMainTab === 'note')
+- NoteArea.tsx:2076 화면텍스트 탭 컨텐츠 조건부 렌더링 (activeMainTab === 'overlay')
+- NoteArea.tsx:2093 돋보기 탭 컨텐츠 조건부 렌더링 (activeMainTab === 'zoom')
+- SettingsPanel.tsx:35 UISettings 인터페이스 왼쪽탭레이아웃 설정 정의
+- SettingsPanel.tsx:736-738 왼쪽탭 레이아웃 토글 설정 UI 및 핸들러
+- NoteTabs.tsx:243-244 스크롤바 thin 스타일 설정
+- NoteTabs.tsx:250 스크롤바 숨김 설정 (scrollbar-width: none)
+- NoteTabs.tsx:253 웹킷 스크롤바 숨김 처리 (::-webkit-scrollbar)
 
-=== 3. 노트 페이지 탭 시스템 ===
+테스트 환경:
+- client/src/pages/TestTimestampPage.tsx: 타임스탬프 기능 독립 테스트 페이지
+- client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 테스트 페이지 (가상키보드 최적화 레이아웃)
+- client/src/pages/TestZoomPage.tsx: 화면 확대 줌 테스트 페이지 (CSS transform 기반)
+- client/src/pages/TestSharePage.tsx: 공유 기능 독립 테스트 페이지
+- client/src/components/SimpleNoteArea.tsx: 타임스탬프 로직 참고용 컴포넌트
+- client/src/components/SimpleShareArea.tsx: 공유 로직 참고용 컴포넌트
+- client/src/components/TabLayoutSettings.tsx: 동적 탭 설정 모달
+- client/src/components/SimpleTabSettings.tsx: 간단한 탭 설정 모달
+- client/src/App.tsx: 테스트 페이지 라우팅 설정
 
-📑 포커스 기반 탭 최소화 시스템:
-- NoteTabs.tsx:전체컴포넌트 다중 페이지 노트 탭 관리
-- NoteTabs.tsx:37-41 isTabsFocused/lastFocusTime 상태 (포커스 기반 포스트잇/책갈피 효과)
-- NoteTabs.tsx:54-73 handleTabClick() 2단계 클릭 처리 (최소화→확대→편집모드)
-- NoteTabs.tsx:58-68 lastFocusTime 기반 편집모드 진입 제어 (100ms 지연으로 포커스 구분)
-- NoteTabs.tsx:131-137 탭 컨테이너 포커스 이벤트 (onFocus/onBlur, tabIndex=0)
-- NoteTabs.tsx:276-282 최소화 상태 스타일 (높이 12px, 상단 고정 축소)
-- NoteTabs.tsx:288-293 최소화시 요소 숨김 (탭명/이모지/삭제버튼/색상인디케이터)
-- NoteTabs.tsx:296-303 포커스 상태 스타일 (원래 크기 복원)
-- NoteTabs.tsx:405-427 + 추가 버튼 (높이 24px, 그림자 유지)
-- NotePage.ts:20-27 PAGE_COLORS 색상 팔레트 (구분도 개선된 6가지 색상)
-- NoteArea.tsx:2047-2049 NoteTabs 컴포넌트 연결 (노트 영역 하단)
-→ 수정 시 주의:
-  1. 포커스 상태: focused/minimized CSS 클래스로 구분
-  2. 2단계 클릭: 최소화→포커스 획득→편집모드 (lastFocusTime으로 구분)
-  3. 상단 고정 축소: transform-origin: top으로 책갈피 효과
-  4. 시각적 방해 최소화: 모든 그림자 제거 (+ 버튼 제외)
-  5. 최소화시 색상 표시: 탭 배경색만 유지, 색상 인디케이터 숨김
-  6. 포커스 이벤트: 탭 컨테이너 전체에 tabIndex=0 필요
-  7. 색상 팔레트: 버터/코랄/스카이/민트/라벤더/피치 (구분도 우선)
+가상 키보드 최적화 시스템 (TestOverlayPage):
+- TestOverlayPage.tsx:1030-1063 헤더 바로 아래 가로 탭 네비게이션
+- TestOverlayPage.tsx:430-520 텍스트 영역 최상단 배치 (비디오 플레이어와 최대한 근접)
+- TestOverlayPage.tsx:434 사용자 팁: "노트 영역을 화면 중앙에 위치시킨 후 클릭하면 영상이 덜 밀려남"
+- TestOverlayPage.tsx:953-961 오버레이 목록 상세 정보 표시
+- TestOverlayPage.tsx:317-360 editOverlay() 편집 기능 (359줄: 탭 자동 이동 방지)
+- TabLayoutSettings.tsx:전체컴포넌트 동적 탭 구성 설정 모달
 
-=== 4. 댓글 시스템 기능별 코드 위치 ===
-
-📝 댓글 시스템 (미연결 상태):
-- CommentModal.tsx:전체컴포넌트 댓글 조회, 필터링, 정렬
-- CommentInputModal.tsx:전체컴포넌트 댓글 작성, 별점 선택
-- TestSharePage.tsx:전체컴포넌트 댓글 시스템 테스트
-- CommentModal.tsx:getAverageRatingByRange 별점 범위별 평균 점수 계산
-- CommentInputModal.tsx:renderNewRatingSelector 가로 배치 별점 선택 UI
-→ 연결 작업 필요: App.tsx에 import하여 메인 앱에서 사용 가능하게 해야 함
+화면 확대 줌 시스템:
+- TestZoomPage.tsx:401-444 CSS transform 기반 줌 스타일 생성 (generateZoomStyle)
+- TestZoomPage.tsx:310-353 requestAnimationFrame 기반 시간 추적 및 자동 줌 활성화
+- TestZoomPage.tsx:20-113 TimeArrowControl 컴포넌트 (분:초 형태, 굵은 삼각화살표 ▲▼)
+- TestZoomPage.tsx:125-245 CoordinateArrowControl 컴포넌트 (백의자리:십의자리:일의자리, 일반화살표 ↑↓)
+- TestZoomPage.tsx:446-476 renderZoomArea() 실시간 줌 영역 미리보기 (빨간 네모)
+- TestZoomPage.tsx:523-573 체크박스 기반 저장된 줌 설정 목록 (영상 플레이어 하단)
+- TestZoomPage.tsx:329-339 좌상단 좌표 기준 transform-origin 설정
+- YouTubePlayer.tsx:511-527 터치홀드 줌 CSS 스타일 (플레이어 컨테이너 iframe 타겟)
+- YouTubePlayer.tsx:520-524 CSS transform 플레이어 iframe 직접 확대 (.youtube-player-container iframe)
+- YouTubePlayer.tsx:79-80 touchPosition/overlayPosition 상태 분리 (iframe용/오버레이용)
+- YouTubePlayer.tsx:515-518 플레이어 컨테이너 overflow hidden 설정
+- YouTubePlayer.tsx:389-423 터치홀드 이벤트 핸들러 (컨트롤 패널 요소 감지 추가)
+- YouTubePlayer.tsx:393-400 터치 타겟 컨트롤 패널 체크 (data-control-panel 속성)
+- YouTubePlayer.tsx:409-413 컨테이너 기준 상대 좌표 변환 (relativeX/relativeY)
+- YouTubePlayer.tsx:561-568 컨트롤 패널 열 때 플레이어 현재값 동기화
