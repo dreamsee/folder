@@ -10,6 +10,7 @@ import SettingsPanel, { UISettings } from "@/components/SettingsPanel";
 import ScreenLock from "@/components/ScreenLock";
 import FavoriteManager from "@/components/FavoriteManager";
 import DebugLogPanel from "@/components/DebugLogPanel";
+import CommentSidePanel from "@/components/CommentSidePanel";
 // import { useToast } from "@/hooks/use-toast"; // 토스트 비활성화
 import { useVirtualKeyboard } from "@/hooks/useVirtualKeyboard";
 import { OverlayData, OverlayPosition } from "@/components/TextOverlay";
@@ -452,6 +453,16 @@ const HomePage = () => {
         isOpen={isDebugLogOpen}
         onToggle={() => setIsDebugLogOpen(!isDebugLogOpen)}
       />
+
+      {/* 댓글 사이드 패널 */}
+      {currentVideoId && (
+        <CommentSidePanel
+          videoId={currentVideoId}
+          player={player}
+          isPlayerReady={isPlayerReady}
+          showNotification={showNotification}
+        />
+      )}
 
     </div>
     </>

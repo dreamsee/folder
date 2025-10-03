@@ -2360,8 +2360,10 @@ const NoteArea: React.FC<NoteAreaProps> = ({
               {세션목록.length > 0 && (
                 <RecordingSessionList
                   sessions={세션목록}
-                  onConvertToNote={세션을노트로변환}
-                  formatTime={formatTime}
+                  onEditSession={() => {}}
+                  onDeleteSession={() => {}}
+                  onCopySession={() => {}}
+                  onApplyToNote={세션을노트로변환}
                   showNotification={showNotification}
                 />
               )}

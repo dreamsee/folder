@@ -303,15 +303,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteTimestamp(id);
-      
+
       if (!success) {
         return res.status(404).json({ message: "타임스탬프를 찾을 수 없습니다." });
       }
-      
+
       res.json({ message: "타임스탬프가 삭제되었습니다." });
     } catch (error) {
       console.error("타임스탬프 삭제 에러:", error);
       return res.status(400).json({ message: "잘못된 요청입니다." });
+    }
+  });
+
+  // YouTube 댓글 API
+  app.get("/api/youtube/comments/:videoId", async (req, res) => {
+    try {
+      const videoId = req.params.videoId;
+      const order = req.query.order as string || 'relevance';
+
+      console.log("댓글 요청:", videoId, "정렬:", order);
+
+      if (!apiKey) {
+        console.error("YouTube API 키가 설정되지 않음");
+        return res.status(500).json({ message: "YouTube API 키가 설정되지 않았습니다." });
+      }
+
+      // YouTube API에서 사용하는 정렬 옵션으로 변환
+      let apiOrder = 'relevance';
+      switch (order) {
+        case 'newest':
+          apiOrder = 'time';
+          break;
+        case 'popular':
+          apiOrder = 'relevance';
+          break;
+        case 'timestamp':
+        case 'relevance':
+        default:
+          apiOrder = 'relevance';
+          break;
+      }
+
+      // YouTube Data API v3 댓글 조회
+      const url = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=${apiOrder}&maxResults=50&key=${apiKey}`;
+
+      console.log("API 호출 URL:", url.replace(apiKey, '***'));
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("YouTube API 댓글 에러:", response.status, response.statusText);
+        console.error("에러 응답:", errorText);
+
+        // 더 구체적인 에러 메시지 반환
+        let errorMessage = "댓글을 가져올 수 없습니다.";
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message;
+          }
+        } catch (e) {
+          // JSON 파싱 실패시 원본 텍스트 사용
+          errorMessage = errorText;
+        }
+
+        return res.status(response.status).json({ message: errorMessage });
+      }
+
+      const data = await response.json();
+      res.json(data);
+
+    } catch (error) {
+      console.error("댓글 조회 에러:", error);
+      return res.status(500).json({ message: "서버 에러가 발생했습니다." });
     }
   });
 

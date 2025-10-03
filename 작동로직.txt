@@ -1,8 +1,8 @@
-유튜브노트 타임스탬프 시스템 작동로직
+유튜브노트 시스템 작동로직
 ==========================================
 
 목차:
-1. 시스템 개요 및 6단계 파이프라인
+1. 타임스탬프 시스템 개요 및 6단계 파이프라인
 2. 타임스탬프 형식 및 정규식
 3. 우선순위 시스템 및 순차 실행
 4. 더블클릭 작동 방식 (시작/종료시간 구분)
@@ -12,7 +12,8 @@
 8. 커스텀바 하이라이트 및 챕터바
 9. 설정값 적용 및 복원 시스템
 10. 화면 확대 줌 시스템
-11. 디버깅 및 로그 시스템
+11. 댓글 사이드 패널 시스템
+12. 디버깅 및 로그 시스템
 
 ==========================================
 
@@ -730,3 +731,231 @@ let associatedText = afterTimestamp.slice(0, endIndex).trim();
 - 외부 클릭시 자동 닫힘
 
 이 시스템은 멀티페이지 환경에서 타임스탬프를 효율적으로 통합 관리할 수 있도록 설계되었습니다.
+
+==========================================
+
+11. 댓글 사이드 패널 시스템
+==========================================
+
+댓글 사이드 패널은 YouTube 영상의 댓글을 가져와서 타임스탬프 네비게이션과 함께 제공하는 기능입니다.
+
+[시스템 개요]
+- 왼쪽 가장자리에서 스와이프/호버로 열리는 320px 패널
+- YouTube Data API v3 commentThreads 엔드포인트 사용
+- 댓글 내 타임스탬프 자동 추출 및 클릭 가능한 링크로 변환
+- 4가지 정렬 옵션 제공
+- HTML 태그 자동 제거하여 깨끗한 텍스트 표시
+
+[작동 단계]
+
+1단계: 패널 열기/닫기
+- 왼쪽 가장자리 50px 영역에서 터치 감지
+- 오른쪽 스와이프 (50px 이상): 패널 열림
+- 왼쪽 스와이프 (50px 이상): 패널 닫힘
+- 패널 외부 클릭시 자동 닫힘
+- 닫기 버튼 (ChevronRight 아이콘) 제공
+
+2단계: 댓글 로드
+- videoId 변경 또는 정렬 옵션 변경시 자동 실행
+- API 요청: GET /api/youtube/comments/:videoId?order={sortBy}
+- 서버에서 YouTube API 호출 및 응답 반환
+- 최대 50개 댓글 로드 (maxResults=50)
+
+3단계: 데이터 파싱
+- textOriginal 필드 우선 사용 (HTML 태그 없는 순수 텍스트)
+- textDisplay는 폴백용 (HTML 포함)
+- 각 댓글에서 타임스탬프 정규식 매칭
+- 지원 형식: HH:MM:SS, H:MM:SS, MM:SS, M:SS
+- 중복 타임스탬프 제거 및 시간순 정렬
+
+4단계: 타임스탬프 추출 로직
+정규식 패턴:
+- /(\d{1,2}:\d{2}:\d{2})/g  (시간:분:초)
+- /(\d{1,2}:\d{2})/g        (분:초)
+
+파싱 방법:
+1. 콜론(:)으로 split
+2. 역순으로 배열 처리 (초 → 분 → 시간)
+3. 초 단위로 변환
+   - parts[0]: 초
+   - parts[1]: 분 × 60
+   - parts[2]: 시간 × 3600
+4. 0초 제외 및 중복 제거
+
+5단계: 정렬 시스템
+[4가지 정렬 옵션]
+1. 관련성순 (relevance): YouTube API 기본 정렬 유지
+2. 최신순 (newest): publishedAt 기준 내림차순
+3. 인기순 (popular): likeCount 기준 내림차순
+4. 타임스탬프 우선 (timestamp):
+   - 타임스탬프 있는 댓글 먼저 표시
+   - 그 다음 좋아요순 정렬
+   - 별도 섹션으로 분리 표시 (파란색 배경)
+
+[정렬 처리 방식]
+- 클라이언트 사이드 정렬 (sortComments 함수)
+- API에서는 relevance/time만 지원
+- popular, timestamp는 프론트엔드에서 처리
+
+6단계: 댓글 렌더링
+[CommentItem 컴포넌트]
+- 작성자명 및 프로필 이미지 영역
+- 작성 날짜 표시
+- 좋아요 개수 표시
+- 댓글 텍스트 내 타임스탬프 링크화
+
+[타임스탬프 링크 변환]
+1. renderTextWithTimestamps() 함수 실행
+2. 추출된 타임스탬프 위치 찾기
+3. 텍스트를 3부분으로 분리:
+   - 타임스탬프 이전 텍스트
+   - 타임스탬프 (클릭 가능한 버튼)
+   - 타임스탬프 이후 텍스트
+4. React 요소 배열로 조합
+
+[링크 스타일]
+- 파란색 텍스트 (text-blue-600)
+- 호버시 진한 파란색 및 밑줄
+- font-medium 굵기
+
+7단계: 타임스탬프 클릭 동작
+- handleTimestampClick(time) 호출
+- player.seekTo(time, true) 실행
+- 영상 재생 시간 즉시 이동
+- 성공 알림 표시: "HH:MM:SS로 이동"
+
+[조건 검사]
+- isPlayerReady: 플레이어 준비 완료 여부
+- player 객체 존재 여부
+- 조건 미충족시 동작하지 않음
+
+8단계: 에러 처리
+[API 에러 케이스]
+1. YouTube API 키 없음: 500 에러 반환
+2. 댓글 비활성화 영상: API에서 에러 응답
+3. API 할당량 초과: 403 에러
+4. 네트워크 오류: fetch 실패
+
+[에러 처리 방식]
+- try-catch로 모든 에러 캐치
+- 에러 발생시 빈 배열 설정
+- showNotification으로 사용자에게 알림
+- 콘솔 에러 로그 출력
+
+9단계: 상태 관리
+[주요 상태]
+- isOpen: 패널 열림/닫힘 (boolean)
+- comments: 댓글 배열 (Comment[])
+- sortBy: 정렬 옵션 (SortOption)
+- isLoading: 로딩 중 여부 (boolean)
+- isHovering: 마우스 호버 여부 (boolean)
+
+[useEffect 의존성]
+- [videoId, sortBy]: 변경시 댓글 재로드
+- [isOpen]: 패널 외부 클릭 감지 리스너 등록/해제
+
+[핵심 주의사항]
+
+1. textOriginal vs textDisplay
+   - textOriginal: 순수 텍스트, HTML 없음
+   - textDisplay: HTML 포함 (<br>, &quot; 등)
+   - 반드시 textOriginal 우선 사용
+   - textDisplay 사용시 HTML 파싱 필수
+
+2. 스와이프 트리거 영역
+   - 최소 50px 필요 (24px는 너무 좁음)
+   - width를 줄이면 사용자가 패널 열기 어려움
+   - fixed position, left: 0으로 배치
+
+3. YouTube API 제약사항
+   - 일일 할당량 제한 있음
+   - commentThreads 엔드포인트 사용
+   - order 파라미터: time 또는 relevance만 지원
+   - maxResults 최대 100 (현재 50 사용)
+
+4. 정렬 옵션 주의
+   - API order 파라미터:
+     * newest → time
+     * popular → relevance
+     * timestamp → relevance (클라이언트 정렬)
+     * relevance → relevance
+   - timestamp, popular는 클라이언트에서 정렬
+
+5. 타임스탬프 추출 정확도
+   - 댓글 텍스트에서만 추출
+   - 타임스탬프 형식이 정확해야 인식
+   - 중복 제거 및 정렬 필수
+   - 0초 타임스탬프는 제외
+
+[서버 API 구조]
+
+엔드포인트: GET /api/youtube/comments/:videoId
+
+쿼리 파라미터:
+- order: time 또는 relevance (선택)
+
+응답 형식:
+{
+  items: [
+    {
+      id: string,
+      snippet: {
+        topLevelComment: {
+          snippet: {
+            authorDisplayName: string,
+            authorProfileImageUrl: string,
+            textOriginal: string,
+            textDisplay: string,
+            likeCount: number,
+            publishedAt: string
+          }
+        }
+      }
+    }
+  ]
+}
+
+[UI 구조]
+
+레이아웃:
+- 고정 패널: 320px 너비, 전체 높이
+- 헤더: 고정 상단 (sticky), 제목 + 닫기 버튼 + 정렬 드롭다운
+- 본문: 스크롤 가능 영역 (overflow-y-auto)
+- 배경 오버레이: 패널 열림시 화면 전체 어둡게
+
+z-index 구조:
+- 트리거 영역: z-40
+- 배경 오버레이: z-40
+- 댓글 패널: z-50
+
+[타임스탬프 우선 정렬 특수 처리]
+
+표시 구조:
+1. 상단 섹션 (파란색 배경):
+   - "타임스탬프 댓글" 제목
+   - 타임스탬프 있는 댓글만 표시
+   - highlight={true}
+
+2. 하단 섹션 (일반):
+   - 타임스탬프 없는 댓글만 표시
+   - highlight={false}
+
+분리 로직:
+- sortedComments.filter()로 타임스탬프 유무 검사
+- timestampComments: timestamps.length > 0
+- regularComments: timestamps.length === 0
+
+[재사용 및 확장성]
+
+이 시스템을 수정할 때:
+1. textOriginal 사용 유지
+2. 스와이프 영역 50px 유지
+3. 정렬 로직 변경시 클라이언트/서버 구분 확인
+4. 타임스탬프 정규식 수정시 extractTimestamps() 함수만 수정
+5. UI 스타일 변경시 z-index 충돌 주의
+
+새로운 기능 추가시:
+- 답글 표시: API에서 replies 필드 파싱 필요
+- 필터링: 작성자, 키워드 기반 필터 추가 가능
+- 페이지네이션: nextPageToken 활용
+- 댓글 작성: YouTube API는 읽기 전용 (작성 불가)
