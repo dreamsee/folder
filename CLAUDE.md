@@ -166,6 +166,7 @@ localStorage나 상태 구조 변경사항
 - 테탐: TestTimestampPage.tsx (http://localhost:5174/test-timestamp)
 - 텍오버: TestOverlayPage.tsx (http://localhost:5174/test-overlay)
 - 텍줌: TestZoomPage.tsx (http://localhost:5174/test-zoom)
+- 드로잉: TestDrawingPage.tsx (http://localhost:5174/test-drawing) - 캔버스 드로잉 오버레이 시스템
 
 파일 명칭 별칭:
 - 주요파일위치.txt는 다음과 같이 불릴 수 있습니다:
@@ -378,3 +379,38 @@ git push
 - 로컬에는 유튜브노트만 있지만 GitHub에는 여러 프로젝트가 있음
 - 다른 폴더들은 컴퓨터에서 관리함
 - 여기서는 유튜브노트만 작업하고 그것만 업데이트
+
+모바일 디버깅 가이드:
+
+모바일 환경에서는 브라우저 콘솔(F12)을 사용할 수 없으므로, 화면 안에 디버그 정보를 표시하는 방법을 사용합니다.
+
+방법:
+1. 디버그 로그 state 생성:
+   const [debugLog, setDebugLog] = useState<string[]>([]);
+
+2. 확인하고 싶은 정보를 배열에 추가:
+   const logs: string[] = [];
+   logs.push(`확인할 값: ${someValue}`);
+   logs.push(`객체 내용: ${JSON.stringify(someObject)}`);
+   setDebugLog(logs);
+
+3. 화면에 표시할 UI 추가:
+   {debugLog.length > 0 && (
+     <div className="bg-yellow-100 border border-yellow-400 rounded p-2 text-xs">
+       <div className="font-bold mb-1">디버그 정보:</div>
+       {debugLog.map((log, i) => (
+         <div key={i}>{log}</div>
+       ))}
+     </div>
+   )}
+
+활용 예시:
+- API 응답 내용 확인
+- 객체의 메서드 목록 확인 (Object.getOwnPropertyNames)
+- 옵션 값 확인 (getOption 결과)
+- 에러 메시지 표시
+
+주의사항:
+- 디버깅 완료 후 관련 코드는 제거할 것
+- 노란색 배경으로 눈에 띄게 표시
+- text-xs로 작은 글씨 사용하여 공간 절약

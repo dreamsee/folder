@@ -1,6 +1,23 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-03: 드로잉 오버레이 시스템 구현 완료
+- TestDrawingPage.tsx: Canvas 기반 그리기 시스템 신규 생성 (5가지 도구)
+- TestDrawingPage.tsx: 그리기 도구 - 펜, 화살표, 사각형, 원, 지우개
+- TestDrawingPage.tsx: 색상 선택 (10가지 색상) 및 굵기 조절 (1-20px)
+- TestDrawingPage.tsx: 타임스탬프 기반 표시/숨김 시스템 (시작시간 + 지속시간)
+- TestDrawingPage.tsx: 여러 스트로크를 하나의 DrawingData로 통합 저장 (용량 효율화)
+- TestDrawingPage.tsx: localStorage 기반 videoId별 그리기 데이터 저장/로드
+- TestDrawingPage.tsx: 그리기 모드 토글 버튼 (영상 터치 vs 그리기 활성화)
+- TestDrawingPage.tsx: 터치 좌표 스케일 보정 (Canvas 실제 크기와 표시 크기 비율)
+- TestDrawingPage.tsx: 시간바 컨트롤러 추가 (영상 탐색 기능)
+- TestDrawingPage.tsx: 임시 스트로크 누적 시스템 (저장 전까지 화면에 유지)
+- App.tsx: /test-drawing 라우트 추가
+- CLAUDE.md: 드로잉 파일 별칭 추가 및 모바일 디버깅 가이드 작성
+- 데이터 구조: Stroke 인터페이스 (type, points, color, thickness)
+- 데이터 구조: DrawingData 인터페이스 (id, strokes[], startTime, duration)
+주요 성과: YouTube 영상 위에 타임스탬프 기반 그림 오버레이 시스템 구현 완료
+
 2025-10-03: 댓글 사이드 패널 HTML 파싱 및 UX 개선
 - CommentSidePanel.tsx: textOriginal 필드 사용으로 HTML 태그 표시 문제 해결
 - CommentSidePanel.tsx: 스와이프 트리거 영역 확대 (24px -> 50px)

@@ -50,6 +50,12 @@ UI 컴포넌트:
 - client/src/lib/youtubeUtils.ts: YouTube 유틸리티 (formatTime 등)
 - client/src/utils/chapterParser.ts: 챕터 파싱
 
+테스트 페이지:
+- client/src/pages/TestTimestampPage.tsx: 타임스탬프 테스트 (http://localhost:5174/test-timestamp)
+- client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 테스트 (http://localhost:5174/test-overlay)
+- client/src/pages/TestZoomPage.tsx: 줌 기능 테스트 (http://localhost:5174/test-zoom)
+- client/src/pages/TestDrawingPage.tsx: 드로잉 오버레이 테스트 (http://localhost:5174/test-drawing)
+
 서버:
 - server/index.ts: Express 서버 메인
 - server/routes.ts: API 라우트
@@ -135,6 +141,24 @@ UI 컴포넌트:
 - HomePage.tsx:458-465 CommentSidePanel 조건부 렌더링 (currentVideoId 존재시)
 - server/routes.ts:319-381 YouTube 댓글 API 엔드포인트 (/api/youtube/comments/:videoId)
 → 수정 시 주의: textOriginal과 textDisplay 차이 (HTML 포함 여부), 스와이프 영역 50px 유지 필요
+
+드로잉 오버레이 시스템:
+- TestDrawingPage.tsx:10-24 Stroke 및 DrawingData 인터페이스 정의
+- TestDrawingPage.tsx:37-43 그리기 관련 state (isDrawing, currentDrawing, tempStrokes)
+- TestDrawingPage.tsx:55 isDrawingMode 토글 state (영상 터치 vs 그리기 모드 전환)
+- TestDrawingPage.tsx:91-154 Canvas 마우스/터치 이벤트 핸들러 (좌표 스케일 보정)
+- TestDrawingPage.tsx:143-151 터치 완료시 tempStrokes에 스트로크 추가 (누적)
+- TestDrawingPage.tsx:156-184 drawOnCanvas() Canvas 렌더링 (저장된 그림 + 임시 그림 + 현재 그리는 중)
+- TestDrawingPage.tsx:238-268 renderStroke() 개별 스트로크 렌더링 (펜/화살표/사각형/원)
+- TestDrawingPage.tsx:270-291 saveDrawing() 모든 임시 스트로크를 하나의 DrawingData로 저장
+- TestDrawingPage.tsx:293-315 localStorage 로드/저장 (videoId별)
+- TestDrawingPage.tsx:353-367 deleteDrawing() 그리기 삭제
+- TestDrawingPage.tsx:451-460 그리기 모드 토글 버튼 UI
+- TestDrawingPage.tsx:476-492 Canvas 오버레이 (isDrawingMode에 따라 pointerEvents 전환)
+- TestDrawingPage.tsx:519-539 저장 버튼 (tempStrokes 개수 표시)
+- App.tsx:11 TestDrawingPage import
+- App.tsx:30 /test-drawing 라우트
+→ 수정 시 주의: Canvas 크기와 표시 크기 비율(scaleX, scaleY) 보정 필수, 여러 스트로크를 하나의 DrawingData로 통합
 
 타임스탬프 생성 및 편집:
 - NoteArea.tsx:874-879 수동타임스탬프추가() 수동 타임스탬프 생성 (녹화 모드)
