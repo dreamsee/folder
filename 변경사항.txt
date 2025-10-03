@@ -1,6 +1,23 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-04: 드로잉 시스템 색상 편집 및 타임스탬프 관리 기능 개선
+- TestDrawingPage.tsx: HSL 슬라이더 색상 편집 시스템 구현 (색조/채도/명도 0-360, 0-100, 0-100)
+- TestDrawingPage.tsx: Hex 색상 코드 직접 입력 기능 추가 (#000000 형식, 자동 검증)
+- TestDrawingPage.tsx: 색상 편집 UI 개선 (제목 옆 텍스트 입력창 8:2 비율 배치)
+- TestDrawingPage.tsx: 실시간 색상 미리보기 추가 (HSL 값 변경시 즉시 반영)
+- TestDrawingPage.tsx: 올가미(Lasso) 채우기 도구 추가 (자유곡선 그리고 자동 닫힘)
+- TestDrawingPage.tsx: 올가미 투명도 조절 (그리는 중 반투명, 완료 후 불투명)
+- TestDrawingPage.tsx: 되돌리기 버튼 추가 (마지막 스트로크 제거, 개수 표시)
+- TestDrawingPage.tsx: 12색 팔레트 편집 기능 (편집 모드에서 각 색상 개별 수정)
+- TestDrawingPage.tsx: 목록에서 시간 수정 기능 추가 (시작/종료 시간 직접 입력)
+- TestDrawingPage.tsx: 시간 입력시 영상 자동 이동 (player.seekTo 연동)
+- TestDrawingPage.tsx: 지속시간을 종료시간으로 변경 (사용자 친화적 표시)
+- TestDrawingPage.tsx: RGB↔HSL 변환 로직 구현 (색상 선택시 자동 변환)
+- TestDrawingPage.tsx: 모바일 디버그 로그 시스템 추가 (화면 상단 노란 배경)
+- 데이터 구조: Stroke 인터페이스에 filled 속성 추가 (올가미 채우기용)
+→ 주요 성과: 직관적인 색상 편집 시스템과 타임스탬프 관리 기능 완성
+
 2025-10-03: 드로잉 오버레이 시스템 구현 완료
 - TestDrawingPage.tsx: Canvas 기반 그리기 시스템 신규 생성 (5가지 도구)
 - TestDrawingPage.tsx: 그리기 도구 - 펜, 화살표, 사각형, 원, 지우개

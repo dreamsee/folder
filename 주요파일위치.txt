@@ -54,13 +54,35 @@ UI 컴포넌트:
 - client/src/pages/TestTimestampPage.tsx: 타임스탬프 테스트 (http://localhost:5174/test-timestamp)
 - client/src/pages/TestOverlayPage.tsx: 텍스트 오버레이 테스트 (http://localhost:5174/test-overlay)
 - client/src/pages/TestZoomPage.tsx: 줌 기능 테스트 (http://localhost:5174/test-zoom)
-- client/src/pages/TestDrawingPage.tsx: 드로잉 오버레이 테스트 (http://localhost:5174/test-drawing)
+- client/src/pages/TestDrawingPage.tsx: 드로잉 오버레이 테스트 (http://localhost:5174/test-drawing, Canvas 기반 그리기)
 
 서버:
 - server/index.ts: Express 서버 메인
 - server/routes.ts: API 라우트
 
 === 2. 기능별 코드 위치 매핑 ===
+
+드로잉 오버레이 시스템:
+- TestDrawingPage.tsx:8 Lasso 아이콘 import
+- TestDrawingPage.tsx:12 Stroke 인터페이스 (type에 lasso 추가, filled 속성)
+- TestDrawingPage.tsx:20 DrawingData 인터페이스 (strokes[] 배열)
+- TestDrawingPage.tsx:43 drawingTool state (pen/arrow/rectangle/circle/lasso/eraser)
+- TestDrawingPage.tsx:48-52 colorPalette state (12색 팔레트)
+- TestDrawingPage.tsx:72 hslValues state (색조/채도/명도)
+- TestDrawingPage.tsx:99-167 마우스/터치 이벤트 핸들러 (좌표 스케일 보정)
+- TestDrawingPage.tsx:170-242 drawOnCanvas() Canvas 렌더링 함수
+- TestDrawingPage.tsx:228-240 올가미 도구 미리보기 (반투명 채우기)
+- TestDrawingPage.tsx:251-312 renderStroke() 스트로크 렌더링 (올가미는 불투명)
+- TestDrawingPage.tsx:293-311 올가미 렌더링 (closePath + fill)
+- TestDrawingPage.tsx:314-341 saveDrawing() 저장 함수 (tempStrokes → DrawingData)
+- TestDrawingPage.tsx:383-391 updateDrawingTime() 시간 업데이트 함수
+- TestDrawingPage.tsx:494-501 올가미 도구 버튼
+- TestDrawingPage.tsx:504-518 되돌리기 버튼 (tempStrokes 개수 표시)
+- TestDrawingPage.tsx:560-651 색상 팔레트 (편집 모드, HSL 변환)
+- TestDrawingPage.tsx:645-891 HSL 슬라이더 편집기 (색조/채도/명도)
+- TestDrawingPage.tsx:652-703 Hex 색상 입력창 (정규식 검증)
+- TestDrawingPage.tsx:1002-1044 목록 시간 수정 입력창 (시작/종료, 영상 이동)
+→ 수정 시 주의: 좌표 스케일 보정 로직 변경 금지 (scaleX/scaleY)
 
 타임스탬프 자동 실행 시스템:
 - NoteArea.tsx:570-607 requestAnimationFrame 기반 고정밀 추적 시스템
