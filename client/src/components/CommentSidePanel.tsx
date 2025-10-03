@@ -28,13 +28,15 @@ interface CommentSidePanelProps {
   player: any;
   isPlayerReady: boolean;
   showNotification: (message: string, type: 'info' | 'success' | 'warning' | 'error') => void;
+  isFullscreen?: boolean; // 전체화면 상태
 }
 
 export const CommentSidePanel: React.FC<CommentSidePanelProps> = ({
   videoId,
   player,
   isPlayerReady,
-  showNotification
+  showNotification,
+  isFullscreen = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -44,6 +46,18 @@ export const CommentSidePanel: React.FC<CommentSidePanelProps> = ({
   const panelRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
   const touchEndX = useRef(0);
+
+  // 전체화면 버튼으로 패널 열기 이벤트 리스너
+  useEffect(() => {
+    const handleOpenPanel = () => {
+      setIsOpen(true);
+    };
+
+    window.addEventListener('openCommentPanel', handleOpenPanel);
+    return () => {
+      window.removeEventListener('openCommentPanel', handleOpenPanel);
+    };
+  }, []);
 
   // 타임스탬프 추출 정규식 (다양한 형식 지원)
   const extractTimestamps = (text: string): Array<{time: number, text: string}> => {
@@ -236,23 +250,26 @@ export const CommentSidePanel: React.FC<CommentSidePanelProps> = ({
 
   return (
     <>
-      {/* 트리거 영역 (왼쪽 가장자리) - 스와이프만 */}
-      <div
-        className="fixed left-0 top-0 h-full z-40"
-        style={{
-          width: '50px',
-          background: isOpen ? 'transparent' : 'linear-gradient(to right, rgba(0,0,0,0.05), transparent)'
-        }}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-      />
+      {/* 트리거 영역 - 일반 모드일 때만 표시 (전체화면은 버튼 사용) */}
+      {!isFullscreen && (
+        <div
+          className="fixed left-0 top-0 h-full z-40"
+          style={{
+            width: '50px',
+            background: isOpen ? 'transparent' : 'linear-gradient(to right, rgba(0,0,0,0.05), transparent)',
+            pointerEvents: isOpen ? 'none' : 'auto'
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        />
+      )}
 
 
       {/* 배경 오버레이 */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-30 z-40 transition-opacity duration-300"
+          className={`${isFullscreen ? 'absolute' : 'fixed'} inset-0 bg-black bg-opacity-30 z-40 transition-opacity duration-300`}
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -260,7 +277,7 @@ export const CommentSidePanel: React.FC<CommentSidePanelProps> = ({
       {/* 댓글 패널 */}
       <div
         ref={panelRef}
-        className={`fixed left-0 top-0 h-full bg-white shadow-xl z-50 transition-transform duration-300 ${
+        className={`${isFullscreen ? 'absolute' : 'fixed'} left-0 top-0 h-full bg-white shadow-xl z-50 transition-transform duration-300 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ width: '320px' }}

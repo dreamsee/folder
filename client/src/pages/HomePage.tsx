@@ -454,16 +454,6 @@ const HomePage = () => {
         onToggle={() => setIsDebugLogOpen(!isDebugLogOpen)}
       />
 
-      {/* 댓글 사이드 패널 */}
-      {currentVideoId && (
-        <CommentSidePanel
-          videoId={currentVideoId}
-          player={player}
-          isPlayerReady={isPlayerReady}
-          showNotification={showNotification}
-        />
-      )}
-
     </div>
     </>
   );

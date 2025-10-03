@@ -1,6 +1,20 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-04: 전체화면 모드 댓글 패널 접근성 개선
+- CommentSidePanel.tsx: isFullscreen prop 추가 및 조건부 positioning 구현 (fixed/absolute)
+- CommentSidePanel.tsx: 전체화면 시 트리거 영역 제거 (터치 블로킹 문제 해결)
+- CommentSidePanel.tsx: CustomEvent 리스너 추가 (openCommentPanel 이벤트 감지)
+- CommentSidePanel.tsx: 배경 오버레이 및 패널 조건부 positioning (lines 272, 280)
+- YouTubePlayer.tsx: MessageCircle 버튼 추가 (전체화면 전용, 우측 하단 right-20 위치)
+- YouTubePlayer.tsx: CommentSidePanel 컴포넌트 이동 (playerContainerRef 내부로 이동)
+- YouTubePlayer.tsx: isFullscreen prop 전달 (CommentSidePanel에 전달)
+- HomePage.tsx: 중복 CommentSidePanel 제거 (YouTubePlayer로 통합)
+- 기능: 전체화면에서 MessageCircle 버튼 클릭으로 댓글 패널 열기
+- 기능: 일반 모드에서는 좌측 스와이프로 댓글 패널 열기 유지
+- 기능: 전체화면 시 화면 터치 및 비디오 컨트롤 정상 작동
+주요 성과: 전체화면 모드에서 댓글 패널 접근성 문제 완전 해결
+
 2025-10-04: 드로잉 시스템 색상 편집 및 타임스탬프 관리 기능 개선
 - TestDrawingPage.tsx: HSL 슬라이더 색상 편집 시스템 구현 (색조/채도/명도 0-360, 0-100, 0-100)
 - TestDrawingPage.tsx: Hex 색상 코드 직접 입력 기능 추가 (#000000 형식, 자동 검증)

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Maximize2, Minimize2, Settings2, Play, Pause, Volume2, RotateCw, Mic } from "lucide-react";
+import { Maximize2, Minimize2, Settings2, Play, Pause, Volume2, RotateCw, Mic, MessageCircle } from "lucide-react";
 import TextOverlay, { OverlayData, Coordinates } from "./TextOverlay";
 import ChapterBar from "./ChapterBar";
+import CommentSidePanel from "./CommentSidePanel";
 import { parseChapters, parseDuration, Chapter } from "@/utils/chapterParser";
 
 interface YouTubePlayerProps {
@@ -591,6 +592,24 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             )}
           </Button>
 
+          {/* 댓글창 열기 버튼 (전체화면일 때만 표시) */}
+          <Button
+            onClick={() => {
+              // CommentSidePanel의 setIsOpen을 직접 호출할 수 없으므로
+              // 임시로 이벤트 발생시켜 열기
+              const event = new CustomEvent('openCommentPanel');
+              window.dispatchEvent(event);
+            }}
+            className={`absolute bottom-4 right-20 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40 ${
+              isFullscreen ? 'block' : 'hidden'
+            }`}
+            size="sm"
+            variant="ghost"
+            title="댓글 열기"
+          >
+            <MessageCircle className="w-5 h-5" />
+          </Button>
+
           <div id="player" className="w-full h-full">
             <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">
               <p>동영상을 검색해 주세요</p>
@@ -697,8 +716,19 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
               </div>
             </div>
           )}
+
+          {/* 댓글 사이드 패널 - 전체화면 컨테이너 내부 */}
+          {currentVideoId && (
+            <CommentSidePanel
+              videoId={currentVideoId}
+              player={player}
+              isPlayerReady={isPlayerReady}
+              showNotification={showNotification}
+              isFullscreen={isFullscreen}
+            />
+          )}
         </div>
-      
+
       {/* 커스텀 진행바 (타임스탬프 하이라이트 포함) */}
       {isPlayerReady && duration > 0 && 바설정?.커스텀바 && (
         <div className="mt-2 space-y-1">

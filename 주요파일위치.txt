@@ -145,24 +145,29 @@ UI 컴포넌트:
 - HomePage.tsx:녹화상태 녹화 관련 상태
 
 댓글 사이드 패널:
-- CommentSidePanel.tsx:33-46 메인 컴포넌트 상태 관리 (isOpen, comments, sortBy, isLoading)
-- CommentSidePanel.tsx:49-86 extractTimestamps() 타임스탬프 추출 함수 (HH:MM:SS, MM:SS 형식)
-- CommentSidePanel.tsx:89-131 loadComments() YouTube API 댓글 로드 (textOriginal 우선 사용)
-- CommentSidePanel.tsx:104 textOriginal 필드 사용으로 HTML 태그 제거
-- CommentSidePanel.tsx:133-161 sortComments() 클라이언트 사이드 정렬 (4가지 옵션)
-- CommentSidePanel.tsx:164-169 handleTimestampClick() 타임스탬프 클릭시 영상 시간 이동
-- CommentSidePanel.tsx:172-191 터치 이벤트 처리 (모바일 스와이프 50px 트리거 영역)
-- CommentSidePanel.tsx:201-210 스와이프 트리거 영역 (width: 50px, 왼쪽 가장자리)
-- CommentSidePanel.tsx:226-230 useEffect videoId/sortBy 변경시 댓글 재로드
-- CommentSidePanel.tsx:232-235 정렬된 댓글 필터링 (타임스탬프 댓글 분리)
-- CommentSidePanel.tsx:285-294 정렬 드롭다운 UI (관련성순, 최신순, 인기순, 타임스탬프 우선)
-- CommentSidePanel.tsx:310-325 타임스탬프 우선 정렬시 별도 섹션 표시 (파란색 배경)
-- CommentSidePanel.tsx:274-279 CommentItem 컴포넌트 (개별 댓글 렌더링)
-- CommentSidePanel.tsx:281-319 renderTextWithTimestamps() 타임스탬프를 클릭 가능한 링크로 변환
-- HomePage.tsx:13 CommentSidePanel import
-- HomePage.tsx:458-465 CommentSidePanel 조건부 렌더링 (currentVideoId 존재시)
+- CommentSidePanel.tsx:26-40 메인 컴포넌트 props (isFullscreen 포함) 및 상태 관리
+- CommentSidePanel.tsx:50-60 CustomEvent 리스너 (openCommentPanel 이벤트 감지)
+- CommentSidePanel.tsx:63-100 extractTimestamps() 타임스탬프 추출 함수 (HH:MM:SS, MM:SS 형식)
+- CommentSidePanel.tsx:103-145 loadComments() YouTube API 댓글 로드 (textOriginal 우선 사용)
+- CommentSidePanel.tsx:122 textOriginal 필드 사용으로 HTML 태그 제거
+- CommentSidePanel.tsx:148-175 sortComments() 클라이언트 사이드 정렬 (4가지 옵션)
+- CommentSidePanel.tsx:178-183 handleTimestampClick() 타임스탬프 클릭시 영상 시간 이동
+- CommentSidePanel.tsx:186-205 터치 이벤트 처리 (모바일 스와이프 50px 트리거 영역)
+- CommentSidePanel.tsx:253-266 조건부 트리거 영역 (!isFullscreen일 때만 렌더링)
+- CommentSidePanel.tsx:269-275 배경 오버레이 조건부 positioning (fixed/absolute)
+- CommentSidePanel.tsx:278-284 패널 조건부 positioning (fixed/absolute)
+- CommentSidePanel.tsx:240-244 useEffect videoId/sortBy 변경시 댓글 재로드
+- CommentSidePanel.tsx:247-249 정렬된 댓글 필터링 (타임스탬프 댓글 분리)
+- CommentSidePanel.tsx:302-311 정렬 드롭다운 UI (관련성순, 최신순, 인기순, 타임스탬프 우선)
+- CommentSidePanel.tsx:327-342 타임스탬프 우선 정렬시 별도 섹션 표시 (파란색 배경)
+- CommentSidePanel.tsx:364-441 CommentItem 컴포넌트 (개별 댓글 렌더링)
+- CommentSidePanel.tsx:370-408 renderTextWithTimestamps() 타임스탬프를 클릭 가능한 링크로 변환
+- YouTubePlayer.tsx:7 CommentSidePanel import
+- YouTubePlayer.tsx:595-611 전체화면 전용 MessageCircle 버튼 (CustomEvent 발행)
+- YouTubePlayer.tsx:720-729 CommentSidePanel 렌더링 (playerContainerRef 내부, isFullscreen prop 전달)
 - server/routes.ts:319-381 YouTube 댓글 API 엔드포인트 (/api/youtube/comments/:videoId)
-→ 수정 시 주의: textOriginal과 textDisplay 차이 (HTML 포함 여부), 스와이프 영역 50px 유지 필요
+→ 수정 시 주의: 전체화면 모드는 absolute positioning 사용, 일반 모드는 fixed positioning 사용
+→ 수정 시 주의: 트리거 영역은 일반 모드에만 렌더링하여 전체화면 터치 블로킹 방지
 
 드로잉 오버레이 시스템:
 - TestDrawingPage.tsx:10-24 Stroke 및 DrawingData 인터페이스 정의
