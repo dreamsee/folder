@@ -170,8 +170,9 @@ UI 컴포넌트:
 - CommentSidePanel.tsx:247-249 정렬된 댓글 필터링 (타임스탬프 댓글 분리)
 - CommentSidePanel.tsx:302-311 정렬 드롭다운 UI (관련성순, 최신순, 인기순, 타임스탬프 우선)
 - CommentSidePanel.tsx:327-342 타임스탬프 우선 정렬시 별도 섹션 표시 (파란색 배경)
-- CommentSidePanel.tsx:364-441 CommentItem 컴포넌트 (개별 댓글 렌더링)
+- CommentSidePanel.tsx:364-436 CommentItem 컴포넌트 (개별 댓글 렌더링, 프로필 이미지 제거됨)
 - CommentSidePanel.tsx:370-408 renderTextWithTimestamps() 타임스탬프를 클릭 가능한 링크로 변환
+- CommentSidePanel.tsx:410-435 댓글 레이아웃 (닉네임/날짜/내용/좋아요, 단일 컬럼 구조)
 - YouTubePlayer.tsx:7 CommentSidePanel import
 - YouTubePlayer.tsx:595-611 전체화면 전용 MessageCircle 버튼 (CustomEvent 발행)
 - YouTubePlayer.tsx:720-729 CommentSidePanel 렌더링 (playerContainerRef 내부, isFullscreen prop 전달)

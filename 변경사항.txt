@@ -1,6 +1,20 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-04: 댓글 사이드 패널 프로필 이미지 제거
+- CommentSidePanel.tsx: 프로필 이미지 div 제거 (lines 413-414)
+- CommentSidePanel.tsx: 불필요한 flex 레이아웃 간소화 (gap-3 제거)
+- 기능: 댓글 UI 간소화, 전체 너비 활용으로 가독성 향상
+주요 성과: 작고 보이지 않는 프로필 이미지 제거로 댓글 공간 효율 개선
+
+2025-10-04: 코드 정리 - 디버그 로그 및 중복 파일 제거
+- VideoLoader.tsx: 디버그 콘솔 로그 제거 (127-128줄)
+- server/routes.ts: 서버 측 디버그 로그 제거 (115-116줄)
+- hooks2 폴더 전체 삭제 (중복된 hooks 파일들)
+  * use-mobile.tsx, use-toast.ts, useMagnifier.ts, useVirtualKeyboard.ts
+- 기능: 불필요한 디버그 코드 제거, 중복 파일 정리
+주요 성과: 351줄 삭제, 코드베이스 정리 및 유지보수성 향상
+
 2025-10-04: 검색 결과 HTML 엔티티 디코딩 수정
 - VideoLoader.tsx: 클라이언트 측 HTML 엔티티 디코딩 함수 추가 (lines 106-116)
 - VideoLoader.tsx: 서버 응답 후 title과 channelTitle 디코딩 처리 (lines 119-125)

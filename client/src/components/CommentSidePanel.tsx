@@ -409,31 +409,26 @@ const CommentItem: React.FC<{
 
   return (
     <div className={`mb-4 pb-4 border-b last:border-b-0 ${highlight ? 'bg-blue-50 p-3 rounded-lg' : ''}`}>
-      <div className="flex items-start gap-3">
-        {/* 프로필 이미지 */}
-        <div className="w-8 h-8 rounded-full bg-gray-300 flex-shrink-0" />
-
-        <div className="flex-1">
-          {/* 작성자 정보 */}
-          <div className="mb-1">
-            <div className="font-semibold text-sm">{comment.author}</div>
-            <div className="text-xs text-gray-500">
-              {new Date(comment.publishedAt).toLocaleDateString()}
-            </div>
+      <div className="flex-1">
+        {/* 작성자 정보 */}
+        <div className="mb-1">
+          <div className="font-semibold text-sm">{comment.author}</div>
+          <div className="text-xs text-gray-500">
+            {new Date(comment.publishedAt).toLocaleDateString()}
           </div>
+        </div>
 
-          {/* 댓글 내용 */}
-          <div className="text-sm text-gray-800 whitespace-pre-wrap">
-            {renderTextWithTimestamps(comment.text)}
-          </div>
+        {/* 댓글 내용 */}
+        <div className="text-sm text-gray-800 whitespace-pre-wrap">
+          {renderTextWithTimestamps(comment.text)}
+        </div>
 
-          {/* 좋아요 */}
-          <div className="flex items-center gap-4 mt-2">
-            <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
-              <Heart className="h-3 w-3" />
-              {comment.likeCount}
-            </button>
-          </div>
+        {/* 좋아요 */}
+        <div className="flex items-center gap-4 mt-2">
+          <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700">
+            <Heart className="h-3 w-3" />
+            {comment.likeCount}
+          </button>
         </div>
       </div>
     </div>
