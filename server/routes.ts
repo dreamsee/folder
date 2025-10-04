@@ -112,9 +112,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const decodedTitle = decodeHtmlEntities(item.snippet.title);
         const decodedChannel = decodeHtmlEntities(item.snippet.channelTitle);
 
-        console.log("원본 제목:", item.snippet.title);
-        console.log("디코딩 후:", decodedTitle);
-
         return {
           videoId: item.id.videoId,
           title: decodedTitle,

@@ -124,9 +124,6 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
         }));
       }
 
-      console.log("=== 디코딩 후 첫 번째 영상 ===");
-      console.log("제목:", data.videos?.[0]?.title);
-
       if (data.videos && data.videos.length > 0) {
         // videoId가 있는 영상만 필터링 (undefined 제거)
         const validVideos = data.videos.filter((v: any) => v.videoId);
