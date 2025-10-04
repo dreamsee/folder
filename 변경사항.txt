@@ -1,6 +1,31 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-04: 검색 결과 HTML 엔티티 디코딩 수정
+- VideoLoader.tsx: 클라이언트 측 HTML 엔티티 디코딩 함수 추가 (lines 106-116)
+- VideoLoader.tsx: 서버 응답 후 title과 channelTitle 디코딩 처리 (lines 119-125)
+- VideoLoader.tsx: 디코딩 후 콘솔 로그 추가 (line 128)
+- 기능: 검색 결과에서 &#39; → ', &quot; → " 등 특수문자 정상 표시
+주요 성과: 서버 디코딩 실패 문제를 클라이언트 측 디코딩으로 해결
+
+2025-10-04: 검색 시스템 개선 및 화면 잠금 확대 UX 개선
+- VideoLoader.tsx: 안 본 영상 날짜순 정렬 기능 추가 (none/desc/asc 순환)
+- VideoLoader.tsx: 중복 영상 제거 로직 추가 (videoId 기준)
+- VideoLoader.tsx: 디버그 로그 추가 (중복 제거, 정렬 상태 확인)
+- server/routes.ts: HTML 엔티티 디코딩 함수 추가 (&#39; → ', &quot; → " 등)
+- server/routes.ts: 영상 제목 및 채널명 디코딩 적용
+- shared/schema.ts: youtubeVideoSchema에서 viewCount 필드 제거
+- ScreenLock.tsx: 확대 시 그림자 효과 제거 (::after 가상 요소 제거)
+- ScreenLock.tsx: 모바일 확대 설정 버튼 표시 (배율 슬라이더 접근 가능)
+- ScreenLock.tsx: 확대 설정 버튼을 화면 잠금 활성화 시에만 표시
+- YouTubePlayer.tsx: 모바일 터치 홀드 오버레이 어두운 효과 제거 (radial-gradient 제거)
+- 기능: 안 본 영상 정렬 - 기본(관련성순) → 최신순 ↓ → 오래된순 ↑ → 기본 순환
+- 기능: 검색 결과에서 HTML 특수문자 정상 표시
+- 기능: 더 많은 영상 불러오기 시 중복 방지
+- 기능: 화면 잠금 확대 시 깔끔한 확대 (그림자/어두운 효과 없음)
+- 기능: 모바일에서도 확대 배율 조정 가능
+주요 성과: 검색 UX 개선 및 화면 확대 기능 최적화
+
 2025-10-04: 전체화면 모드 댓글 패널 접근성 개선
 - CommentSidePanel.tsx: isFullscreen prop 추가 및 조건부 positioning 구현 (fixed/absolute)
 - CommentSidePanel.tsx: 전체화면 시 트리거 영역 제거 (터치 블로킹 문제 해결)

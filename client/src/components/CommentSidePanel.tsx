@@ -415,11 +415,11 @@ const CommentItem: React.FC<{
 
         <div className="flex-1">
           {/* 작성자 정보 */}
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-semibold text-sm">{comment.author}</span>
-            <span className="text-xs text-gray-500">
+          <div className="mb-1">
+            <div className="font-semibold text-sm">{comment.author}</div>
+            <div className="text-xs text-gray-500">
               {new Date(comment.publishedAt).toLocaleDateString()}
-            </span>
+            </div>
           </div>
 
           {/* 댓글 내용 */}

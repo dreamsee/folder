@@ -539,18 +539,6 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         </style>
       )}
 
-      {/* 터치 홀드 오버레이 효과 */}
-      {isMobile && isLocked && isTouchHolding && (
-        <>
-          <div
-            className="fixed inset-0 pointer-events-none z-[9998]"
-            style={{
-              background: `radial-gradient(circle at ${overlayPosition.x}px ${overlayPosition.y}px, transparent 100px, rgba(0, 0, 0, 0.3) 200px)`,
-              transition: 'background 0.3s ease-out',
-            }}
-          />
-        </>
-      )}
 
       <div>
         <div

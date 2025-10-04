@@ -9,7 +9,7 @@ YouTube 노트 앱 주요 파일 위치 및 코드 매핑
 핵심 컴포넌트:
 - client/src/components/NoteArea.tsx: 노트 영역 및 재생 컨트롤
 - client/src/components/YouTubePlayer.tsx: YouTube 플레이어
-- client/src/components/VideoLoader.tsx: 영상 검색 및 로딩
+- client/src/components/VideoLoader.tsx: 영상 검색 및 로딩 (HTML 엔티티 디코딩, 중복 제거, 정렬)
 
 UI 컴포넌트:
 - client/src/components/SettingsPanel.tsx: 우측 설정 패널
@@ -19,7 +19,7 @@ UI 컴포넌트:
 - client/src/components/ChapterBar.tsx: YouTube 챕터 바
 - client/src/components/TimeSkipControls.tsx: 영상 건너뛰기
 - client/src/components/FavoriteManager.tsx: 즐겨찾기 관리
-- client/src/components/ScreenLock.tsx: 화면 잠금
+- client/src/components/ScreenLock.tsx: 화면 잠금 및 확대 기능 (PC 클릭 확대, 모바일 터치 홀드 확대)
 
 왼쪽탭 레이아웃:
 - client/src/components/LeftSidebarTabs.tsx: 왼쪽 세로 탭 컴포넌트 (노트/화면글자/돋보기)
@@ -82,7 +82,7 @@ UI 컴포넌트:
 - TestDrawingPage.tsx:645-891 HSL 슬라이더 편집기 (색조/채도/명도)
 - TestDrawingPage.tsx:652-703 Hex 색상 입력창 (정규식 검증)
 - TestDrawingPage.tsx:1002-1044 목록 시간 수정 입력창 (시작/종료, 영상 이동)
-→ 수정 시 주의: 좌표 스케일 보정 로직 변경 금지 (scaleX/scaleY)
+→ 수정 시 주의: 좌표 보정은 99-167 참조
 
 타임스탬프 자동 실행 시스템:
 - NoteArea.tsx:570-607 requestAnimationFrame 기반 고정밀 추적 시스템
@@ -107,12 +107,22 @@ UI 컴포넌트:
 - SettingsPanel.tsx:화면텍스트섹션 오버레이 설정 UI
 - HomePage.tsx:오버레이상태들 오버레이 관련 상태 관리
 
-영상 로딩 및 재생:
-- VideoLoader.tsx:handleVideoSelect 영상 선택 및 시청횟수 증가
+영상 검색 및 로딩:
+- VideoLoader.tsx:52-146 handleSearch() 영상 검색 함수 (페이지네이션 지원)
+- VideoLoader.tsx:106-116 decodeHtmlEntities() 클라이언트 측 HTML 엔티티 디코딩 함수
+- VideoLoader.tsx:119-125 서버 응답 후 title과 channelTitle 디코딩 처리
+- VideoLoader.tsx:114-119 중복 영상 제거 (videoId 기준 필터링)
+- VideoLoader.tsx:173-207 applyFilter() 필터링 및 정렬 (watched/blacklisted/unwatched)
+- VideoLoader.tsx:187-199 안 본 영상 날짜순 정렬 (none/desc/asc)
+- VideoLoader.tsx:274-332 handleVideoSelect() 영상 선택 및 시청횟수 증가
+- VideoLoader.tsx:419-451 안 본 영상 버튼 (정렬 순환: none → 📅↓ → 📅↑ → none)
+- server/routes.ts:26-131 YouTube 검색 API 엔드포인트
+- server/routes.ts:100-112 HTML 엔티티 디코딩 (서버 측, 작동 안 함)
 - YouTubePlayer.tsx:loadVideoById YouTube API 영상 로딩
 - YouTubePlayer.tsx:onPlayerStateChange 재생 상태 변화 처리
 - FavoriteManager.tsx:handleVideoPlay 즐겨찾기 영상 재생
 - HomePage.tsx:currentVideoId currentVideoId 상태 관리
+→ 수정 시 주의: 디코딩은 VideoLoader.tsx:106-125, 중복제거는 114-119, 정렬은 173-207 참조
 
 설정 관리:
 - SettingsPanel.tsx:전체컴포넌트 모든 설정 UI (총 843줄)
@@ -166,8 +176,7 @@ UI 컴포넌트:
 - YouTubePlayer.tsx:595-611 전체화면 전용 MessageCircle 버튼 (CustomEvent 발행)
 - YouTubePlayer.tsx:720-729 CommentSidePanel 렌더링 (playerContainerRef 내부, isFullscreen prop 전달)
 - server/routes.ts:319-381 YouTube 댓글 API 엔드포인트 (/api/youtube/comments/:videoId)
-→ 수정 시 주의: 전체화면 모드는 absolute positioning 사용, 일반 모드는 fixed positioning 사용
-→ 수정 시 주의: 트리거 영역은 일반 모드에만 렌더링하여 전체화면 터치 블로킹 방지
+→ 수정 시 주의: positioning은 269-275, 278-284 참조, 트리거 영역은 253-266 참조
 
 드로잉 오버레이 시스템:
 - TestDrawingPage.tsx:10-24 Stroke 및 DrawingData 인터페이스 정의
@@ -185,7 +194,7 @@ UI 컴포넌트:
 - TestDrawingPage.tsx:519-539 저장 버튼 (tempStrokes 개수 표시)
 - App.tsx:11 TestDrawingPage import
 - App.tsx:30 /test-drawing 라우트
-→ 수정 시 주의: Canvas 크기와 표시 크기 비율(scaleX, scaleY) 보정 필수, 여러 스트로크를 하나의 DrawingData로 통합
+→ 수정 시 주의: 스케일 보정은 91-154, 통합 저장은 270-291 참조
 
 타임스탬프 생성 및 편집:
 - NoteArea.tsx:874-879 수동타임스탬프추가() 수동 타임스탬프 생성 (녹화 모드)
@@ -286,11 +295,13 @@ UI 컴포넌트:
 - TestZoomPage.tsx:446-476 renderZoomArea() 실시간 줌 영역 미리보기 (빨간 네모)
 - TestZoomPage.tsx:523-573 체크박스 기반 저장된 줌 설정 목록 (영상 플레이어 하단)
 - TestZoomPage.tsx:329-339 좌상단 좌표 기준 transform-origin 설정
-- YouTubePlayer.tsx:511-527 터치홀드 줌 CSS 스타일 (플레이어 컨테이너 iframe 타겟)
-- YouTubePlayer.tsx:520-524 CSS transform 플레이어 iframe 직접 확대 (.youtube-player-container iframe)
+- ScreenLock.tsx:217-230 PC 클릭 확대 CSS 스타일 (그림자 효과 제거됨)
+- ScreenLock.tsx:157-214 확대 설정 Popover (화면 잠금 시에만 표시)
+- ScreenLock.tsx:169-185 PC용 클릭 확대 사용 토글
+- ScreenLock.tsx:188-208 배율 슬라이더 (1.5x-5.0x, PC/모바일 모두 표시)
+- YouTubePlayer.tsx:524-540 모바일 터치홀드 줌 CSS 스타일 (iframe 타겟)
+- YouTubePlayer.tsx:534-537 CSS transform iframe 직접 확대 (어두운 오버레이 제거됨)
 - YouTubePlayer.tsx:79-80 touchPosition/overlayPosition 상태 분리 (iframe용/오버레이용)
-- YouTubePlayer.tsx:515-518 플레이어 컨테이너 overflow hidden 설정
 - YouTubePlayer.tsx:389-423 터치홀드 이벤트 핸들러 (컨트롤 패널 요소 감지 추가)
 - YouTubePlayer.tsx:393-400 터치 타겟 컨트롤 패널 체크 (data-control-panel 속성)
-- YouTubePlayer.tsx:409-413 컨테이너 기준 상대 좌표 변환 (relativeX/relativeY)
-- YouTubePlayer.tsx:561-568 컨트롤 패널 열 때 플레이어 현재값 동기화
+→ 수정 시 주의: PC 확대는 217-230, 모바일 확대는 524-540 참조

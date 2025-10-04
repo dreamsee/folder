@@ -40,6 +40,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
   const [filterMode, setFilterMode] = useState<'watched' | 'blacklisted' | 'unwatched'>('unwatched');
   const [filteredResults, setFilteredResults] = useState<YoutubeVideo[]>([]);
   const [watchedSortOrder, setWatchedSortOrder] = useState<'desc' | 'asc'>('desc');
+  const [unwatchedSortOrder, setUnwatchedSortOrder] = useState<'none' | 'desc' | 'asc'>('none');
   const [nextPageToken, setNextPageToken] = useState<string | null>(null);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [folderSelectorOpen, setFolderSelectorOpen] = useState(false);
@@ -101,6 +102,31 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
       
       const data: any = await response.json();
 
+      // HTML 엔티티 디코딩 함수 (클라이언트 측)
+      const decodeHtmlEntities = (text: string): string => {
+        return text
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&#x27;/g, "'")
+          .replace(/&apos;/g, "'")
+          .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+      };
+
+      // 클라이언트 측에서 타이틀과 채널명 디코딩
+      if (data.videos) {
+        data.videos = data.videos.map((video: any) => ({
+          ...video,
+          title: decodeHtmlEntities(video.title || ''),
+          channelTitle: decodeHtmlEntities(video.channelTitle || '')
+        }));
+      }
+
+      console.log("=== 디코딩 후 첫 번째 영상 ===");
+      console.log("제목:", data.videos?.[0]?.title);
+
       if (data.videos && data.videos.length > 0) {
         // videoId가 있는 영상만 필터링 (undefined 제거)
         const validVideos = data.videos.filter((v: any) => v.videoId);
@@ -110,11 +136,18 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
           ? validVideos
           : [...searchResults, ...validVideos];
 
-        setSearchResults(newVideos);
+        // 중복 제거 (videoId 기준)
+        const uniqueVideos = newVideos.filter((video, index, self) =>
+          index === self.findIndex((v) => v.videoId === video.videoId)
+        );
+
+        console.log("중복 제거 전:", newVideos.length, "중복 제거 후:", uniqueVideos.length);
+
+        setSearchResults(uniqueVideos);
         setNextPageToken(data.nextPageToken || null);
-        
+
         // 필터링 적용
-        applyFilter(newVideos, filterMode);
+        applyFilter(uniqueVideos, filterMode);
 
         if (isInitialSearch) {
           if (invalidCount > 0) {
@@ -164,9 +197,11 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
 
   // 필터링 함수
   const applyFilter = async (videos: YoutubeVideo[], mode: 'watched' | 'blacklisted' | 'unwatched') => {
+    console.log("applyFilter 호출 - 모드:", mode, "정렬:", unwatchedSortOrder, "영상 개수:", videos.length);
+
     const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
     const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
-    
+
     let filtered = videos;
     
     if (mode === 'watched') {
@@ -185,8 +220,16 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     } else if (mode === 'unwatched') {
       // 안 본 영상: 시청 기록도 없고 블랙리스트도 아닌 영상
       filtered = videos.filter(video => !watchHistory[video.videoId] && !blacklist[video.videoId]);
-      
-      // 15개 제한 제거 - 모든 안본 영상 표시
+
+      // 안 본 영상 날짜순 정렬 (none이 아닐 때만)
+      if (unwatchedSortOrder !== 'none') {
+        filtered.sort((a, b) => {
+          const aDate = new Date(a.publishedAt || 0).getTime();
+          const bDate = new Date(b.publishedAt || 0).getTime();
+          return unwatchedSortOrder === 'desc' ? bDate - aDate : aDate - bDate;
+        });
+      }
+      // unwatchedSortOrder가 'none'이면 YouTube API 기본 순서(관련성순) 유지
     }
     
     setFilteredResults(filtered);
@@ -336,7 +379,7 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
     if (searchResults.length > 0) {
       applyFilter(searchResults, filterMode);
     }
-  }, [filterMode, searchResults, watchedSortOrder]);
+  }, [filterMode, searchResults, watchedSortOrder, unwatchedSortOrder]);
   
   // 팝업 모드일 때 자동으로 검색 입력란에 포커스
   useEffect(() => {
@@ -413,14 +456,32 @@ const VideoLoader: React.FC<VideoLoaderProps> = ({
           <Button
             size="sm"
             variant={filterMode === 'unwatched' ? 'default' : 'outline'}
-            onClick={() => setFilterMode('unwatched')}
-            className="text-xs"
+            onClick={() => {
+              if (filterMode === 'unwatched') {
+                // 정렬 순서 순환: none → desc → asc → none
+                if (unwatchedSortOrder === 'none') {
+                  setUnwatchedSortOrder('desc');
+                } else if (unwatchedSortOrder === 'desc') {
+                  setUnwatchedSortOrder('asc');
+                } else {
+                  setUnwatchedSortOrder('none');
+                }
+              } else {
+                setFilterMode('unwatched');
+              }
+            }}
+            className="text-xs flex items-center gap-1"
           >
             안 본 영상 ({searchResults.filter(v => {
               const watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '{}');
               const blacklist = JSON.parse(localStorage.getItem('videoBlacklist') || '{}');
               return !watchHistory[v.videoId] && !blacklist[v.videoId];
             }).length})
+            {filterMode === 'unwatched' && unwatchedSortOrder !== 'none' && (
+              <span className="text-[10px]">
+                📅{unwatchedSortOrder === 'desc' ? '↓' : '↑'}
+              </span>
+            )}
           </Button>
           <Button
             size="sm"

@@ -154,61 +154,63 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
               <span className="hidden sm:inline">즐겨찾기</span>
             </Button>
 
-            {/* 설정 버튼 (PC만) */}
-            {!isMobile && (
+            {/* 설정 버튼 (화면 잠금 활성화 시에만 표시) */}
+            {isLocked && (
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="ghost" size="sm">
                     <Settings2 className="h-4 w-4" />
                   </Button>
                 </PopoverTrigger>
-              <PopoverContent className="w-80">
-                <div className="space-y-4">
-                  <h3 className="font-medium text-sm">확대 설정</h3>
-                  
-                  {/* 확대 활성화 */}
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm">클릭 확대 사용</label>
-                    <Button
-                      variant={magnifierSettings.enabled ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() =>
-                        onMagnifierSettingsChange({
-                          ...magnifierSettings,
-                          enabled: !magnifierSettings.enabled,
-                        })
-                      }
-                    >
-                      {magnifierSettings.enabled ? '켜짐' : '꺼짐'}
-                    </Button>
-                  </div>
+                <PopoverContent className="w-80">
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-sm">확대 설정</h3>
 
-                  {/* 배율 조절 */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">배율</label>
-                      <span className="text-sm text-muted-foreground">
-                        {magnifierSettings.zoom.toFixed(1)}x
-                      </span>
+                    {/* PC만 확대 활성화 토글 표시 */}
+                    {!isMobile && (
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm">클릭 확대 사용</label>
+                        <Button
+                          variant={magnifierSettings.enabled ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() =>
+                            onMagnifierSettingsChange({
+                              ...magnifierSettings,
+                              enabled: !magnifierSettings.enabled,
+                            })
+                          }
+                        >
+                          {magnifierSettings.enabled ? '켜짐' : '꺼짐'}
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* 배율 조절 */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm">배율</label>
+                        <span className="text-sm text-muted-foreground">
+                          {magnifierSettings.zoom.toFixed(1)}x
+                        </span>
+                      </div>
+                      <Slider
+                        value={[magnifierSettings.zoom]}
+                        onValueChange={([value]) =>
+                          onMagnifierSettingsChange({
+                            ...magnifierSettings,
+                            zoom: value,
+                          })
+                        }
+                        min={1.5}
+                        max={5}
+                        step={0.5}
+                        className="w-full"
+                      />
                     </div>
-                    <Slider
-                      value={[magnifierSettings.zoom]}
-                      onValueChange={([value]) =>
-                        onMagnifierSettingsChange({
-                          ...magnifierSettings,
-                          zoom: value,
-                        })
-                      }
-                      min={1.5}
-                      max={5}
-                      step={0.5}
-                      className="w-full"
-                    />
-                  </div>
 
-                </div>
-              </PopoverContent>
-            </Popover>
+                  </div>
+                </PopoverContent>
+              </Popover>
             )}
           </div>
         </div>
@@ -224,15 +226,6 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
               transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
               z-index: 50;
               position: relative;
-            }
-            
-            /* 확대 시 그림자 효과 */
-            .youtube-player-container::after {
-              content: '';
-              position: absolute;
-              inset: -10px;
-              background: radial-gradient(ellipse at center, rgba(0,0,0,0.2) 0%, transparent 70%);
-              pointer-events: none;
             }
           `}
         </style>

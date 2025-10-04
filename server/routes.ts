@@ -41,16 +41,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const mockVideos = [];
         const startIndex = pageToken ? parseInt(pageToken) * 50 : 0;
         for (let i = 0; i < 50; i++) {
+          const daysAgo = Math.floor(Math.random() * 365); // 0-365일 전
+          const publishedDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+
           mockVideos.push({
             videoId: `video_${startIndex + i}_${Date.now()}`,
             title: `${query} 검색 결과 ${startIndex + i + 1}`,
             thumbnail: `https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg`,
-            channelTitle: `채널 ${(startIndex + i) % 5 + 1}`
+            channelTitle: `채널 ${(startIndex + i) % 5 + 1}`,
+            publishedAt: publishedDate
           });
         }
-        return res.json({ 
-          videos: mockVideos, 
-          nextPageToken: startIndex < 200 ? String(Math.floor(startIndex / 50) + 1) : null 
+        return res.json({
+          videos: mockVideos,
+          nextPageToken: startIndex < 200 ? String(Math.floor(startIndex / 50) + 1) : null
         });
       }
 
@@ -86,20 +90,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const data = await response.json() as any;
-      console.log("API 응답 데이터:", data);
 
       if (!data.items || data.items.length === 0) {
         return res.status(404).json({ message: "검색 결과가 없습니다." });
       }
 
-      const videos = data.items.map((item: any) => ({
-        videoId: item.id.videoId,
-        title: item.snippet.title,
-        thumbnail: item.snippet.thumbnails.medium.url,
-        channelTitle: item.snippet.channelTitle
-      }));
+      // HTML 엔티티 디코딩 함수 (개선된 버전)
+      const decodeHtmlEntities = (text: string): string => {
+        return text
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&#x27;/g, "'")
+          .replace(/&apos;/g, "'")
+          .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+      };
 
-      return res.json({ 
+      const videos = data.items.map((item: any) => {
+        const decodedTitle = decodeHtmlEntities(item.snippet.title);
+        const decodedChannel = decodeHtmlEntities(item.snippet.channelTitle);
+
+        console.log("원본 제목:", item.snippet.title);
+        console.log("디코딩 후:", decodedTitle);
+
+        return {
+          videoId: item.id.videoId,
+          title: decodedTitle,
+          thumbnail: item.snippet.thumbnails.medium.url,
+          channelTitle: decodedChannel,
+          publishedAt: item.snippet.publishedAt
+        };
+      });
+
+      return res.json({
         videos,
         nextPageToken: data.nextPageToken || null
       });
