@@ -1,6 +1,22 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-04: 챕터바 개수 설정 기능 추가
+- SettingsPanel.tsx: UISettings 인터페이스에 챕터바개수 필드 추가 (line 25)
+- SettingsPanel.tsx: 기본설정 및 전체모드에 챕터바개수: 3 기본값 설정 (lines 207, 293)
+- SettingsPanel.tsx: 챕터바 설정 UI 수정 (lines 623-651)
+  * 부제목 변경: "영상의 챕터별 구간을 표시" → "챕터구간 표시"
+  * 숫자 입력칸 추가: w-10 크기, 토글 왼쪽 배치
+  * 빈칸 허용: 입력 중 빈칸 가능, 포커스 아웃시 1로 자동 설정
+  * 좌우 배치: 제목/부제목(왼쪽) + 숫자입력+토글(오른쪽)
+- ChapterBar.tsx: chaptersPerPageSetting prop 추가 (lines 5-11, 18)
+- ChapterBar.tsx: 설정값 우선 사용 로직 구현 (lines 21-22)
+- ChapterBar.tsx: 설정값 변경시 자동 업데이트 useEffect (lines 33-38)
+- YouTubePlayer.tsx: 바설정 인터페이스에 챕터바개수 필드 추가 (line 31)
+- YouTubePlayer.tsx: ChapterBar에 챕터바개수 전달 (line 805)
+- 기능: 설정 패널에서 챕터바 표시 개수 실시간 조절 가능
+주요 성과: 사용자가 원하는 챕터 개수를 직접 설정할 수 있어 유연성 향상
+
 2025-10-04: 챕터바 동적 폭 할당 및 스마트 텍스트 절단 시스템 구현
 - ChapterBar.tsx: 전체 챕터 모드와 페이지 모드의 폭 할당 방식 분리
   * 전체 챕터 모드: 시간 비율 기반 폭 할당 (기존 방식 유지)

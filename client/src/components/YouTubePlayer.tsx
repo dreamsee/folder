@@ -28,6 +28,7 @@ interface YouTubePlayerProps {
   바설정?: {
     커스텀바: boolean;
     챕터바: boolean;
+    챕터바개수?: number;
   };
   currentTime?: number; // 현재 재생 시간 (HomePage에서 전달)
   uiSettings?: {
@@ -801,6 +802,7 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
             chapters={chapters}
             currentTime={currentTime}
             onChapterClick={handleChapterClick}
+            chaptersPerPageSetting={바설정?.챕터바개수}
           />
         </div>
       )}

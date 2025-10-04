@@ -130,6 +130,9 @@ UI 컴포넌트:
 - SettingsPanel.tsx:655-715 재생 컨트롤 하위 설정들 (볼륨/속도/녹화/도장/편집)
 - SettingsPanel.tsx:400-500 재생 기본값 설정 (기본 재생 속도)
 - SettingsPanel.tsx:12-50 UISettings 인터페이스 정의
+- SettingsPanel.tsx:22-26 바설정 인터페이스 (커스텀바, 챕터바, 챕터바개수)
+- SettingsPanel.tsx:623-651 챕터바 설정 UI (제목/부제목/숫자입력/토글)
+- SettingsPanel.tsx:629-642 챕터바개수 입력칸 (w-10, 빈칸 허용, 포커스 아웃시 1로 설정)
 - HomePage.tsx:uiSettings UISettings 상태 관리
 - NoteArea.tsx:재생기본값적용 새 영상 로드시 기본값 적용
 - YouTubePlayer.tsx:설정동기화 플레이어 설정 동기화
@@ -142,6 +145,10 @@ UI 컴포넌트:
 
 챕터 및 네비게이션:
 - ChapterBar.tsx:전체컴포넌트 챕터 표시 및 페이지네이션
+- ChapterBar.tsx:5-11 ChapterBarProps 인터페이스 (chaptersPerPageSetting prop 추가)
+- ChapterBar.tsx:18 chaptersPerPageSetting prop 받기
+- ChapterBar.tsx:21-22 chaptersPerPage/inputValue state (설정값 우선 사용)
+- ChapterBar.tsx:33-38 설정값 변경시 챕터바개수 업데이트 useEffect
 - ChapterBar.tsx:34-78 textWidthCache 및 measureTextWidth 함수 (텍스트 폭 측정)
 - ChapterBar.tsx:80-130 smartTruncate 함수 (이진 탐색 + 단어 경계 절단)
 - ChapterBar.tsx:132-159 getMaxWidth 함수 (같은 줄 충돌 감지)
@@ -152,6 +159,8 @@ UI 컴포넌트:
 - ChapterBar.tsx:250-340 챕터바 렌더링 (위/아래 줄 분리)
 - ChapterBar.tsx:251-260 표시 형식 UI ("[28]챕터 표시 3")
 - chapterParser.ts:전체파일 챕터 파싱 로직
+- YouTubePlayer.tsx:28-32 바설정 인터페이스 (챕터바개수 필드 추가)
+- YouTubePlayer.tsx:801-806 ChapterBar 렌더링 (chaptersPerPageSetting 전달)
 - YouTubePlayer.tsx:챕터연동 챕터 데이터 처리
 → 수정 시 주의: 폭 할당 모드는 161-201, 텍스트 절단은 80-130, 충돌 감지는 132-159 참조
 

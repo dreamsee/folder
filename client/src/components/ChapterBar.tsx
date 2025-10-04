@@ -7,17 +7,19 @@ interface ChapterBarProps {
   currentTime: number;
   onChapterClick: (seconds: number) => void;
   className?: string;
+  chaptersPerPageSetting?: number; // 설정 패널에서 받아온 챕터바 개수
 }
 
 const ChapterBar: React.FC<ChapterBarProps> = ({
   chapters,
   currentTime,
   onChapterClick,
-  className = ""
+  className = "",
+  chaptersPerPageSetting
 }) => {
   const [currentPage, setCurrentPage] = useState(0);
-  const [chaptersPerPage, setChaptersPerPage] = useState(3); // 기본값: 3개씩 표시
-  const [inputValue, setInputValue] = useState('3'); // 입력 필드용 별도 상태
+  const [chaptersPerPage, setChaptersPerPage] = useState(chaptersPerPageSetting || 3); // 설정값 우선 사용
+  const [inputValue, setInputValue] = useState(String(chaptersPerPageSetting || 3)); // 입력 필드용 별도 상태
   const [pageWindowStart, setPageWindowStart] = useState(0); // 표시할 페이지 그룹의 시작 인덱스
   const [maxVisiblePages, setMaxVisiblePages] = useState(7); // 보일 수 있는 최대 페이지 수
   const containerRef = useRef<HTMLDivElement>(null);
@@ -27,12 +29,13 @@ const ChapterBar: React.FC<ChapterBarProps> = ({
     return null;
   }
 
-  // 챕터 수가 변경되면 기본값 3으로 리셋
+  // 챕터 수가 변경되거나 설정값이 변경되면 업데이트
   useEffect(() => {
-    setChaptersPerPage(3);
-    setInputValue('3');
+    const newValue = chaptersPerPageSetting || 3;
+    setChaptersPerPage(newValue);
+    setInputValue(String(newValue));
     setCurrentPage(0);
-  }, [chapters.length]);
+  }, [chapters.length, chaptersPerPageSetting]);
 
   // 컨테이너 너비에 따라 보일 수 있는 최대 페이지 수 계산
   useEffect(() => {

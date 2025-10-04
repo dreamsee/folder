@@ -22,6 +22,7 @@ export interface UISettings {
   바설정: {
     커스텀바: boolean;
     챕터바: boolean;
+    챕터바개수?: number;
   };
   재생컨트롤: {
     전체표시: boolean;
@@ -203,7 +204,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const 기본설정: UISettings = {
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
     검색창: { 유지: true, 목록유지: false },
-    바설정: { 커스텀바: true, 챕터바: true },
+    바설정: { 커스텀바: true, 챕터바: true, 챕터바개수: 3 },
     재생컨트롤: { 전체표시: true, 플레이어내장: false, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
@@ -289,7 +290,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         새설정 = {
           상단부: { 제목표시: true, 부제목표시: true, 부제목내용: settings.상단부?.부제목내용 || "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
           검색창: { 유지: true, 목록유지: settings.검색창?.목록유지 ?? false },
-          바설정: { 커스텀바: true, 챕터바: true },
+          바설정: { 커스텀바: true, 챕터바: true, 챕터바개수: 3 },
           재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 녹화: true, 도장: true, 편집: true },
           노트영역: { 표시: true },
           화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
@@ -622,15 +623,49 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               <div className="flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="text-sm">챕터 바</span>
-                  <span className="text-xs text-gray-500">영상의 챕터별 구간을 표시</span>
+                  <span className="text-xs text-gray-500">챕터구간 표시</span>
                 </div>
-                <Switch
-                  checked={settings.바설정?.챕터바 ?? true}
-                  onCheckedChange={(값) => handleSettingChange("바설정", {
-                    ...settings.바설정,
-                    챕터바: 값
-                  })}
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    value={settings.바설정?.챕터바개수 ?? ''}
+                    onChange={(e) => {
+                      const 입력값 = e.target.value;
+                      if (입력값 === '') {
+                        handleSettingChange("바설정", {
+                          ...settings.바설정,
+                          챕터바개수: ''
+                        });
+                      } else {
+                        const 값 = parseInt(입력값);
+                        if (!isNaN(값)) {
+                          handleSettingChange("바설정", {
+                            ...settings.바설정,
+                            챕터바개수: 값
+                          });
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (e.target.value === '') {
+                        handleSettingChange("바설정", {
+                          ...settings.바설정,
+                          챕터바개수: 1
+                        });
+                      }
+                    }}
+                    className="w-10 h-8 text-sm text-center"
+                    min={1}
+                    max={9999999999}
+                  />
+                  <Switch
+                    checked={settings.바설정?.챕터바 ?? true}
+                    onCheckedChange={(값) => handleSettingChange("바설정", {
+                      ...settings.바설정,
+                      챕터바: 값
+                    })}
+                  />
+                </div>
               </div>
             </div>
           </div>
