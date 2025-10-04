@@ -150,7 +150,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({
           title: `목업 영상 제목 - ${videoId}`,
           channelTitle: "목업 채널",
-          thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"
+          thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+          description: "0:00 인트로\n1:30 메인 내용\n5:00 마무리" // 목업 챕터
         });
       }
 
@@ -176,7 +177,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         title: videoInfo.snippet.title,
         channelTitle: videoInfo.snippet.channelTitle,
-        thumbnail: videoInfo.snippet.thumbnails.medium?.url || videoInfo.snippet.thumbnails.default?.url
+        thumbnail: videoInfo.snippet.thumbnails.medium?.url || videoInfo.snippet.thumbnails.default?.url,
+        description: videoInfo.snippet.description || ''
       });
 
     } catch (error) {

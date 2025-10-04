@@ -142,8 +142,18 @@ UI 컴포넌트:
 
 챕터 및 네비게이션:
 - ChapterBar.tsx:전체컴포넌트 챕터 표시 및 페이지네이션
+- ChapterBar.tsx:34-78 textWidthCache 및 measureTextWidth 함수 (텍스트 폭 측정)
+- ChapterBar.tsx:80-130 smartTruncate 함수 (이진 탐색 + 단어 경계 절단)
+- ChapterBar.tsx:132-159 getMaxWidth 함수 (같은 줄 충돌 감지)
+- ChapterBar.tsx:161-201 chaptersWithRelativeWidth 계산 (동적 폭 할당)
+  * 전체 챕터 모드: 시간 비율 사용
+  * 페이지 모드: 텍스트 길이 비율 사용 (최소 10%, 최대 균등×2)
+  * 정규화: 총합 100% 맞춤
+- ChapterBar.tsx:250-340 챕터바 렌더링 (위/아래 줄 분리)
+- ChapterBar.tsx:251-260 표시 형식 UI ("[28]챕터 표시 3")
 - chapterParser.ts:전체파일 챕터 파싱 로직
 - YouTubePlayer.tsx:챕터연동 챕터 데이터 처리
+→ 수정 시 주의: 폭 할당 모드는 161-201, 텍스트 절단은 80-130, 충돌 감지는 132-159 참조
 
 녹화 시스템:
 - NoteArea.tsx:851-872 녹화토글() 녹화 시작/중지 함수
