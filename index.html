@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Manager</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <!-- 좌측 사이드바 -->
+    <aside id="sidebar">
+        <div class="sidebar-content">
+            <h2>영역 설정</h2>
+
+            <div class="save-load-section">
+                <button class="save-btn" onclick="saveToJSON()">저장</button>
+                <button class="load-btn" onclick="loadFromJSON()">불러오기</button>
+                <input type="file" id="fileInput" accept=".json" style="display: none;" onchange="handleFileLoad(event)">
+            </div>
+
+            <div class="input-group">
+                <label>영역 1</label>
+                <input type="text" id="title1" placeholder="제목 입력">
+                <textarea id="buttons1" placeholder="버튼 추가: - 버튼이름"></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>영역 2</label>
+                <input type="text" id="title2" placeholder="제목 입력">
+                <textarea id="buttons2" placeholder="버튼 추가: - 버튼이름"></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>영역 3</label>
+                <input type="text" id="title3" placeholder="제목 입력">
+                <textarea id="buttons3" placeholder="버튼 추가: - 버튼이름"></textarea>
+            </div>
+
+            <div class="input-group">
+                <label>영역 4</label>
+                <input type="text" id="title4" placeholder="제목 입력">
+                <textarea id="buttons4" placeholder="버튼 추가: - 버튼이름"></textarea>
+            </div>
+        </div>
+    </aside>
+
+    <!-- 메인 콘텐츠 영역 -->
+    <main id="mainContent">
+        <div id="area1" class="content-area">
+            <h2 class="area-title"></h2>
+            <div class="button-container"></div>
+        </div>
+
+        <div id="area2" class="content-area">
+            <h2 class="area-title"></h2>
+            <div class="button-container"></div>
+        </div>
+
+        <div id="area3" class="content-area">
+            <h2 class="area-title"></h2>
+            <div class="button-container"></div>
+        </div>
+
+        <div id="area4" class="content-area">
+            <h2 class="area-title"></h2>
+            <div class="button-container"></div>
+        </div>
+    </main>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
