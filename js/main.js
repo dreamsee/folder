@@ -433,7 +433,13 @@ function moveRowUp(button) {
     const prevRow = row.previousElementSibling;
 
     if (prevRow) {
+        // 이동하기 전에 row에 focus 클래스 임시 추가
+        row.classList.add('keep-focus');
         row.parentNode.insertBefore(row, prevRow);
+        // 이동 후 버튼에 포커스
+        button.focus();
+        // 클래스 제거
+        setTimeout(() => row.classList.remove('keep-focus'), 100);
     }
 }
 
@@ -583,7 +589,7 @@ function toggleWidthMode(button) {
         column.setAttribute('data-width-mode', 'px');
         button.textContent = 'px';
         input.placeholder = 'px';
-        input.value = '200'; // 기본값 200px
+        input.value = '100'; // 기본값 100px
         input.removeAttribute('max');
         input.setAttribute('min', '50');
         input.setAttribute('step', '10');
@@ -1009,6 +1015,9 @@ function initSidebarToggle() {
     }, false);
 
     function handleSwipe() {
+        // 모달창이 열려있으면 스와이프 무시
+        if (currentModal) return;
+
         const diffX = touchEndX - touchStartX;
         const diffY = touchEndY - touchStartY;
 
@@ -1033,7 +1042,7 @@ function initSidebarToggle() {
 // 메모장 초기화
 function initNotePad() {
     const notePad = document.getElementById('notePad');
-    const handle = notePad.querySelector('.note-handle');
+    const handle = document.querySelector('.note-handle');
     const textarea = notePad.querySelector('.note-textarea');
     const content = notePad.querySelector('.note-content');
 
@@ -1059,20 +1068,22 @@ function initNotePad() {
         e.preventDefault();
         isDragging = true;
         startY = e.clientY;
-        startHeight = content.offsetHeight;
+        startHeight = notePad.offsetHeight;
         dragDistance = 0;
         dragStartTime = Date.now();
-        content.style.transition = 'none';
+        notePad.style.transition = 'none';
+        handle.style.transition = 'none';
     });
 
     // 터치 드래그 시작
     handle.addEventListener('touchstart', function(e) {
         isDragging = true;
         startY = e.touches[0].clientY;
-        startHeight = content.offsetHeight;
+        startHeight = notePad.offsetHeight;
         dragDistance = 0;
         dragStartTime = Date.now();
-        content.style.transition = 'none';
+        notePad.style.transition = 'none';
+        handle.style.transition = 'none';
     }, { passive: true });
 
     // 마우스 드래그 중
@@ -1084,14 +1095,14 @@ function initNotePad() {
         dragDistance = Math.abs(diff);
 
         let newHeight = startHeight + diff;
-        newHeight = Math.max(0, Math.min(newHeight, window.innerHeight - 100));
+        newHeight = Math.max(0, Math.min(newHeight, window.innerHeight - 50));
 
-        content.style.maxHeight = newHeight + 'px';
-        content.style.height = newHeight + 'px';
-        textarea.style.minHeight = (newHeight - 30) + 'px';
+        notePad.style.height = newHeight + 'px';
+        handle.style.top = newHeight + 'px';
+        textarea.style.minHeight = (newHeight - 40) + 'px';
 
-        if (newHeight > 10) {
-            notePad.classList.add('expanded');
+        if (newHeight > 0) {
+            notePad.style.pointerEvents = 'auto';
         }
     });
 
@@ -1104,14 +1115,14 @@ function initNotePad() {
         dragDistance = Math.abs(diff);
 
         let newHeight = startHeight + diff;
-        newHeight = Math.max(0, Math.min(newHeight, window.innerHeight - 100));
+        newHeight = Math.max(0, Math.min(newHeight, window.innerHeight - 50));
 
-        content.style.maxHeight = newHeight + 'px';
-        content.style.height = newHeight + 'px';
-        textarea.style.minHeight = (newHeight - 30) + 'px';
+        notePad.style.height = newHeight + 'px';
+        handle.style.top = newHeight + 'px';
+        textarea.style.minHeight = (newHeight - 40) + 'px';
 
-        if (newHeight > 10) {
-            notePad.classList.add('expanded');
+        if (newHeight > 0) {
+            notePad.style.pointerEvents = 'auto';
         }
     }, { passive: true });
 
@@ -1120,7 +1131,8 @@ function initNotePad() {
         if (!isDragging) return;
 
         isDragging = false;
-        content.style.transition = 'max-height 0.3s ease';
+        notePad.style.transition = 'height 0.3s ease';
+        handle.style.transition = 'top 0.3s ease';
 
         const dragTime = Date.now() - dragStartTime;
 
@@ -1129,18 +1141,20 @@ function initNotePad() {
             // 클릭: 내용 지우고 접기
             textarea.value = '';
             localStorage.removeItem('notepad_content');
-            notePad.classList.remove('expanded');
-            content.style.height = '';
-            content.style.maxHeight = '';
+            notePad.style.height = '0';
+            handle.style.top = '0';
             textarea.style.minHeight = '';
+            notePad.style.pointerEvents = 'none';
         } else {
             // 드래그: 높이가 50px 미만이면 접기 (내용은 유지)
-            const currentHeight = content.offsetHeight;
+            const currentHeight = notePad.offsetHeight;
             if (currentHeight < 50) {
-                notePad.classList.remove('expanded');
-                content.style.height = '';
-                content.style.maxHeight = '';
+                notePad.style.height = '0';
+                handle.style.top = '0';
                 textarea.style.minHeight = '';
+                notePad.style.pointerEvents = 'none';
+            } else {
+                notePad.style.pointerEvents = 'auto';
             }
         }
     });
@@ -1150,7 +1164,8 @@ function initNotePad() {
         if (!isDragging) return;
 
         isDragging = false;
-        content.style.transition = 'max-height 0.3s ease';
+        notePad.style.transition = 'height 0.3s ease';
+        handle.style.transition = 'top 0.3s ease';
 
         const dragTime = Date.now() - dragStartTime;
 
@@ -1159,18 +1174,20 @@ function initNotePad() {
             // 클릭: 내용 지우고 접기
             textarea.value = '';
             localStorage.removeItem('notepad_content');
-            notePad.classList.remove('expanded');
-            content.style.height = '';
-            content.style.maxHeight = '';
+            notePad.style.height = '0';
+            handle.style.top = '0';
             textarea.style.minHeight = '';
+            notePad.style.pointerEvents = 'none';
         } else {
             // 드래그: 높이가 50px 미만이면 접기 (내용은 유지)
-            const currentHeight = content.offsetHeight;
+            const currentHeight = notePad.offsetHeight;
             if (currentHeight < 50) {
-                notePad.classList.remove('expanded');
-                content.style.height = '';
-                content.style.maxHeight = '';
+                notePad.style.height = '0';
+                handle.style.top = '0';
                 textarea.style.minHeight = '';
+                notePad.style.pointerEvents = 'none';
+            } else {
+                notePad.style.pointerEvents = 'auto';
             }
         }
     });
