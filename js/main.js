@@ -440,8 +440,16 @@ function moveRowDown(button) {
 
 // Textarea 자동 높이 조절
 function autoResizeTextarea(textarea) {
+    // 빈 값이면 height를 설정하지 않고 CSS min-height 사용
+    if (!textarea.value) {
+        textarea.style.height = '';
+        textarea.style.padding = '13px 8px 4px';
+        return;
+    }
+
     textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
+    const newHeight = Math.max(textarea.scrollHeight, 30);  // 최소 30px 보장
+    textarea.style.height = newHeight + 'px';
 
     // 줄 수에 따라 padding 조절
     const lineCount = (textarea.value.match(/\n/g) || []).length + 1;
