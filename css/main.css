@@ -516,3 +516,84 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.5; }
 }
+
+/* 메모장 */
+#notePad {
+    position: fixed;
+    top: 0;
+    right: 20px;
+    width: 300px;
+    background-color: #fff3cd;
+    border: 2px solid #daa520;
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+    z-index: 3000;
+    transition: transform 0.3s ease;
+    transform: translateY(-100%);
+}
+
+#notePad.expanded {
+    transform: translateY(0);
+}
+
+.note-handle {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+    padding: 10px;
+    text-align: center;
+    cursor: move;
+    font-weight: bold;
+    font-size: 14px;
+    user-select: none;
+    border-radius: 0 0 8px 8px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+}
+
+.note-handle::before {
+    content: '☰';
+    font-size: 18px;
+}
+
+.note-handle:hover {
+    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+}
+
+.note-content {
+    padding: 15px;
+}
+
+.note-textarea {
+    width: 100%;
+    min-height: 150px;
+    border: 1px solid #daa520;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 14px;
+    font-family: Arial, sans-serif;
+    resize: none;
+    background-color: #fffbf0;
+    box-sizing: border-box;
+}
+
+.note-textarea:focus {
+    outline: none;
+    border-color: #f39c12;
+    box-shadow: 0 0 5px rgba(243, 156, 18, 0.3);
+}
+
+@media (max-width: 768px) {
+    #notePad {
+        right: 10px;
+        width: 250px;
+    }
+
+    .note-textarea {
+        min-height: 120px;
+        font-size: 13px;
+    }
+}
