@@ -203,10 +203,11 @@ function openModal(buttonName) {
             <div class="modal-body">
                 <div class="fixed-rows">
                     <div class="header-row">
-                        <div class="header-column">
+                        <div class="header-column" data-width-mode="ratio">
                             <input type="text" class="header-cell" placeholder="열 제목 1" oninput="updatePlaceholders()">
                             <div class="column-bottom">
-                                <input type="number" class="width-input" placeholder="비율" value="1" min="0.1" max="10" step="0.1" oninput="applyManualWidths()">
+                                <input type="number" class="width-input" placeholder="비율" value="1" min="0.1" step="0.1" oninput="applyManualWidths()">
+                                <button class="width-mode-toggle" onclick="toggleWidthMode(this)">비율</button>
                                 <div class="column-controls">
                                     <button class="column-btn" onclick="moveColumnLeft(this)">◀</button>
                                     <button class="column-btn" onclick="moveColumnRight(this)">▶</button>
@@ -303,10 +304,12 @@ function addColumn(button) {
     // 헤더에 새 열 추가
     const newColumn = document.createElement('div');
     newColumn.className = 'header-column';
+    newColumn.setAttribute('data-width-mode', 'ratio');
     newColumn.innerHTML = `
         <input type="text" class="header-cell" placeholder="열 제목 ${newColumnCount}" oninput="updatePlaceholders()">
         <div class="column-bottom">
-            <input type="number" class="width-input" placeholder="비율" value="${newDefaultValue}" min="0.1" max="10" step="0.1" oninput="applyManualWidths()">
+            <input type="number" class="width-input" placeholder="비율" value="${newDefaultValue}" min="0.1" step="0.1" oninput="applyManualWidths()">
+            <button class="width-mode-toggle" onclick="toggleWidthMode(this)">비율</button>
             <div class="column-controls">
                 <button class="column-btn" onclick="moveColumnLeft(this)">◀</button>
                 <button class="column-btn" onclick="moveColumnRight(this)">▶</button>
@@ -490,6 +493,35 @@ function attachAutoResize(textarea) {
     });
 }
 
+// 너비 모드 토글 (비율 ↔ px)
+function toggleWidthMode(button) {
+    const column = button.closest('.header-column');
+    const currentMode = column.getAttribute('data-width-mode');
+    const input = column.querySelector('.width-input');
+
+    if (currentMode === 'ratio') {
+        // 비율 → px
+        column.setAttribute('data-width-mode', 'px');
+        button.textContent = 'px';
+        input.placeholder = 'px';
+        input.value = '200'; // 기본값 200px
+        input.removeAttribute('max');
+        input.setAttribute('min', '50');
+        input.setAttribute('step', '10');
+    } else {
+        // px → 비율
+        column.setAttribute('data-width-mode', 'ratio');
+        button.textContent = '비율';
+        input.placeholder = '비율';
+        input.value = '1';
+        input.setAttribute('min', '0.1');
+        input.removeAttribute('max');
+        input.setAttribute('step', '0.1');
+    }
+
+    applyManualWidths();
+}
+
 // 수동 너비 비율 적용
 function applyManualWidths() {
     if (!currentModal) return;
@@ -497,28 +529,48 @@ function applyManualWidths() {
     const modal = currentModal.querySelector('.modal-content');
     const headerColumns = modal.querySelectorAll('.header-column');
     const dataRows = modal.querySelectorAll('.data-row');
-    const widthInputs = modal.querySelectorAll('.width-input');
-
-    // 비율 값 수집
-    const ratios = Array.from(widthInputs).map(input => {
-        const value = parseInt(input.value) || 1;
-        return Math.max(1, Math.min(10, value)); // 1~10 사이로 제한
-    });
-
-    const totalRatio = ratios.reduce((sum, ratio) => sum + ratio, 0);
 
     // 헤더 열에 너비 적용
     headerColumns.forEach((column, index) => {
-        column.style.flex = `${ratios[index]} 1 0`;
+        const mode = column.getAttribute('data-width-mode');
+        const input = column.querySelector('.width-input');
+        const value = parseFloat(input.value) || (mode === 'px' ? 200 : 1);
+
+        if (mode === 'px') {
+            // px 모드: 고정 너비
+            column.style.flex = `0 0 ${value}px`;
+        } else {
+            // 비율 모드: 유연한 너비
+            column.style.flex = `${value} 1 0`;
+        }
     });
 
     // 데이터 셀에 너비 적용
     dataRows.forEach(row => {
         const cells = row.querySelectorAll('.data-cell');
         cells.forEach((cell, index) => {
-            cell.style.flex = `${ratios[index]} 1 0`;
+            const column = headerColumns[index];
+            if (!column) return;
+
+            const mode = column.getAttribute('data-width-mode');
+            const input = column.querySelector('.width-input');
+            const value = parseFloat(input.value) || (mode === 'px' ? 200 : 1);
+
+            if (mode === 'px') {
+                cell.style.flex = `0 0 ${value}px`;
+            } else {
+                cell.style.flex = `${value} 1 0`;
+            }
         });
     });
+
+    // 너비 변경 후 모든 textarea 높이 재계산
+    setTimeout(() => {
+        const allCells = modal.querySelectorAll('.data-cell');
+        allCells.forEach(cell => {
+            autoResizeTextarea(cell);
+        });
+    }, 0);
 }
 
 // 열 삭제
@@ -743,18 +795,28 @@ function saveModalData(buttonName) {
 
     const modal = currentModal.querySelector('.modal-content');
     const headerCells = modal.querySelectorAll('.header-cell');
-    const widthInputs = modal.querySelectorAll('.width-input');
+    const headerColumns = modal.querySelectorAll('.header-column');
     const dataRows = modal.querySelectorAll('.data-row');
 
     const headers = Array.from(headerCells).map(cell => cell.value);
-    const widths = Array.from(widthInputs).map(input => parseInt(input.value) || 1);
+
+    // 너비와 모드 함께 저장
+    const widthsData = Array.from(headerColumns).map(column => {
+        const input = column.querySelector('.width-input');
+        const mode = column.getAttribute('data-width-mode');
+        return {
+            value: parseFloat(input.value) || (mode === 'px' ? 200 : 1),
+            mode: mode || 'ratio'
+        };
+    });
+
     const rows = Array.from(dataRows).map(row => {
         return Array.from(row.querySelectorAll('.data-cell')).map(cell => cell.value);
     });
 
     modalDataStore[buttonName] = {
         headers: headers,
-        widths: widths,
+        widthsData: widthsData,
         rows: rows
     };
 }
@@ -775,10 +837,27 @@ function loadModalData(buttonName, modal) {
     data.headers.forEach((headerText, index) => {
         const column = document.createElement('div');
         column.className = 'header-column';
+
+        // widthsData가 있으면 사용, 없으면 구 형식(widths) 호환
+        let widthData = { value: 1, mode: 'ratio' };
+        if (data.widthsData && data.widthsData[index]) {
+            widthData = data.widthsData[index];
+        } else if (data.widths && data.widths[index]) {
+            widthData = { value: data.widths[index], mode: 'ratio' };
+        }
+
+        column.setAttribute('data-width-mode', widthData.mode);
+
+        const modeText = widthData.mode === 'px' ? 'px' : '비율';
+        const placeholder = widthData.mode === 'px' ? 'px' : '비율';
+        const minValue = widthData.mode === 'px' ? '50' : '0.1';
+        const stepValue = widthData.mode === 'px' ? '10' : '0.1';
+
         column.innerHTML = `
             <input type="text" class="header-cell" value="${headerText}" placeholder="열 제목 ${index + 1}" oninput="updatePlaceholders()">
             <div class="column-bottom">
-                <input type="number" class="width-input" placeholder="비율" value="${data.widths ? data.widths[index] : 1}" min="1" max="10" oninput="applyManualWidths()">
+                <input type="number" class="width-input" placeholder="${placeholder}" value="${widthData.value}" min="${minValue}" step="${stepValue}" oninput="applyManualWidths()">
+                <button class="width-mode-toggle" onclick="toggleWidthMode(this)">${modeText}</button>
                 <div class="column-controls">
                     <button class="column-btn" onclick="moveColumnLeft(this)">◀</button>
                     <button class="column-btn" onclick="moveColumnRight(this)">▶</button>

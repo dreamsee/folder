@@ -342,12 +342,27 @@ body {
 }
 
 .width-input {
-    width: 55px;
+    width: 50px;
     padding: 5px;
     border: 1px solid #bdc3c7;
     border-radius: 4px;
     font-size: 13px;
     text-align: center;
+}
+
+.width-mode-toggle {
+    padding: 4px 6px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.width-mode-toggle:hover {
+    background-color: #2980b9;
 }
 
 .column-controls {
@@ -434,6 +449,11 @@ body {
     overflow: hidden;
     text-align: center;
     min-height: 30px;
+}
+
+.data-cell::placeholder {
+    color: #d0d0d0;
+    opacity: 1;
 }
 
 .add-row-wrapper {
