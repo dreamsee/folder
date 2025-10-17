@@ -181,13 +181,202 @@ function renderAreas(areas) {
                 const button = document.createElement('button');
                 button.className = 'area-button';
                 button.textContent = buttonName;
-                button.onclick = () => openModal(buttonName);
+
+                // 롱프레스 기능 추가
+                let pressTimer = null;
+                let longPressed = false;
+
+                const startPress = () => {
+                    longPressed = false;
+                    pressTimer = setTimeout(() => {
+                        longPressed = true;
+                        showButtonMenu(button, buttonName, areaData.id);
+                    }, 500);
+                };
+
+                const cancelPress = (e) => {
+                    if (pressTimer) {
+                        clearTimeout(pressTimer);
+                        pressTimer = null;
+                    }
+                    // 롱프레스였으면 클릭 이벤트 방지
+                    if (longPressed) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        longPressed = false;
+                    } else if (!longPressed) {
+                        // 일반 클릭
+                        openModal(buttonName);
+                    }
+                };
+
+                button.addEventListener('mousedown', startPress);
+                button.addEventListener('touchstart', startPress, { passive: true });
+                button.addEventListener('mouseup', cancelPress);
+                button.addEventListener('mouseleave', () => {
+                    if (pressTimer) {
+                        clearTimeout(pressTimer);
+                        pressTimer = null;
+                    }
+                });
+                button.addEventListener('touchend', cancelPress);
+                button.addEventListener('touchcancel', () => {
+                    if (pressTimer) {
+                        clearTimeout(pressTimer);
+                        pressTimer = null;
+                    }
+                });
+
                 rowDiv.appendChild(button);
             });
 
             buttonContainer.appendChild(rowDiv);
         });
     });
+}
+
+// 버튼 메뉴 표시
+function showButtonMenu(button, oldButtonName, areaId) {
+    // 기존 메뉴가 있으면 제거
+    const existingMenu = document.querySelector('.button-context-menu');
+    if (existingMenu) existingMenu.remove();
+
+    const menu = document.createElement('div');
+    menu.className = 'button-context-menu';
+    menu.innerHTML = `
+        <button class="menu-item" data-action="rename">이름 변경</button>
+        <button class="menu-item" data-action="delete">삭제</button>
+        <button class="menu-item" data-action="cancel">취소</button>
+    `;
+
+    // 버튼 위치에 메뉴 표시
+    const rect = button.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${rect.bottom + 5}px`;
+    menu.style.left = `${rect.left}px`;
+
+    document.body.appendChild(menu);
+
+    // 메뉴 항목 클릭 처리
+    menu.addEventListener('click', async (e) => {
+        const action = e.target.dataset.action;
+
+        if (action === 'rename') {
+            await renameButton(oldButtonName, areaId);
+        } else if (action === 'delete') {
+            await deleteButton(oldButtonName, areaId);
+        }
+
+        menu.remove();
+    });
+
+    // 메뉴 외부 클릭시 닫기
+    setTimeout(() => {
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        document.addEventListener('click', closeMenu);
+    }, 100);
+}
+
+// 버튼 이름 변경
+async function renameButton(oldName, areaId) {
+    const newName = prompt('새 버튼 이름을 입력하세요:', oldName);
+
+    if (!newName || !newName.trim() || newName === oldName) return;
+
+    // modalDataStore 키 변경
+    if (modalDataStore[oldName]) {
+        modalDataStore[newName] = modalDataStore[oldName];
+        delete modalDataStore[oldName];
+    }
+
+    // 사이드바 텍스트 업데이트
+    updateSidebarButtonName(areaId, oldName, newName);
+
+    // 화면 업데이트
+    updateLayout();
+}
+
+// 버튼 삭제
+async function deleteButton(buttonName, areaId) {
+    if (!confirm(`"${buttonName}" 버튼을 삭제하시겠습니까?\n저장된 모든 데이터도 함께 삭제됩니다.`)) {
+        return;
+    }
+
+    // modalDataStore에서 삭제
+    if (modalDataStore[buttonName]) {
+        delete modalDataStore[buttonName];
+    }
+
+    // 사이드바에서 버튼 제거
+    removeSidebarButton(areaId, buttonName);
+
+    // 화면 업데이트
+    updateLayout();
+}
+
+// 사이드바에서 버튼 이름 변경
+function updateSidebarButtonName(areaId, oldName, newName) {
+    const textarea = document.getElementById(`buttons${areaId}`);
+    const lines = textarea.value.split('\n');
+
+    const updatedLines = lines.map(line => {
+        if (line.includes(oldName)) {
+            // 쉼표로 구분된 버튼들 처리
+            const buttons = line.split(',').map(btn => btn.trim());
+            const updatedButtons = buttons.map(btn => {
+                // '- 버튼이름' 형식 처리
+                if (btn.startsWith('-')) {
+                    const name = btn.substring(1).trim();
+                    return name === oldName ? `- ${newName}` : btn;
+                }
+                return btn === oldName ? newName : btn;
+            });
+            return updatedButtons.join(', ');
+        }
+        return line;
+    });
+
+    textarea.value = updatedLines.join('\n');
+}
+
+// 사이드바에서 버튼 제거
+function removeSidebarButton(areaId, buttonName) {
+    const textarea = document.getElementById(`buttons${areaId}`);
+    const lines = textarea.value.split('\n');
+
+    const updatedLines = lines.map(line => {
+        if (line.includes(buttonName)) {
+            // 쉼표로 구분된 버튼들 처리
+            const buttons = line.split(',').map(btn => btn.trim());
+            const filteredButtons = buttons.filter(btn => {
+                // '- 버튼이름' 형식 처리
+                if (btn.startsWith('-')) {
+                    const name = btn.substring(1).trim();
+                    return name !== buttonName;
+                }
+                return btn !== buttonName;
+            });
+
+            // 버튼이 하나도 남지 않으면 빈 줄 반환
+            if (filteredButtons.length === 0) return '';
+
+            // 첫 버튼에만 '-' 유지
+            return filteredButtons.map((btn, idx) => {
+                if (idx === 0 && !btn.startsWith('-')) {
+                    return `- ${btn}`;
+                }
+                return btn;
+            }).join(', ');
+        }
+        return line;
+    }).filter(line => line.trim() !== ''); // 빈 줄 제거
+
+    textarea.value = updatedLines.join('\n');
 }
 
 // 모달 열기
