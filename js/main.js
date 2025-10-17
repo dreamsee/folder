@@ -1062,7 +1062,7 @@ function initNotePad() {
         startHeight = content.offsetHeight;
         dragDistance = 0;
         dragStartTime = Date.now();
-        notePad.style.transition = 'none';
+        content.style.transition = 'none';
     });
 
     // 터치 드래그 시작
@@ -1072,7 +1072,7 @@ function initNotePad() {
         startHeight = content.offsetHeight;
         dragDistance = 0;
         dragStartTime = Date.now();
-        notePad.style.transition = 'none';
+        content.style.transition = 'none';
     }, { passive: true });
 
     // 마우스 드래그 중
@@ -1086,6 +1086,7 @@ function initNotePad() {
         let newHeight = startHeight + diff;
         newHeight = Math.max(0, Math.min(newHeight, window.innerHeight - 100));
 
+        content.style.maxHeight = newHeight + 'px';
         content.style.height = newHeight + 'px';
         textarea.style.minHeight = (newHeight - 30) + 'px';
 
@@ -1105,6 +1106,7 @@ function initNotePad() {
         let newHeight = startHeight + diff;
         newHeight = Math.max(0, Math.min(newHeight, window.innerHeight - 100));
 
+        content.style.maxHeight = newHeight + 'px';
         content.style.height = newHeight + 'px';
         textarea.style.minHeight = (newHeight - 30) + 'px';
 
@@ -1118,7 +1120,7 @@ function initNotePad() {
         if (!isDragging) return;
 
         isDragging = false;
-        notePad.style.transition = 'transform 0.3s ease';
+        content.style.transition = 'max-height 0.3s ease';
 
         const dragTime = Date.now() - dragStartTime;
 
@@ -1129,6 +1131,7 @@ function initNotePad() {
             localStorage.removeItem('notepad_content');
             notePad.classList.remove('expanded');
             content.style.height = '';
+            content.style.maxHeight = '';
             textarea.style.minHeight = '';
         } else {
             // 드래그: 높이가 50px 미만이면 접기 (내용은 유지)
@@ -1136,6 +1139,7 @@ function initNotePad() {
             if (currentHeight < 50) {
                 notePad.classList.remove('expanded');
                 content.style.height = '';
+                content.style.maxHeight = '';
                 textarea.style.minHeight = '';
             }
         }
@@ -1146,7 +1150,7 @@ function initNotePad() {
         if (!isDragging) return;
 
         isDragging = false;
-        notePad.style.transition = 'transform 0.3s ease';
+        content.style.transition = 'max-height 0.3s ease';
 
         const dragTime = Date.now() - dragStartTime;
 
@@ -1157,6 +1161,7 @@ function initNotePad() {
             localStorage.removeItem('notepad_content');
             notePad.classList.remove('expanded');
             content.style.height = '';
+            content.style.maxHeight = '';
             textarea.style.minHeight = '';
         } else {
             // 드래그: 높이가 50px 미만이면 접기 (내용은 유지)
@@ -1164,6 +1169,7 @@ function initNotePad() {
             if (currentHeight < 50) {
                 notePad.classList.remove('expanded');
                 content.style.height = '';
+                content.style.maxHeight = '';
                 textarea.style.minHeight = '';
             }
         }
