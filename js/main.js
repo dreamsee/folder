@@ -1,6 +1,9 @@
 // 전역 변수
-let currentModal = null;
+let modalStack = []; // 모달 스택으로 변경
 let modalDataStore = {};
+
+// 모달별 현재 페이지 인덱스 저장
+let currentPageIndex = {};
 
 // 페이지 로드시 초기화
 document.addEventListener('DOMContentLoaded', function() {
@@ -54,12 +57,13 @@ function parseButtons(text) {
     const lines = text.split('\n')
         .map(line => line.trim())
         .filter(line => line.startsWith('-'))
-        .map(line => line.substring(1))  // trim 제거
+        .map(line => line.substring(1).trim())
         .filter(line => line.length > 0);
 
-    // 각 줄을 쉼표로 분리 (띄어쓰기 포함)
+    // 각 줄을 쉼표로만 분리 (띄어쓰기는 버튼 이름에 포함)
     return lines.map(line => {
         return line.split(',')
+            .map(btn => btn.trim())
             .filter(btn => btn.length > 0);
     });
 }
@@ -188,14 +192,10 @@ function renderAreas(areas) {
 
 // 모달 열기
 function openModal(buttonName) {
-    // 기존 모달이 있으면 제거
-    if (currentModal) {
-        document.body.removeChild(currentModal);
-    }
-
     // 모달 생성
     const modal = document.createElement('div');
     modal.className = 'modal active';
+    modal.dataset.modalName = buttonName; // 모달 이름 저장
 
     modal.innerHTML = `
         <div class="modal-content">
@@ -235,6 +235,12 @@ function openModal(buttonName) {
                     <div class="add-row-wrapper">
                         <button class="add-row-btn top" onclick="addDataRowTop(this)">▲ 위로 행 추가</button>
                         <button class="add-row-btn bottom" onclick="addDataRowBottom(this)">▼ 아래로 행 추가</button>
+                        <div class="page-navigation">
+                            <button class="page-nav-btn" onclick="previousPage(this)">◀</button>
+                            <button class="page-title-btn" onclick="togglePageList(this)">페이지 1</button>
+                            <button class="page-nav-btn" onclick="nextPage(this)">▶</button>
+                            <button class="page-menu-btn" onclick="openPageMenu(this)">📄</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -242,7 +248,7 @@ function openModal(buttonName) {
     `;
 
     document.body.appendChild(modal);
-    currentModal = modal;
+    modalStack.push(modal); // 스택에 추가
 
     // 저장된 데이터 불러오기
     const modalContent = modal.querySelector('.modal-content');
@@ -253,10 +259,10 @@ function openModal(buttonName) {
     initialTextareas.forEach(textarea => attachAutoResize(textarea));
 
     // 초기 placeholder 업데이트
-    updatePlaceholders();
+    updatePlaceholders(modal);
 
     // 초기 너비 적용
-    setTimeout(() => applyManualWidths(), 100);
+    setTimeout(() => applyManualWidths(modal), 100);
 
     // 배경 클릭시 닫기
     modal.addEventListener('click', function(e) {
@@ -264,24 +270,46 @@ function openModal(buttonName) {
             closeModal();
         }
     });
-
-    // ESC 키로 닫기
-    document.addEventListener('keydown', function escHandler(e) {
-        if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', escHandler);
-        }
-    });
 }
+
+// ESC 키로 최상단 모달 닫기
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && modalStack.length > 0) {
+        closeModal();
+    }
+});
 
 // 모달 닫기
 function closeModal() {
-    if (currentModal) {
-        const title = currentModal.querySelector('.modal-title').textContent;
-        saveModalData(title);
-        document.body.removeChild(currentModal);
-        currentModal = null;
+    if (modalStack.length === 0) return;
+
+    // 최상단 모달 가져오기
+    const modal = modalStack.pop();
+    const title = modal.querySelector('.modal-title').textContent;
+
+    // 데이터 저장
+    saveModalData(title, modal);
+
+    // localStorage에 즉시 저장
+    const data = {
+        areas: [],
+        modalData: modalDataStore
+    };
+
+    for (let i = 1; i <= 4; i++) {
+        const titleInput = document.getElementById(`title${i}`).value;
+        const buttons = document.getElementById(`buttons${i}`).value;
+        data.areas.push({
+            id: i,
+            title: titleInput,
+            buttons: buttons
+        });
     }
+
+    localStorage.setItem('dashboard_autosave', JSON.stringify(data));
+
+    // DOM에서 제거
+    document.body.removeChild(modal);
 }
 
 // 열 추가 (헤더에 열 추가 + 모든 데이터 행에도 열 추가)
@@ -339,8 +367,9 @@ function addColumn(button) {
         }
     });
 
-    applyManualWidths();
-    updatePlaceholders();
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
+    updatePlaceholders(modalElement);
 
     if (currentColumns + 1 >= 10) {
         button.disabled = true;
@@ -383,8 +412,9 @@ function addDataRowTop(button) {
 
     // 맨 위에 추가
     container.insertBefore(newRow, container.firstChild);
-    applyManualWidths();
-    updatePlaceholders();
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
+    updatePlaceholders(modalElement);
 }
 
 // 데이터 행 아래로 추가
@@ -423,8 +453,9 @@ function addDataRowBottom(button) {
 
     // 맨 아래에 추가
     container.appendChild(newRow);
-    applyManualWidths();
-    updatePlaceholders();
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
+    updatePlaceholders(modalElement);
 }
 
 // 행 위로 이동
@@ -476,10 +507,22 @@ function autoResizeTextarea(textarea) {
 }
 
 // Placeholder 업데이트 (열 제목으로)
-function updatePlaceholders() {
-    if (!currentModal) return;
+function updatePlaceholders(modalElement) {
+    // modalElement가 제공되지 않으면 이벤트 타겟에서 찾기
+    if (!modalElement) {
+        if (event && event.target) {
+            modalElement = event.target.closest('.modal');
+        }
+    }
 
-    const modal = currentModal.querySelector('.modal-content');
+    // 그래도 없으면 최상단 모달 사용
+    if (!modalElement && modalStack.length > 0) {
+        modalElement = modalStack[modalStack.length - 1];
+    }
+
+    if (!modalElement) return;
+
+    const modal = modalElement.querySelector('.modal-content');
     const headerCells = modal.querySelectorAll('.header-cell');
     const dataRows = modal.querySelectorAll('.data-row');
 
@@ -503,6 +546,124 @@ function attachAutoResize(textarea) {
     textarea.addEventListener('input', function() {
         autoResizeTextarea(this);
     });
+
+    // blur 시 버튼 렌더링
+    textarea.addEventListener('blur', function() {
+        if (!textarea.classList.contains('editing')) {
+            renderCellContent(this);
+        }
+    });
+
+    // 초기 렌더링
+    renderCellContent(textarea);
+}
+
+// 셀 내용 렌더링 (버튼 또는 텍스트)
+function renderCellContent(textarea) {
+    const text = textarea.value.trim();
+
+    // 버튼 형식인지 체크 (- 로 시작하는 줄이 있는지)
+    const hasButtons = text.split('\n').some(line => line.trim().startsWith('-'));
+
+    if (hasButtons && !textarea.classList.contains('editing')) {
+        // 버튼 모드로 렌더링
+        const buttons = parseButtons(text);
+        if (buttons.length > 0) {
+            renderCellButtons(textarea, buttons);
+        }
+    }
+}
+
+// 셀에 버튼 렌더링
+function renderCellButtons(textarea, buttons) {
+    // 기존 버튼 컨테이너가 있으면 제거
+    const existingContainer = textarea.nextElementSibling;
+    if (existingContainer && existingContainer.classList.contains('cell-button-container')) {
+        existingContainer.remove();
+    }
+
+    // 버튼 컨테이너 생성
+    const container = document.createElement('div');
+    container.className = 'cell-button-container';
+
+    buttons.forEach(buttonRow => {
+        const rowDiv = document.createElement('div');
+        rowDiv.className = 'cell-button-row';
+
+        buttonRow.forEach(buttonName => {
+            const button = document.createElement('button');
+            button.className = 'cell-modal-button';
+            button.textContent = buttonName;
+            button.onclick = () => openModal(buttonName);
+
+            // Long press 이벤트 추가 (500ms 이상 누르면 편집 모드)
+            let pressTimer = null;
+            let longPressed = false;
+
+            const startPress = () => {
+                longPressed = false;
+                pressTimer = setTimeout(() => {
+                    longPressed = true;
+                    enterEditMode(textarea);
+                }, 500);
+            };
+
+            const cancelPress = (e) => {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+                // long press였으면 클릭 이벤트 방지
+                if (longPressed) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            };
+
+            button.addEventListener('mousedown', startPress);
+            button.addEventListener('touchstart', startPress);
+            button.addEventListener('mouseup', cancelPress);
+            button.addEventListener('mouseleave', cancelPress);
+            button.addEventListener('touchend', cancelPress);
+            button.addEventListener('touchcancel', cancelPress);
+
+            rowDiv.appendChild(button);
+        });
+
+        container.appendChild(rowDiv);
+    });
+
+    // textarea 숨기고 버튼 표시
+    textarea.style.display = 'none';
+    textarea.parentNode.insertBefore(container, textarea.nextSibling);
+
+    // 컨테이너 더블클릭 시 편집 모드로 전환
+    container.addEventListener('dblclick', function(e) {
+        if (e.target.tagName !== 'BUTTON') {
+            enterEditMode(textarea);
+        }
+    });
+}
+
+// 편집 모드 진입
+function enterEditMode(textarea) {
+    const container = textarea.nextElementSibling;
+
+    if (container && container.classList.contains('cell-button-container')) {
+        container.remove();
+    }
+
+    textarea.style.display = '';
+    textarea.classList.add('editing');
+    textarea.focus();
+
+    // blur 시 편집 모드 해제
+    const blurHandler = function() {
+        textarea.classList.remove('editing');
+        renderCellContent(textarea);
+        textarea.removeEventListener('blur', blurHandler);
+    };
+    textarea.addEventListener('blur', blurHandler);
 }
 
 // 음성 입력 시작
@@ -604,14 +765,27 @@ function toggleWidthMode(button) {
         input.setAttribute('step', '0.1');
     }
 
-    applyManualWidths();
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
 }
 
 // 수동 너비 비율 적용
-function applyManualWidths() {
-    if (!currentModal) return;
+function applyManualWidths(modalElement) {
+    // modalElement가 제공되지 않으면 이벤트 타겟에서 찾기
+    if (!modalElement) {
+        if (event && event.target) {
+            modalElement = event.target.closest('.modal');
+        }
+    }
 
-    const modal = currentModal.querySelector('.modal-content');
+    // 그래도 없으면 최상단 모달 사용
+    if (!modalElement && modalStack.length > 0) {
+        modalElement = modalStack[modalStack.length - 1];
+    }
+
+    if (!modalElement) return;
+
+    const modal = modalElement.querySelector('.modal-content');
     const headerColumns = modal.querySelectorAll('.header-column');
     const dataRows = modal.querySelectorAll('.data-row');
 
@@ -691,8 +865,9 @@ function deleteColumn(button) {
         input.value = newDefaultValue;
     });
 
-    applyManualWidths();
-    updatePlaceholders();
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
+    updatePlaceholders(modalElement);
 }
 
 // 열 왼쪽으로 이동
@@ -716,7 +891,8 @@ function moveColumnLeft(button) {
         }
     });
 
-    applyManualWidths();
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
 }
 
 // 열 오른쪽으로 이동
@@ -749,7 +925,8 @@ function moveColumnRight(button) {
         }
     });
 
-    applyManualWidths();
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
 }
 
 // JSON 저장
@@ -827,11 +1004,11 @@ function handleFileLoad(event) {
 
 // 자동 저장 (LocalStorage)
 function autoSave() {
-    // 현재 열려있는 모달이 있으면 먼저 저장
-    if (currentModal) {
-        const title = currentModal.querySelector('.modal-title').textContent;
-        saveModalData(title);
-    }
+    // 열려있는 모든 모달 저장
+    modalStack.forEach(modalElement => {
+        const title = modalElement.querySelector('.modal-title').textContent;
+        saveModalData(title, modalElement);
+    });
 
     const data = {
         areas: [],
@@ -875,10 +1052,16 @@ function loadAutoSave() {
 }
 
 // 모달 데이터 저장
-function saveModalData(buttonName) {
-    if (!currentModal) return;
+function saveModalData(buttonName, modalElement) {
+    if (!modalElement) return;
 
-    const modal = currentModal.querySelector('.modal-content');
+    // 페이지 시스템이 있으면 saveCurrentPage 사용
+    if (modalDataStore[buttonName] && modalDataStore[buttonName].pages) {
+        saveCurrentPage(modalElement);
+        return;
+    }
+
+    const modal = modalElement.querySelector('.modal-content');
     const headerCells = modal.querySelectorAll('.header-cell');
     const headerColumns = modal.querySelectorAll('.header-column');
     const dataRows = modal.querySelectorAll('.data-row');
@@ -896,7 +1079,8 @@ function saveModalData(buttonName) {
     });
 
     const rows = Array.from(dataRows).map(row => {
-        return Array.from(row.querySelectorAll('.data-cell')).map(cell => cell.value);
+        const cells = Array.from(row.querySelectorAll('.data-cell'));
+        return cells.map(cell => cell.value);
     });
 
     modalDataStore[buttonName] = {
@@ -908,88 +1092,44 @@ function saveModalData(buttonName) {
 
 // 모달 데이터 복원
 function loadModalData(buttonName, modal) {
-    if (!modalDataStore[buttonName]) return;
+    if (!modalDataStore[buttonName]) {
+        return;
+    }
 
     const data = modalDataStore[buttonName];
-    const headerRow = modal.querySelector('.header-row');
-    const inputFields = modal.querySelector('.input-fields');
 
-    // 기존 내용 삭제
-    headerRow.innerHTML = '';
-    inputFields.innerHTML = '<div class="data-rows-container"></div><div class="add-row-wrapper"><button class="add-row-btn top" onclick="addDataRowTop(this)">▲ 위로 행 추가</button><button class="add-row-btn bottom" onclick="addDataRowBottom(this)">▼ 아래로 행 추가</button></div>';
+    // 기존 형식 데이터를 페이지 형식으로 마이그레이션
+    if (!data.pages && data.headers) {
+        modalDataStore[buttonName] = {
+            headers: data.headers,
+            widthsData: data.widthsData,
+            pages: [{
+                title: '페이지 1',
+                rows: data.rows
+            }]
+        };
+    }
 
-    // 헤더 복원
-    data.headers.forEach((headerText, index) => {
-        const column = document.createElement('div');
-        column.className = 'header-column';
+    // 구 페이지 형식(페이지별 헤더)을 신 형식(공통 헤더)으로 마이그레이션
+    if (data.pages && data.pages.length > 0 && data.pages[0].headers) {
+        const firstPage = data.pages[0];
+        modalDataStore[buttonName] = {
+            headers: firstPage.headers,
+            widthsData: firstPage.widthsData,
+            pages: data.pages.map(page => ({
+                title: page.title,
+                rows: page.rows
+            }))
+        };
+    }
 
-        // widthsData가 있으면 사용, 없으면 구 형식(widths) 호환
-        let widthData = { value: 1, mode: 'ratio' };
-        if (data.widthsData && data.widthsData[index]) {
-            widthData = data.widthsData[index];
-        } else if (data.widths && data.widths[index]) {
-            widthData = { value: data.widths[index], mode: 'ratio' };
-        }
+    // 페이지 시스템으로 로드
+    if (!currentPageIndex[buttonName]) currentPageIndex[buttonName] = 0;
 
-        column.setAttribute('data-width-mode', widthData.mode);
-
-        const modeText = widthData.mode === 'px' ? 'px' : '비율';
-        const placeholder = widthData.mode === 'px' ? 'px' : '비율';
-        const minValue = widthData.mode === 'px' ? '50' : '0.1';
-        const stepValue = widthData.mode === 'px' ? '10' : '0.1';
-
-        column.innerHTML = `
-            <input type="text" class="header-cell" value="${headerText}" placeholder="열 제목 ${index + 1}" oninput="updatePlaceholders()">
-            <div class="column-bottom">
-                <input type="number" class="width-input" placeholder="${placeholder}" value="${widthData.value}" min="${minValue}" step="${stepValue}" oninput="applyManualWidths()">
-                <button class="width-mode-toggle" onclick="toggleWidthMode(this)">${modeText}</button>
-                <div class="column-controls">
-                    <button class="column-btn" onclick="moveColumnLeft(this)">◀</button>
-                    <button class="column-btn" onclick="moveColumnRight(this)">▶</button>
-                    <button class="column-btn delete" onclick="deleteColumn(this)">×</button>
-                </div>
-            </div>
-        `;
-        headerRow.appendChild(column);
-    });
-
-    // + 열 추가 버튼 추가
-    const addColumnBtn = document.createElement('button');
-    addColumnBtn.className = 'add-column-btn';
-    addColumnBtn.textContent = '+열';
-    addColumnBtn.onclick = function() { addColumn(this); };
-    headerRow.appendChild(addColumnBtn);
-
-    // 데이터 행 복원
-    const container = modal.querySelector('.data-rows-container');
-    data.rows.forEach((rowData, rowIndex) => {
-        const row = document.createElement('div');
-        row.className = 'data-row';
-
-        rowData.forEach((cellText, cellIndex) => {
-            const cell = document.createElement('textarea');
-            cell.className = 'data-cell';
-            cell.value = cellText;
-            cell.placeholder = `데이터 ${cellIndex + 1}`;
-            attachAutoResize(cell);  // 자동 높이 조절 추가
-            row.appendChild(cell);
-        });
-
-        // 행 이동 버튼 추가
-        const rowControls = document.createElement('div');
-        rowControls.className = 'row-controls';
-        rowControls.innerHTML = `
-            <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
-            <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
-            <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
-        `;
-        row.appendChild(rowControls);
-
-        container.appendChild(row);
-    });
-
-    applyManualWidths();
-    updatePlaceholders();
+    if (modalDataStore[buttonName].pages && modalDataStore[buttonName].pages.length > 0) {
+        const modalElement = modal.closest('.modal');
+        loadPage(modalElement, buttonName, 0);
+    }
 }
 
 // 사이드바 토글 초기화
@@ -1016,7 +1156,7 @@ function initSidebarToggle() {
 
     function handleSwipe() {
         // 모달창이 열려있으면 스와이프 무시
-        if (currentModal) return;
+        if (modalStack.length > 0) return;
 
         const diffX = touchEndX - touchStartX;
         const diffY = touchEndY - touchStartY;
@@ -1191,4 +1331,343 @@ function initNotePad() {
             }
         }
     });
+}
+
+// ===== 페이지 시스템 함수 =====
+
+// 이전 페이지로 이동
+function previousPage(button) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+
+    if (!currentPageIndex[buttonName]) currentPageIndex[buttonName] = 0;
+
+    const pageData = modalDataStore[buttonName];
+    if (!pageData || !pageData.pages) return;
+
+    if (currentPageIndex[buttonName] > 0) {
+        saveCurrentPage(modal);
+        currentPageIndex[buttonName]--;
+        loadPage(modal, buttonName, currentPageIndex[buttonName]);
+    }
+}
+
+// 다음 페이지로 이동
+function nextPage(button) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+
+    if (!currentPageIndex[buttonName]) currentPageIndex[buttonName] = 0;
+
+    const pageData = modalDataStore[buttonName];
+    if (!pageData || !pageData.pages) return;
+
+    if (currentPageIndex[buttonName] < pageData.pages.length - 1) {
+        saveCurrentPage(modal);
+        currentPageIndex[buttonName]++;
+        loadPage(modal, buttonName, currentPageIndex[buttonName]);
+    }
+}
+
+// 페이지 목록 토글
+function togglePageList(button) {
+    const existingList = button.parentNode.querySelector('.page-list-stack');
+
+    if (existingList) {
+        existingList.remove();
+        return;
+    }
+
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+    const pageData = modalDataStore[buttonName];
+
+    if (!pageData || !pageData.pages || pageData.pages.length <= 1) return;
+
+    const currentIndex = currentPageIndex[buttonName] || 0;
+    const otherPages = pageData.pages.map((p, i) => ({ page: p, index: i }))
+                                     .filter((_, i) => i !== currentIndex);
+
+    if (otherPages.length === 0) return;
+
+    // 탑쌓기 계산
+    const stackContainer = document.createElement('div');
+    stackContainer.className = 'page-list-stack';
+
+    const base = Math.ceil(Math.sqrt(otherPages.length));
+    const floors = Math.ceil(otherPages.length / base);
+
+    let idx = 0;
+    for (let floor = 0; floor < floors; floor++) {
+        const row = document.createElement('div');
+        row.className = 'page-stack-row';
+
+        const itemsInFloor = Math.min(base, otherPages.length - idx);
+        for (let i = 0; i < itemsInFloor; i++) {
+            const pageItem = document.createElement('div');
+            pageItem.className = 'page-list-item';
+            pageItem.textContent = otherPages[idx].page.title || `페이지 ${otherPages[idx].index + 1}`;
+
+            // idx를 클로저로 캡처
+            const capturedIndex = otherPages[idx].index;
+            pageItem.addEventListener('click', () => {
+                switchToPage(button, capturedIndex);
+            });
+
+            row.appendChild(pageItem);
+            idx++;
+        }
+
+        stackContainer.appendChild(row);
+    }
+
+    button.parentNode.appendChild(stackContainer);
+}
+
+// 페이지 관리 메뉴 열기
+function openPageMenu(button) {
+    const existingMenu = button.parentNode.querySelector('.page-menu');
+
+    if (existingMenu) {
+        existingMenu.remove();
+        return;
+    }
+
+    const menu = document.createElement('div');
+    menu.className = 'page-menu';
+    menu.innerHTML = `
+        <button onclick="addNewPage(this)">페이지 추가</button>
+        <button onclick="renamePage(this)">페이지 이름 변경</button>
+        <button onclick="deletePage(this)">페이지 삭제</button>
+    `;
+
+    button.parentNode.appendChild(menu);
+}
+
+// 페이지 전환
+function switchToPage(button, pageIndex) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+
+    saveCurrentPage(modal);
+    currentPageIndex[buttonName] = pageIndex;
+    loadPage(modal, buttonName, pageIndex);
+
+    // 목록 닫기 (button은 page-title-btn이고, list는 그 형제)
+    const list = button.parentNode.querySelector('.page-list-stack');
+    if (list) list.remove();
+}
+
+// 현재 페이지 저장
+function saveCurrentPage(modal) {
+    const buttonName = modal.dataset.modalName;
+    const pageIndex = currentPageIndex[buttonName] || 0;
+
+    const modalContent = modal.querySelector('.modal-content');
+    const headerCells = modalContent.querySelectorAll('.header-cell');
+    const headerColumns = modalContent.querySelectorAll('.header-column');
+    const dataRows = modalContent.querySelectorAll('.data-row');
+
+    const headers = Array.from(headerCells).map(cell => cell.value);
+    const widthsData = Array.from(headerColumns).map(column => {
+        const input = column.querySelector('.width-input');
+        const mode = column.getAttribute('data-width-mode');
+        return {
+            value: parseFloat(input.value) || (mode === 'px' ? 200 : 1),
+            mode: mode || 'ratio'
+        };
+    });
+    const rows = Array.from(dataRows).map(row => {
+        const cells = Array.from(row.querySelectorAll('.data-cell'));
+        return cells.map(cell => cell.value);
+    });
+
+    if (!modalDataStore[buttonName]) {
+        modalDataStore[buttonName] = {
+            headers: headers,
+            widthsData: widthsData,
+            pages: [{ title: '페이지 1', rows: rows }]
+        };
+        return;
+    }
+
+    if (!modalDataStore[buttonName].pages) {
+        modalDataStore[buttonName].pages = [{ title: '페이지 1', rows: [] }];
+    }
+
+    // 헤더와 너비는 공통으로 저장 (모든 페이지 공유)
+    modalDataStore[buttonName].headers = headers;
+    modalDataStore[buttonName].widthsData = widthsData;
+
+    // 행 데이터만 페이지별로 저장
+    if (modalDataStore[buttonName].pages[pageIndex]) {
+        modalDataStore[buttonName].pages[pageIndex].rows = rows;
+    }
+}
+
+// 페이지 불러오기
+function loadPage(modal, buttonName, pageIndex) {
+    const data = modalDataStore[buttonName];
+    const pageData = data.pages[pageIndex];
+    if (!pageData) return;
+
+    const modalContent = modal.querySelector('.modal-content');
+    const headerRow = modalContent.querySelector('.header-row');
+    const inputFields = modalContent.querySelector('.input-fields');
+
+    // 기존 내용 삭제
+    headerRow.innerHTML = '';
+    inputFields.innerHTML = '<div class="data-rows-container"></div><div class="add-row-wrapper"><button class="add-row-btn top" onclick="addDataRowTop(this)">▲ 위로 행 추가</button><button class="add-row-btn bottom" onclick="addDataRowBottom(this)">▼ 아래로 행 추가</button><div class="page-navigation"><button class="page-nav-btn" onclick="previousPage(this)">◀</button><button class="page-title-btn" onclick="togglePageList(this)">' + (pageData.title || `페이지 ${pageIndex + 1}`) + '</button><button class="page-nav-btn" onclick="nextPage(this)">▶</button><button class="page-menu-btn" onclick="openPageMenu(this)">📄</button></div></div>';
+
+    // 헤더 복원 (공통 헤더 사용)
+    data.headers.forEach((headerText, index) => {
+        const column = document.createElement('div');
+        column.className = 'header-column';
+
+        let widthData = data.widthsData?.[index] || { value: 1, mode: 'ratio' };
+        column.setAttribute('data-width-mode', widthData.mode);
+
+        const modeText = widthData.mode === 'px' ? 'px' : '비율';
+        const placeholder = widthData.mode === 'px' ? 'px' : '비율';
+        const minValue = widthData.mode === 'px' ? '50' : '0.1';
+        const stepValue = widthData.mode === 'px' ? '10' : '0.1';
+
+        column.innerHTML = `
+            <input type="text" class="header-cell" value="${headerText}" placeholder="열 제목 ${index + 1}" oninput="updatePlaceholders()">
+            <div class="column-bottom">
+                <input type="number" class="width-input" placeholder="${placeholder}" value="${widthData.value}" min="${minValue}" step="${stepValue}" oninput="applyManualWidths()">
+                <button class="width-mode-toggle" onclick="toggleWidthMode(this)">${modeText}</button>
+                <div class="column-controls">
+                    <button class="column-btn" onclick="moveColumnLeft(this)">◀</button>
+                    <button class="column-btn" onclick="moveColumnRight(this)">▶</button>
+                    <button class="column-btn delete" onclick="deleteColumn(this)">×</button>
+                </div>
+            </div>
+        `;
+        headerRow.appendChild(column);
+    });
+
+    const addColumnBtn = document.createElement('button');
+    addColumnBtn.className = 'add-column-btn';
+    addColumnBtn.textContent = '+열';
+    addColumnBtn.onclick = function() { addColumn(this); };
+    headerRow.appendChild(addColumnBtn);
+
+    // 데이터 행 복원 (페이지별 rows 사용)
+    const container = modalContent.querySelector('.data-rows-container');
+    pageData.rows.forEach((rowData) => {
+        const row = document.createElement('div');
+        row.className = 'data-row';
+
+        const cells = [];
+        // 열 개수만큼 셀 생성 (rowData에 없는 인덱스는 빈 문자열)
+        data.headers.forEach((_, cellIndex) => {
+            const cell = document.createElement('textarea');
+            cell.className = 'data-cell';
+            cell.value = rowData[cellIndex] || '';
+            cell.placeholder = `데이터 ${cellIndex + 1}`;
+            row.appendChild(cell);
+            cells.push(cell);
+        });
+
+        const rowControls = document.createElement('div');
+        rowControls.className = 'row-controls';
+        rowControls.innerHTML = `
+            <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
+            <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+            <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
+        `;
+        row.appendChild(rowControls);
+
+        container.appendChild(row);
+
+        cells.forEach(cell => attachAutoResize(cell));
+    });
+
+    applyManualWidths(modal);
+    updatePlaceholders(modal);
+}
+
+// 새 페이지 추가
+function addNewPage(button) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+
+    if (!modalDataStore[buttonName]) {
+        modalDataStore[buttonName] = {
+            headers: [''],
+            widthsData: [{ value: 1, mode: 'ratio' }],
+            pages: []
+        };
+    }
+
+    if (!modalDataStore[buttonName].pages) {
+        modalDataStore[buttonName].pages = [];
+    }
+
+    // 현재 페이지 저장
+    saveCurrentPage(modal);
+
+    const data = modalDataStore[buttonName];
+    const newPageIndex = data.pages.length;
+
+    // 공통 헤더 개수만큼 빈 셀로 구성된 행 1줄 생성
+    const emptyRow = data.headers.map(() => '');
+
+    data.pages.push({
+        title: `페이지 ${newPageIndex + 1}`,
+        rows: [emptyRow]  // 빈 행 1줄만 추가
+    });
+
+    currentPageIndex[buttonName] = newPageIndex;
+    loadPage(modal, buttonName, newPageIndex);
+
+    // 메뉴 닫기
+    const menu = button.closest('.page-menu');
+    if (menu) menu.remove();
+}
+
+// 페이지 이름 변경
+function renamePage(button) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+    const pageIndex = currentPageIndex[buttonName] || 0;
+
+    const newName = prompt('페이지 이름을 입력하세요:', modalDataStore[buttonName].pages[pageIndex].title);
+    if (newName && newName.trim()) {
+        modalDataStore[buttonName].pages[pageIndex].title = newName.trim();
+
+        const titleBtn = modal.querySelector('.page-title-btn');
+        if (titleBtn) titleBtn.textContent = newName.trim();
+    }
+
+    // 메뉴 닫기
+    const menu = button.closest('.page-menu');
+    if (menu) menu.remove();
+}
+
+// 페이지 삭제
+function deletePage(button) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+    const pageIndex = currentPageIndex[buttonName] || 0;
+
+    if (modalDataStore[buttonName].pages.length <= 1) {
+        alert('마지막 페이지는 삭제할 수 없습니다.');
+        return;
+    }
+
+    if (!confirm('이 페이지를 삭제하시겠습니까?')) return;
+
+    modalDataStore[buttonName].pages.splice(pageIndex, 1);
+
+    if (pageIndex >= modalDataStore[buttonName].pages.length) {
+        currentPageIndex[buttonName] = modalDataStore[buttonName].pages.length - 1;
+    }
+
+    loadPage(modal, buttonName, currentPageIndex[buttonName]);
+
+    // 메뉴 닫기
+    const menu = button.closest('.page-menu');
+    if (menu) menu.remove();
 }

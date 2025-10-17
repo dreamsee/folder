@@ -458,6 +458,47 @@ body {
     opacity: 1;
 }
 
+/* 셀 내부 버튼 */
+.cell-button-container {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+    background-color: transparent;
+    min-width: 50px;
+    max-width: 100%;
+    flex-shrink: 1;
+    flex-grow: 1;
+    border-top: none;
+    border-bottom: 1px solid #ddd;
+    border-left: none;
+    border-right: none;
+    min-height: 30px;
+}
+
+.cell-button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    justify-content: center;
+}
+
+.cell-modal-button {
+    padding: 6px 12px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: pre;
+    font-family: monospace;
+}
+
+.cell-modal-button:hover {
+    background-color: #2980b9;
+}
+
 .add-row-wrapper {
     padding: 10px;
     border-top: 1px solid #ddd;
@@ -467,6 +508,125 @@ body {
     z-index: 10;
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* 페이지 네비게이션 */
+.page-navigation {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    margin-left: auto;
+}
+
+.page-nav-btn {
+    padding: 6px 10px;
+    background-color: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.page-nav-btn:hover {
+    background-color: #7f8c8d;
+}
+
+.page-nav-btn:disabled {
+    background-color: #bdc3c7;
+    cursor: not-allowed;
+}
+
+.page-title-btn {
+    padding: 6px 15px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    position: relative;
+}
+
+.page-title-btn:hover {
+    background-color: #2980b9;
+}
+
+.page-menu-btn {
+    padding: 6px 10px;
+    background-color: #e67e22;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.page-menu-btn:hover {
+    background-color: #d35400;
+}
+
+/* 페이지 목록 (탑쌓기) */
+.page-list-stack {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 5px;
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 3px;
+    z-index: 100;
+}
+
+.page-stack-row {
+    display: flex;
+    gap: 3px;
+    justify-content: center;
+}
+
+.page-list-item {
+    padding: 6px 12px;
+    background-color: #ecf0f1;
+    border: 1px solid #bdc3c7;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.page-list-item:hover {
+    background-color: #d5dbdb;
+}
+
+/* 페이지 관리 메뉴 */
+.page-menu {
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    margin-bottom: 5px;
+    background-color: white;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+    min-width: 150px;
+}
+
+.page-menu button {
+    width: 100%;
+    padding: 8px 12px;
+    background-color: transparent;
+    border: none;
+    text-align: left;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.page-menu button:hover {
+    background-color: #ecf0f1;
 }
 
 .row-controls {
