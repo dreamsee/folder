@@ -472,6 +472,7 @@ body {
     flex-direction: column;
     gap: 3px;
     flex-shrink: 0;
+    align-items: center;
 }
 
 .row-move-btn {
@@ -488,4 +489,30 @@ body {
 
 .row-move-btn:hover {
     background-color: #7f8c8d;
+}
+
+.voice-input-btn {
+    padding: 3px 5px;
+    background-color: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1.2;
+    min-width: 18px;
+}
+
+.voice-input-btn:hover {
+    background-color: #c0392b;
+}
+
+.voice-input-btn.recording {
+    background-color: #27ae60;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
 }

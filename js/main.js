@@ -225,6 +225,7 @@ function openModal(buttonName) {
                             <div class="row-controls">
                                 <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
                                 <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+                                <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
                             </div>
                         </div>
                     </div>
@@ -373,6 +374,7 @@ function addDataRowTop(button) {
     rowControls.innerHTML = `
         <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
         <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+        <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
     `;
     newRow.appendChild(rowControls);
 
@@ -412,6 +414,7 @@ function addDataRowBottom(button) {
     rowControls.innerHTML = `
         <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
         <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+        <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
     `;
     newRow.appendChild(rowControls);
 
@@ -491,6 +494,79 @@ function attachAutoResize(textarea) {
     textarea.addEventListener('input', function() {
         autoResizeTextarea(this);
     });
+}
+
+// 음성 입력 시작
+function startVoiceInput(button) {
+    const row = button.closest('.data-row');
+    const cells = row.querySelectorAll('.data-cell');
+
+    // 어떤 셀에 입력할지 결정 (비어있는 첫 번째 셀 또는 마지막 셀)
+    let targetCell = null;
+    for (let cell of cells) {
+        if (!cell.value.trim()) {
+            targetCell = cell;
+            break;
+        }
+    }
+    if (!targetCell) {
+        targetCell = cells[cells.length - 1]; // 모두 차있으면 마지막 셀
+    }
+
+    // Web Speech API 지원 확인
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+        alert('이 브라우저는 음성 인식을 지원하지 않습니다.');
+        return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ko-KR';
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    // 녹음 시작
+    button.classList.add('recording');
+
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+
+        // 기존 텍스트에 추가 (비어있으면 그냥 입력)
+        if (targetCell.value.trim()) {
+            targetCell.value += ' ' + transcript;
+        } else {
+            targetCell.value = transcript;
+        }
+
+        // textarea 높이 재조정
+        autoResizeTextarea(targetCell);
+        button.classList.remove('recording');
+    };
+
+    recognition.onerror = function(event) {
+        console.error('음성 인식 오류:', event.error);
+        button.classList.remove('recording');
+
+        if (event.error === 'no-speech') {
+            alert('음성이 감지되지 않았습니다.');
+        } else if (event.error === 'not-allowed') {
+            alert('마이크 권한이 필요합니다.');
+        } else {
+            alert('음성 인식 중 오류가 발생했습니다: ' + event.error);
+        }
+    };
+
+    recognition.onend = function() {
+        button.classList.remove('recording');
+    };
+
+    try {
+        recognition.start();
+    } catch (error) {
+        console.error('음성 인식 시작 오류:', error);
+        button.classList.remove('recording');
+        alert('음성 인식을 시작할 수 없습니다.');
+    }
 }
 
 // 너비 모드 토글 (비율 ↔ px)
@@ -896,6 +972,7 @@ function loadModalData(buttonName, modal) {
         rowControls.innerHTML = `
             <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
             <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+            <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
         `;
         row.appendChild(rowControls);
 
