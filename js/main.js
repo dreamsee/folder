@@ -16,6 +16,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 5초마다 자동 저장
     setInterval(autoSave, 5000);
+
+    // 사이드바 토글 기능
+    initSidebarToggle();
 });
 
 // 레이아웃 업데이트 함수
@@ -201,9 +204,9 @@ function openModal(buttonName) {
                 <div class="fixed-rows">
                     <div class="header-row">
                         <div class="header-column">
-                            <input type="text" class="header-cell" placeholder="열 제목 1">
+                            <input type="text" class="header-cell" placeholder="열 제목 1" oninput="updatePlaceholders()">
                             <div class="column-bottom">
-                                <input type="number" class="width-input" placeholder="비율" value="1" min="1" max="10" oninput="applyManualWidths()">
+                                <input type="number" class="width-input" placeholder="비율" value="1" min="0.1" max="10" step="0.1" oninput="applyManualWidths()">
                                 <div class="column-controls">
                                     <button class="column-btn" onclick="moveColumnLeft(this)">◀</button>
                                     <button class="column-btn" onclick="moveColumnRight(this)">▶</button>
@@ -211,17 +214,22 @@ function openModal(buttonName) {
                                 </div>
                             </div>
                         </div>
-                        <button class="add-column-btn" onclick="addColumn(this)">+ 열 추가</button>
+                        <button class="add-column-btn" onclick="addColumn(this)">+열</button>
                     </div>
                 </div>
                 <div class="input-fields">
                     <div class="data-rows-container">
                         <div class="data-row">
-                            <textarea class="data-cell" placeholder="데이터 1"></textarea>
+                            <textarea class="data-cell" placeholder=""></textarea>
+                            <div class="row-controls">
+                                <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
+                                <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+                            </div>
                         </div>
                     </div>
                     <div class="add-row-wrapper">
-                        <button class="add-row-btn" onclick="addDataRow(this)">+ 행 추가</button>
+                        <button class="add-row-btn top" onclick="addDataRowTop(this)">▲ 위로 행 추가</button>
+                        <button class="add-row-btn bottom" onclick="addDataRowBottom(this)">▼ 아래로 행 추가</button>
                     </div>
                 </div>
             </div>
@@ -234,6 +242,13 @@ function openModal(buttonName) {
     // 저장된 데이터 불러오기
     const modalContent = modal.querySelector('.modal-content');
     loadModalData(buttonName, modalContent);
+
+    // 초기 textarea에 자동 높이 조절 이벤트 추가
+    const initialTextareas = modal.querySelectorAll('.data-cell');
+    initialTextareas.forEach(textarea => attachAutoResize(textarea));
+
+    // 초기 placeholder 업데이트
+    updatePlaceholders();
 
     // 초기 너비 적용
     setTimeout(() => applyManualWidths(), 100);
@@ -275,13 +290,23 @@ function addColumn(button) {
         return;
     }
 
+    // 새로운 기본값 계산 (10 ÷ 새 열 개수)
+    const newColumnCount = currentColumns + 1;
+    const newDefaultValue = (10 / newColumnCount).toFixed(1);
+
+    // 기존 열들의 값도 업데이트
+    const existingInputs = modal.querySelectorAll('.width-input');
+    existingInputs.forEach(input => {
+        input.value = newDefaultValue;
+    });
+
     // 헤더에 새 열 추가
     const newColumn = document.createElement('div');
     newColumn.className = 'header-column';
     newColumn.innerHTML = `
-        <input type="text" class="header-cell" placeholder="열 제목 ${currentColumns + 1}">
+        <input type="text" class="header-cell" placeholder="열 제목 ${newColumnCount}" oninput="updatePlaceholders()">
         <div class="column-bottom">
-            <input type="number" class="width-input" placeholder="비율" value="1" min="1" max="10" oninput="applyManualWidths()">
+            <input type="number" class="width-input" placeholder="비율" value="${newDefaultValue}" min="0.1" max="10" step="0.1" oninput="applyManualWidths()">
             <div class="column-controls">
                 <button class="column-btn" onclick="moveColumnLeft(this)">◀</button>
                 <button class="column-btn" onclick="moveColumnRight(this)">▶</button>
@@ -297,18 +322,26 @@ function addColumn(button) {
         const newCell = document.createElement('textarea');
         newCell.className = 'data-cell';
         newCell.placeholder = `데이터 ${currentColumns + 1}`;
-        row.appendChild(newCell);
+        attachAutoResize(newCell);  // 자동 높이 조절 추가
+        // row-controls 이전에 삽입
+        const rowControls = row.querySelector('.row-controls');
+        if (rowControls) {
+            row.insertBefore(newCell, rowControls);
+        } else {
+            row.appendChild(newCell);
+        }
     });
 
     applyManualWidths();
+    updatePlaceholders();
 
     if (currentColumns + 1 >= 10) {
         button.disabled = true;
     }
 }
 
-// 데이터 행 추가
-function addDataRow(button) {
+// 데이터 행 위로 추가
+function addDataRowTop(button) {
     const modal = button.closest('.modal-content');
     const container = modal.querySelector('.data-rows-container');
     const currentRows = container.querySelectorAll('.data-row').length;
@@ -327,11 +360,126 @@ function addDataRow(button) {
         const cell = document.createElement('textarea');
         cell.className = 'data-cell';
         cell.placeholder = `데이터 ${i + 1}`;
+        attachAutoResize(cell);  // 자동 높이 조절 추가
         newRow.appendChild(cell);
     }
 
+    // 행 이동 버튼 추가
+    const rowControls = document.createElement('div');
+    rowControls.className = 'row-controls';
+    rowControls.innerHTML = `
+        <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
+        <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+    `;
+    newRow.appendChild(rowControls);
+
+    // 맨 위에 추가
+    container.insertBefore(newRow, container.firstChild);
+    applyManualWidths();
+    updatePlaceholders();
+}
+
+// 데이터 행 아래로 추가
+function addDataRowBottom(button) {
+    const modal = button.closest('.modal-content');
+    const container = modal.querySelector('.data-rows-container');
+    const currentRows = container.querySelectorAll('.data-row').length;
+    const columnCount = modal.querySelectorAll('.header-column').length;
+
+    if (currentRows >= 50) {
+        return;
+    }
+
+    // 새 데이터 행 생성
+    const newRow = document.createElement('div');
+    newRow.className = 'data-row';
+
+    // 현재 열 개수만큼 셀 추가
+    for (let i = 0; i < columnCount; i++) {
+        const cell = document.createElement('textarea');
+        cell.className = 'data-cell';
+        cell.placeholder = `데이터 ${i + 1}`;
+        attachAutoResize(cell);  // 자동 높이 조절 추가
+        newRow.appendChild(cell);
+    }
+
+    // 행 이동 버튼 추가
+    const rowControls = document.createElement('div');
+    rowControls.className = 'row-controls';
+    rowControls.innerHTML = `
+        <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
+        <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+    `;
+    newRow.appendChild(rowControls);
+
+    // 맨 아래에 추가
     container.appendChild(newRow);
     applyManualWidths();
+    updatePlaceholders();
+}
+
+// 행 위로 이동
+function moveRowUp(button) {
+    const row = button.closest('.data-row');
+    const prevRow = row.previousElementSibling;
+
+    if (prevRow) {
+        row.parentNode.insertBefore(row, prevRow);
+    }
+}
+
+// 행 아래로 이동
+function moveRowDown(button) {
+    const row = button.closest('.data-row');
+    const nextRow = row.nextElementSibling;
+
+    if (nextRow) {
+        row.parentNode.insertBefore(nextRow, row);
+    }
+}
+
+// Textarea 자동 높이 조절
+function autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+
+    // 줄 수에 따라 padding 조절
+    const lineCount = (textarea.value.match(/\n/g) || []).length + 1;
+    if (lineCount >= 2) {
+        textarea.style.padding = '7px 8px 9px';
+    } else {
+        textarea.style.padding = '13px 8px 4px';
+    }
+}
+
+// Placeholder 업데이트 (열 제목으로)
+function updatePlaceholders() {
+    if (!currentModal) return;
+
+    const modal = currentModal.querySelector('.modal-content');
+    const headerCells = modal.querySelectorAll('.header-cell');
+    const dataRows = modal.querySelectorAll('.data-row');
+
+    // 각 행의 셀에 대해 placeholder 업데이트
+    dataRows.forEach(row => {
+        const cells = row.querySelectorAll('.data-cell');
+        cells.forEach((cell, index) => {
+            if (headerCells[index]) {
+                cell.placeholder = headerCells[index].value || '';
+            }
+        });
+    });
+}
+
+// Textarea에 자동 높이 조절 이벤트 추가
+function attachAutoResize(textarea) {
+    // 초기 높이 설정
+    autoResizeTextarea(textarea);
+
+    // input 이벤트로 자동 높이 조절
+    textarea.addEventListener('input', function() {
+        autoResizeTextarea(this);
+    });
 }
 
 // 수동 너비 비율 적용
@@ -390,7 +538,16 @@ function deleteColumn(button) {
         }
     });
 
+    // 남은 열 개수로 기본값 재계산
+    const remainingColumns = headerRow.querySelectorAll('.header-column').length;
+    const newDefaultValue = (10 / remainingColumns).toFixed(1);
+    const existingInputs = modal.querySelectorAll('.width-input');
+    existingInputs.forEach(input => {
+        input.value = newDefaultValue;
+    });
+
     applyManualWidths();
+    updatePlaceholders();
 }
 
 // 열 왼쪽으로 이동
@@ -525,6 +682,12 @@ function handleFileLoad(event) {
 
 // 자동 저장 (LocalStorage)
 function autoSave() {
+    // 현재 열려있는 모달이 있으면 먼저 저장
+    if (currentModal) {
+        const title = currentModal.querySelector('.modal-title').textContent;
+        saveModalData(title);
+    }
+
     const data = {
         areas: [],
         modalData: modalDataStore
@@ -598,14 +761,14 @@ function loadModalData(buttonName, modal) {
 
     // 기존 내용 삭제
     headerRow.innerHTML = '';
-    inputFields.innerHTML = '<div class="data-rows-container"></div><div class="add-row-wrapper"><button class="add-row-btn" onclick="addDataRow(this)">+ 행 추가</button></div>';
+    inputFields.innerHTML = '<div class="data-rows-container"></div><div class="add-row-wrapper"><button class="add-row-btn top" onclick="addDataRowTop(this)">▲ 위로 행 추가</button><button class="add-row-btn bottom" onclick="addDataRowBottom(this)">▼ 아래로 행 추가</button></div>';
 
     // 헤더 복원
     data.headers.forEach((headerText, index) => {
         const column = document.createElement('div');
         column.className = 'header-column';
         column.innerHTML = `
-            <input type="text" class="header-cell" value="${headerText}" placeholder="열 제목 ${index + 1}">
+            <input type="text" class="header-cell" value="${headerText}" placeholder="열 제목 ${index + 1}" oninput="updatePlaceholders()">
             <div class="column-bottom">
                 <input type="number" class="width-input" placeholder="비율" value="${data.widths ? data.widths[index] : 1}" min="1" max="10" oninput="applyManualWidths()">
                 <div class="column-controls">
@@ -621,7 +784,7 @@ function loadModalData(buttonName, modal) {
     // + 열 추가 버튼 추가
     const addColumnBtn = document.createElement('button');
     addColumnBtn.className = 'add-column-btn';
-    addColumnBtn.textContent = '+ 열 추가';
+    addColumnBtn.textContent = '+열';
     addColumnBtn.onclick = function() { addColumn(this); };
     headerRow.appendChild(addColumnBtn);
 
@@ -636,11 +799,66 @@ function loadModalData(buttonName, modal) {
             cell.className = 'data-cell';
             cell.value = cellText;
             cell.placeholder = `데이터 ${cellIndex + 1}`;
+            attachAutoResize(cell);  // 자동 높이 조절 추가
             row.appendChild(cell);
         });
+
+        // 행 이동 버튼 추가
+        const rowControls = document.createElement('div');
+        rowControls.className = 'row-controls';
+        rowControls.innerHTML = `
+            <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
+            <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+        `;
+        row.appendChild(rowControls);
 
         container.appendChild(row);
     });
 
     applyManualWidths();
+    updatePlaceholders();
+}
+
+// 사이드바 토글 초기화
+function initSidebarToggle() {
+    const sidebar = document.getElementById('sidebar');
+    const mainContent = document.getElementById('mainContent');
+
+    // 스와이프 제스처 감지
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchEndX = 0;
+    let touchEndY = 0;
+
+    document.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+    }, false);
+
+    document.addEventListener('touchend', function(e) {
+        touchEndX = e.changedTouches[0].screenX;
+        touchEndY = e.changedTouches[0].screenY;
+        handleSwipe();
+    }, false);
+
+    function handleSwipe() {
+        const diffX = touchEndX - touchStartX;
+        const diffY = touchEndY - touchStartY;
+
+        // 가로 스와이프가 세로 스와이프보다 더 커야 함
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+            // 최소 스와이프 거리 (50px)
+            if (Math.abs(diffX) > 50) {
+                if (diffX > 0) {
+                    // 오른쪽으로 스와이프 -> 사이드바 보이기
+                    sidebar.classList.remove('hidden');
+                    mainContent.classList.remove('full');
+                } else {
+                    // 왼쪽으로 스와이프 -> 사이드바 숨기기
+                    sidebar.classList.add('hidden');
+                    mainContent.classList.add('full');
+                }
+            }
+        }
+    }
 }

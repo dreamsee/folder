@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clear Storage</title>
+</head>
+<body>
+<h1>LocalStorage 삭제</h1>
+<button onclick="clearAndReload()">LocalStorage 삭제하고 메인으로</button>
+<script>
+function clearAndReload() {
+    localStorage.clear();
+    sessionStorage.clear();
+    alert('삭제 완료!');
+    window.location.href = 'index.html';
+}
+</script>
+</body>
+</html>
