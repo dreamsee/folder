@@ -205,7 +205,9 @@ function renderAreas(areas) {
                         e.stopPropagation();
                         longPressed = false;
                     } else if (!longPressed) {
-                        // 일반 클릭
+                        // 일반 클릭 - 이벤트 전파 차단하여 모달이 바로 닫히는 것 방지
+                        e.preventDefault();
+                        e.stopPropagation();
                         openModal(buttonName);
                     }
                 };
@@ -418,6 +420,7 @@ function openModal(buttonName) {
                                 <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
                                 <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
                                 <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
+                                <button class="row-add-btn" onclick="addRowBelow(this)">행 추가</button>
                             </div>
                         </div>
                     </div>
@@ -453,12 +456,14 @@ function openModal(buttonName) {
     // 초기 너비 적용
     setTimeout(() => applyManualWidths(modal), 100);
 
-    // 배경 클릭시 닫기
-    modal.addEventListener('click', function(e) {
-        if (e.target === modal) {
-            closeModal();
-        }
-    });
+    // 배경 클릭시 닫기 (이벤트 버블링 방지를 위해 지연 등록)
+    setTimeout(() => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    }, 100);
 }
 
 // ESC 키로 최상단 모달 닫기
@@ -596,6 +601,7 @@ function addDataRowTop(button) {
         <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
         <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
         <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
+        <button class="row-add-btn" onclick="addRowBelow(this)">행 추가</button>
     `;
     newRow.appendChild(rowControls);
 
@@ -637,6 +643,7 @@ function addDataRowBottom(button) {
         <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
         <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
         <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
+        <button class="row-add-btn" onclick="addRowBelow(this)">행 추가</button>
     `;
     newRow.appendChild(rowControls);
 
@@ -671,6 +678,50 @@ function moveRowDown(button) {
     if (nextRow) {
         row.parentNode.insertBefore(nextRow, row);
     }
+}
+
+// 현재 행 아래에 새 행 추가
+function addRowBelow(button) {
+    const currentRow = button.closest('.data-row');
+    const modal = button.closest('.modal-content');
+    const container = modal.querySelector('.data-rows-container');
+    const currentRows = container.querySelectorAll('.data-row').length;
+    const columnCount = modal.querySelectorAll('.header-column').length;
+
+    if (currentRows >= 50) {
+        return;
+    }
+
+    // 새 데이터 행 생성
+    const newRow = document.createElement('div');
+    newRow.className = 'data-row';
+
+    // 현재 열 개수만큼 셀 추가
+    for (let i = 0; i < columnCount; i++) {
+        const cell = document.createElement('textarea');
+        cell.className = 'data-cell';
+        cell.placeholder = `데이터 ${i + 1}`;
+        attachAutoResize(cell);  // 자동 높이 조절 추가
+        newRow.appendChild(cell);
+    }
+
+    // 행 이동 버튼 추가
+    const rowControls = document.createElement('div');
+    rowControls.className = 'row-controls';
+    rowControls.innerHTML = `
+        <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
+        <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
+        <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
+        <button class="row-add-btn" onclick="addRowBelow(this)">행 추가</button>
+    `;
+    newRow.appendChild(rowControls);
+
+    // 현재 행 바로 다음에 삽입
+    currentRow.parentNode.insertBefore(newRow, currentRow.nextSibling);
+
+    const modalElement = button.closest('.modal');
+    applyManualWidths(modalElement);
+    updatePlaceholders(modalElement);
 }
 
 // Textarea 자동 높이 조절
@@ -783,7 +834,11 @@ function renderCellButtons(textarea, buttons) {
             const button = document.createElement('button');
             button.className = 'cell-modal-button';
             button.textContent = buttonName;
-            button.onclick = () => openModal(buttonName);
+            button.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                openModal(buttonName);
+            };
 
             // Long press 이벤트 추가 (500ms 이상 누르면 편집 모드)
             let pressTimer = null;
@@ -804,6 +859,10 @@ function renderCellButtons(textarea, buttons) {
                 }
                 // long press였으면 클릭 이벤트 방지
                 if (longPressed) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                } else {
+                    // 일반 클릭도 이벤트 전파 차단 (onclick 핸들러가 처리)
                     e.preventDefault();
                     e.stopPropagation();
                 }
@@ -1290,34 +1349,40 @@ function loadModalData(buttonName, modal) {
     // 기존 형식 데이터를 페이지 형식으로 마이그레이션
     if (!data.pages && data.headers) {
         modalDataStore[buttonName] = {
-            headers: data.headers,
-            widthsData: data.widthsData,
+            headers: data.headers || [''],
+            widthsData: data.widthsData || [{ value: 1, mode: 'ratio' }],
             pages: [{
                 title: '페이지 1',
-                rows: data.rows
+                rows: data.rows || [['']]  // rows가 없으면 기본값 제공
             }]
         };
     }
 
     // 구 페이지 형식(페이지별 헤더)을 신 형식(공통 헤더)으로 마이그레이션
-    if (data.pages && data.pages.length > 0 && data.pages[0].headers) {
-        const firstPage = data.pages[0];
+    const currentData = modalDataStore[buttonName];
+    if (currentData.pages && currentData.pages.length > 0 && currentData.pages[0].headers) {
+        const firstPage = currentData.pages[0];
         modalDataStore[buttonName] = {
-            headers: firstPage.headers,
-            widthsData: firstPage.widthsData,
-            pages: data.pages.map(page => ({
-                title: page.title,
-                rows: page.rows
+            headers: firstPage.headers || [''],
+            widthsData: firstPage.widthsData || [{ value: 1, mode: 'ratio' }],
+            pages: currentData.pages.map(page => ({
+                title: page.title || '페이지 1',
+                rows: page.rows || [['']]  // rows가 없으면 기본값 제공
             }))
         };
     }
 
     // 페이지 시스템으로 로드
-    if (!currentPageIndex[buttonName]) currentPageIndex[buttonName] = 0;
+    if (currentPageIndex[buttonName] === undefined) currentPageIndex[buttonName] = 0;
 
-    if (modalDataStore[buttonName].pages && modalDataStore[buttonName].pages.length > 0) {
+    const finalData = modalDataStore[buttonName];
+    if (finalData.pages && finalData.pages.length > 0) {
         const modalElement = modal.closest('.modal');
-        loadPage(modalElement, buttonName, 0);
+        // 현재 페이지 인덱스를 사용하되, 범위를 벗어나면 0으로
+        const pageIndex = currentPageIndex[buttonName];
+        const validIndex = (pageIndex < finalData.pages.length) ? pageIndex : 0;
+        currentPageIndex[buttonName] = validIndex;
+        loadPage(modalElement, buttonName, validIndex);
     }
 }
 
@@ -1529,7 +1594,7 @@ function previousPage(button) {
     const modal = button.closest('.modal');
     const buttonName = modal.dataset.modalName;
 
-    if (!currentPageIndex[buttonName]) currentPageIndex[buttonName] = 0;
+    if (currentPageIndex[buttonName] === undefined) currentPageIndex[buttonName] = 0;
 
     const pageData = modalDataStore[buttonName];
     if (!pageData || !pageData.pages) return;
@@ -1546,7 +1611,7 @@ function nextPage(button) {
     const modal = button.closest('.modal');
     const buttonName = modal.dataset.modalName;
 
-    if (!currentPageIndex[buttonName]) currentPageIndex[buttonName] = 0;
+    if (currentPageIndex[buttonName] === undefined) currentPageIndex[buttonName] = 0;
 
     const pageData = modalDataStore[buttonName];
     if (!pageData || !pageData.pages) return;
@@ -1627,6 +1692,8 @@ function openPageMenu(button) {
     menu.innerHTML = `
         <button onclick="addNewPage(this)">페이지 추가</button>
         <button onclick="renamePage(this)">페이지 이름 변경</button>
+        <button onclick="movePageUp(this)">위로 이동</button>
+        <button onclick="movePageDown(this)">아래로 이동</button>
         <button onclick="deletePage(this)">페이지 삭제</button>
     `;
 
@@ -1765,6 +1832,7 @@ function loadPage(modal, buttonName, pageIndex) {
             <button class="row-move-btn" onclick="moveRowUp(this)">▲</button>
             <button class="row-move-btn" onclick="moveRowDown(this)">▼</button>
             <button class="voice-input-btn" onclick="startVoiceInput(this)">🎤</button>
+            <button class="row-add-btn" onclick="addRowBelow(this)">행 추가</button>
         `;
         row.appendChild(rowControls);
 
@@ -1854,6 +1922,60 @@ function deletePage(button) {
         currentPageIndex[buttonName] = modalDataStore[buttonName].pages.length - 1;
     }
 
+    loadPage(modal, buttonName, currentPageIndex[buttonName]);
+
+    // 메뉴 닫기
+    const menu = button.closest('.page-menu');
+    if (menu) menu.remove();
+}
+
+// 페이지 위로 이동
+function movePageUp(button) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+    const pageIndex = currentPageIndex[buttonName] || 0;
+
+    if (pageIndex === 0) {
+        alert('이미 첫 번째 페이지입니다.');
+        return;
+    }
+
+    // 현재 페이지 저장
+    saveCurrentPage(modal);
+
+    // 페이지 순서 교환
+    const pages = modalDataStore[buttonName].pages;
+    [pages[pageIndex - 1], pages[pageIndex]] = [pages[pageIndex], pages[pageIndex - 1]];
+
+    // 새 인덱스로 이동
+    currentPageIndex[buttonName] = pageIndex - 1;
+    loadPage(modal, buttonName, currentPageIndex[buttonName]);
+
+    // 메뉴 닫기
+    const menu = button.closest('.page-menu');
+    if (menu) menu.remove();
+}
+
+// 페이지 아래로 이동
+function movePageDown(button) {
+    const modal = button.closest('.modal');
+    const buttonName = modal.dataset.modalName;
+    const pageIndex = currentPageIndex[buttonName] || 0;
+    const pages = modalDataStore[buttonName].pages;
+
+    if (pageIndex === pages.length - 1) {
+        alert('이미 마지막 페이지입니다.');
+        return;
+    }
+
+    // 현재 페이지 저장
+    saveCurrentPage(modal);
+
+    // 페이지 순서 교환
+    [pages[pageIndex], pages[pageIndex + 1]] = [pages[pageIndex + 1], pages[pageIndex]];
+
+    // 새 인덱스로 이동
+    currentPageIndex[buttonName] = pageIndex + 1;
     loadPage(modal, buttonName, currentPageIndex[buttonName]);
 
     // 메뉴 닫기
