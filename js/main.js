@@ -442,6 +442,9 @@ function openModal(buttonName) {
     document.body.appendChild(modal);
     modalStack.push(modal); // 스택에 추가
 
+    // z-index를 스택 깊이에 따라 동적으로 설정 (2000 + 스택 인덱스 * 100)
+    modal.style.zIndex = 2000 + (modalStack.length - 1) * 100;
+
     // 저장된 데이터 불러오기
     const modalContent = modal.querySelector('.modal-content');
     loadModalData(buttonName, modalContent);
@@ -861,19 +864,27 @@ function renderCellButtons(textarea, buttons) {
                 if (longPressed) {
                     e.preventDefault();
                     e.stopPropagation();
-                } else {
-                    // 일반 클릭도 이벤트 전파 차단 (onclick 핸들러가 처리)
-                    e.preventDefault();
-                    e.stopPropagation();
+                    longPressed = false;
                 }
+                // 일반 클릭은 onclick 핸들러가 처리하도록 preventDefault 안 함
             };
 
             button.addEventListener('mousedown', startPress);
-            button.addEventListener('touchstart', startPress);
+            button.addEventListener('touchstart', startPress, { passive: true });
             button.addEventListener('mouseup', cancelPress);
-            button.addEventListener('mouseleave', cancelPress);
+            button.addEventListener('mouseleave', () => {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+            });
             button.addEventListener('touchend', cancelPress);
-            button.addEventListener('touchcancel', cancelPress);
+            button.addEventListener('touchcancel', () => {
+                if (pressTimer) {
+                    clearTimeout(pressTimer);
+                    pressTimer = null;
+                }
+            });
 
             rowDiv.appendChild(button);
         });
@@ -1471,6 +1482,7 @@ function initNotePad() {
 
     // 터치 드래그 시작
     handle.addEventListener('touchstart', function(e) {
+        e.preventDefault();
         isDragging = true;
         startY = e.touches[0].clientY;
         startHeight = notePad.offsetHeight;
@@ -1478,11 +1490,12 @@ function initNotePad() {
         dragStartTime = Date.now();
         notePad.style.transition = 'none';
         handle.style.transition = 'none';
-    }, { passive: true });
+    });
 
     // 마우스 드래그 중
     document.addEventListener('mousemove', function(e) {
         if (!isDragging) return;
+        e.preventDefault();
 
         const currentY = e.clientY;
         const diff = currentY - startY;
@@ -1503,6 +1516,7 @@ function initNotePad() {
     // 터치 드래그 중
     document.addEventListener('touchmove', function(e) {
         if (!isDragging) return;
+        e.preventDefault();
 
         const currentY = e.touches[0].clientY;
         const diff = currentY - startY;
@@ -1518,7 +1532,7 @@ function initNotePad() {
         if (newHeight > 0) {
             notePad.style.pointerEvents = 'auto';
         }
-    }, { passive: true });
+    });
 
     // 마우스 드래그 종료
     document.addEventListener('mouseup', function(e) {
