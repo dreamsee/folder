@@ -15,6 +15,7 @@ interface ScreenLockProps {
     enabled: boolean;
     zoom: number;
     size: number;
+    mode: 'hold' | 'toggle';
   };
   onMagnifierSettingsChange: (settings: any) => void;
   onFavoritesOpen?: () => void;
@@ -37,7 +38,9 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   const [isMobile, setIsMobile] = useState(false);
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
   const [lastReleasePosition, setLastReleasePosition] = useState({ x: 50, y: 50 }); // 마우스를 뗀 마지막 위치
-  const [isClicked, setIsClicked] = useState(false);
+  const [isClicked, setIsClicked] = useState(false); // 홀드 모드: 마우스 다운 상태
+  const [isToggled, setIsToggled] = useState(false); // 토글 모드: 확대 고정 상태
+  const [mouseDownPosition, setMouseDownPosition] = useState({ x: 0, y: 0 }); // 마우스 다운 위치 (드래그 감지용)
 
   useEffect(() => {
     // 모바일 감지
@@ -60,20 +63,26 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
     const handleMouseDown = (e: MouseEvent) => {
       const playerElement = document.querySelector('.youtube-player-container');
       if (playerElement && playerElement.contains(e.target as Node)) {
-        if (magnifierSettings.enabled && isLocked) {
+        if (isLocked) {
           const rect = playerElement.getBoundingClientRect();
           const relativeX = ((e.clientX - rect.left) / rect.width) * 100;
           const relativeY = ((e.clientY - rect.top) / rect.height) * 100;
 
+          // 마우스 다운 위치 저장 (드래그 감지용)
+          setMouseDownPosition({ x: relativeX, y: relativeY });
           setClickPosition({ x: relativeX, y: relativeY });
-          setIsClicked(true);
+
+          if (magnifierSettings.mode === 'hold') {
+            // 홀드 모드: 마우스 다운 시 확대
+            setIsClicked(true);
+          }
         }
       }
     };
 
-    // 마우스 무브: 드래그 중 확대 위치 이동
+    // 마우스 무브: 드래그 중 확대 위치 이동 (홀드 모드만)
     const handleMouseMove = (e: MouseEvent) => {
-      if (isClicked && magnifierSettings.enabled && isLocked) {
+      if (magnifierSettings.mode === 'hold' && isClicked && isLocked) {
         const playerElement = document.querySelector('.youtube-player-container');
         if (playerElement) {
           const rect = playerElement.getBoundingClientRect();
@@ -85,17 +94,36 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
       }
     };
 
-    // 마우스 업: 확대 해제 (마지막 위치 저장)
+    // 마우스 업: 확대 해제 또는 토글
     const handleMouseUp = (e: MouseEvent) => {
-      // 마우스를 뗀 위치를 직접 계산하여 저장 (setState 비동기 문제 방지)
       const playerElement = document.querySelector('.youtube-player-container');
       if (playerElement && playerElement.contains(e.target as Node)) {
         const rect = playerElement.getBoundingClientRect();
         const relativeX = ((e.clientX - rect.left) / rect.width) * 100;
         const relativeY = ((e.clientY - rect.top) / rect.height) * 100;
         setLastReleasePosition({ x: relativeX, y: relativeY });
+
+        if (magnifierSettings.mode === 'toggle') {
+          // 토글 모드: 드래그가 아닌 클릭일 때만 토글
+          const distanceX = Math.abs(relativeX - mouseDownPosition.x);
+          const distanceY = Math.abs(relativeY - mouseDownPosition.y);
+          const isDrag = distanceX > 2 || distanceY > 2; // 2% 이상 이동하면 드래그로 간주
+
+          if (!isDrag) {
+            // 클릭: 토글
+            setIsToggled(!isToggled);
+            // 토글 시 클릭 위치를 새로 설정 (축소→확대 시)
+            if (!isToggled) {
+              setClickPosition({ x: relativeX, y: relativeY });
+            }
+          }
+        }
       }
-      setIsClicked(false);
+
+      if (magnifierSettings.mode === 'hold') {
+        // 홀드 모드: 마우스 업 시 확대 해제
+        setIsClicked(false);
+      }
     };
 
     if (magnifierSettings.enabled) {
@@ -109,7 +137,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isLocked, magnifierSettings.enabled, isClicked]);
+  }, [isLocked, magnifierSettings.enabled, magnifierSettings.mode, isClicked, isToggled, mouseDownPosition]);
 
   const magnifierSizes = {
     1: 100, // 소
@@ -148,7 +176,9 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
               <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  {isMobile ? '영상을 길게 눌러서' : '클릭하여'} {magnifierSettings.zoom.toFixed(1)}x 확대
+                  {magnifierSettings.mode === 'toggle'
+                    ? `클릭시 ${magnifierSettings.zoom.toFixed(1)}x 확대/축소`
+                    : `누르고 있으면 ${magnifierSettings.zoom.toFixed(1)}x 확대`}
                 </span>
               </div>
             )}
@@ -191,21 +221,35 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
                   <div className="space-y-4">
                     <h3 className="font-medium text-sm">확대 설정</h3>
 
-                    {/* 확대 활성화 토글 */}
+                    {/* 확대 모드 선택 */}
                     <div className="flex items-center justify-between">
-                      <label className="text-sm">{isMobile ? '터치' : '클릭'} 확대 사용</label>
-                      <Button
-                        variant={magnifierSettings.enabled ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() =>
-                          onMagnifierSettingsChange({
-                            ...magnifierSettings,
-                            enabled: !magnifierSettings.enabled,
-                          })
-                        }
-                      >
-                        {magnifierSettings.enabled ? '켜짐' : '꺼짐'}
-                      </Button>
+                      <label className="text-sm">확대 모드</label>
+                      <div className="flex gap-2">
+                        <Button
+                          variant={magnifierSettings.mode === 'toggle' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() =>
+                            onMagnifierSettingsChange({
+                              ...magnifierSettings,
+                              mode: 'toggle',
+                            })
+                          }
+                        >
+                          클릭시 확대/축소
+                        </Button>
+                        <Button
+                          variant={magnifierSettings.mode === 'hold' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() =>
+                            onMagnifierSettingsChange({
+                              ...magnifierSettings,
+                              mode: 'hold',
+                            })
+                          }
+                        >
+                          홀드시 확대
+                        </Button>
+                      </div>
                     </div>
 
                     {/* 배율 조절 */}
@@ -239,13 +283,14 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
         </div>
       </div>
 
-      {/* 클릭 확대 효과 - 영상 영역 내부에서만 확대 (컨테이너 overflow hidden) */}
-      {isLocked && magnifierSettings.enabled && isClicked && (
+      {/* 홀드 모드: 확대 효과 (플레이어 안에서만 보임) */}
+      {isLocked && magnifierSettings.mode === 'hold' && isClicked && (
         <style>
           {`
             .youtube-player-container {
               overflow: hidden !important;
               position: relative;
+              z-index: 100;
             }
             .youtube-player-container iframe {
               transform: scale(${magnifierSettings.zoom});
@@ -256,8 +301,25 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
         </style>
       )}
 
-      {/* 확대되지 않은 상태의 기본 스타일 */}
-      {isLocked && magnifierSettings.enabled && !isClicked && (
+      {/* 토글 모드: 확대 효과 (화면 전체로 넘어감) */}
+      {isLocked && magnifierSettings.mode === 'toggle' && isToggled && (
+        <style>
+          {`
+            .youtube-player-container {
+              position: relative;
+              z-index: 100;
+            }
+            .youtube-player-container iframe {
+              transform: scale(${magnifierSettings.zoom});
+              transform-origin: ${clickPosition.x}% ${clickPosition.y}%;
+              transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            }
+          `}
+        </style>
+      )}
+
+      {/* 홀드 모드: 줌아웃 스타일 (플레이어 안에서만) */}
+      {isLocked && magnifierSettings.mode === 'hold' && !isClicked && (
         <style>
           {`
             .youtube-player-container {
@@ -271,11 +333,24 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
           `}
         </style>
       )}
+
+      {/* 토글 모드: 줌아웃 스타일 (화면 전체) */}
+      {isLocked && magnifierSettings.mode === 'toggle' && !isToggled && (
+        <style>
+          {`
+            .youtube-player-container iframe {
+              transform: scale(1);
+              transform-origin: ${lastReleasePosition.x}% ${lastReleasePosition.y}%;
+              transition: transform 0.9s cubic-bezier(0.5, 0.3, 0, 0.99);
+            }
+          `}
+        </style>
+      )}
       
       {/* 모바일 터치 홀드 확대 효과는 YouTubePlayer에서 처리됨 */}
       
       {/* 클릭/터치 위치 표시 (확대 중심점 시각화) */}
-      {isClicked && magnifierSettings.enabled && (
+      {((magnifierSettings.mode === 'hold' && isClicked) || (magnifierSettings.mode === 'toggle' && isToggled)) && (
         <div className="fixed pointer-events-none z-[60]">
           <div
             className="absolute animate-ping"

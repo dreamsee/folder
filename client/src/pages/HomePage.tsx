@@ -72,6 +72,7 @@ const HomePage = () => {
     enabled: true,
     zoom: 2.0,
     size: 2, // 1: 소, 2: 중, 3: 대
+    mode: 'hold' as 'hold' | 'toggle', // hold: 홀드시 확대, toggle: 클릭시 확대/축소
   });
   const [uiSettings, setUiSettings] = useState<UISettings>({
     상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
