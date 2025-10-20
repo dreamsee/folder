@@ -218,9 +218,9 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
                             zoom: value,
                           })
                         }
-                        min={1.5}
+                        min={1.1}
                         max={5}
-                        step={0.5}
+                        step={0.1}
                         className="w-full"
                       />
                     </div>
@@ -260,7 +260,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
             .youtube-player-container iframe {
               transform: scale(1);
               transform-origin: ${lastReleasePosition.x}% ${lastReleasePosition.y}%;
-              transition: transform 0.9s cubic-bezier(0, 0.6, 0, 0.9);
+              transition: transform 0.9s cubic-bezier(0.5, 0.3, 0, 0.99);
             }
           `}
         </style>
