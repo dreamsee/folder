@@ -96,15 +96,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "검색 결과가 없습니다." });
       }
 
-<<<<<<< HEAD
-      const videos = data.items.map((item: any) => ({
-        videoId: item.id.videoId,
-        title: item.snippet.title,
-        thumbnail: item.snippet.thumbnails.medium.url,
-        channelTitle: item.snippet.channelTitle,
-        publishedAt: item.snippet.publishedAt
-      }));
-=======
       // HTML 엔티티 디코딩 함수 (개선된 버전)
       const decodeHtmlEntities = (text: string): string => {
         return text
@@ -117,7 +108,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .replace(/&apos;/g, "'")
           .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
       };
->>>>>>> 49a3255550b579b6eaaa3cf794d9fd8e63f7e5d1
 
       const videos = data.items.map((item: any) => {
         const decodedTitle = decodeHtmlEntities(item.snippet.title);
