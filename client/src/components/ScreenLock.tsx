@@ -86,9 +86,15 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
     };
 
     // 마우스 업: 확대 해제 (마지막 위치 저장)
-    const handleMouseUp = () => {
-      // 마우스를 뗀 위치를 저장하여 줌아웃 시 해당 위치 기준으로 복귀
-      setLastReleasePosition({ x: clickPosition.x, y: clickPosition.y });
+    const handleMouseUp = (e: MouseEvent) => {
+      // 마우스를 뗀 위치를 직접 계산하여 저장 (setState 비동기 문제 방지)
+      const playerElement = document.querySelector('.youtube-player-container');
+      if (playerElement && playerElement.contains(e.target as Node)) {
+        const rect = playerElement.getBoundingClientRect();
+        const relativeX = ((e.clientX - rect.left) / rect.width) * 100;
+        const relativeY = ((e.clientY - rect.top) / rect.height) * 100;
+        setLastReleasePosition({ x: relativeX, y: relativeY });
+      }
       setIsClicked(false);
     };
 
