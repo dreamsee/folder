@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { X, FolderOpen } from "lucide-react";
+import { X, FolderOpen, Plus, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface Folder {
   id: string;
@@ -19,6 +20,13 @@ interface FavoriteVideo {
   channelTitle: string;
   thumbnail: string;
   folderId: string | null;
+  addedAt: string;
+  publishedAt?: string;
+}
+
+interface FavoriteChannel {
+  id: string;
+  name: string;
   addedAt: string;
 }
 
@@ -39,9 +47,15 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
 }) => {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [favorites, setFavorites] = useState<FavoriteVideo[]>([]);
+  const [channels, setChannels] = useState<FavoriteChannel[]>([]);
   const [activeTab, setActiveTab] = useState("all");
   const [editMode, setEditMode] = useState(false);
   const [selectedVideos, setSelectedVideos] = useState<Set<string>>(new Set());
+  const [newChannelName, setNewChannelName] = useState("");
+  const [isAddingChannel, setIsAddingChannel] = useState(false);
+  const [selectedChannel, setSelectedChannel] = useState<string | null>(null);
+  const [channelVideos, setChannelVideos] = useState<FavoriteVideo[]>([]);
+  const [loadingChannelVideos, setLoadingChannelVideos] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -61,6 +75,10 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
     const favoriteList = Object.values(favoritesData) as FavoriteVideo[];
     favoriteList.sort((a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime());
     setFavorites(favoriteList);
+
+    // 구독 채널 데이터 로드
+    const channelsData = JSON.parse(localStorage.getItem('favoriteChannels') || '[]');
+    setChannels(channelsData);
   };
 
   // 폴더별 영상 필터링
@@ -193,6 +211,9 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
       }
     });
 
+    // 구독 채널 탭 추가
+    tabs.push({ id: "channels", label: "구독 채널", count: channels.length });
+
     return tabs;
   };
 
@@ -223,6 +244,104 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
     if (!folderId) return { name: '미분류', color: '#6B7280' };
     const folder = folders.find(f => f.id === folderId);
     return folder ? { name: folder.name, color: folder.color } : { name: '알 수 없음', color: '#6B7280' };
+  };
+
+  // 채널 추가 함수
+  const addChannel = () => {
+    if (!newChannelName.trim()) {
+      showNotification?.('채널명을 입력해주세요.', 'warning');
+      return;
+    }
+
+    const channelsData = JSON.parse(localStorage.getItem('favoriteChannels') || '[]');
+
+    // 중복 확인
+    if (channelsData.some((ch: FavoriteChannel) => ch.name === newChannelName.trim())) {
+      showNotification?.('이미 추가된 채널입니다.', 'info');
+      return;
+    }
+
+    const newChannel: FavoriteChannel = {
+      id: Date.now().toString(),
+      name: newChannelName.trim(),
+      addedAt: new Date().toISOString()
+    };
+
+    channelsData.push(newChannel);
+    localStorage.setItem('favoriteChannels', JSON.stringify(channelsData));
+    setChannels(channelsData);
+    setNewChannelName("");
+    setIsAddingChannel(false);
+    showNotification?.('채널이 추가되었습니다.', 'success');
+  };
+
+  // 채널 삭제 함수
+  const deleteChannel = (channelId: string) => {
+    const channelsData = JSON.parse(localStorage.getItem('favoriteChannels') || '[]');
+    const updatedChannels = channelsData.filter((ch: FavoriteChannel) => ch.id !== channelId);
+    localStorage.setItem('favoriteChannels', JSON.stringify(updatedChannels));
+    setChannels(updatedChannels);
+    showNotification?.('채널이 삭제되었습니다.', 'success');
+  };
+
+  // 채널 선택시 영상 검색 함수
+  const loadChannelVideos = async (channelName: string) => {
+    setSelectedChannel(channelName);
+    setLoadingChannelVideos(true);
+    setChannelVideos([]);
+
+    try {
+      // YouTube API로 채널 영상 검색 (최대 50개 검색 후 필터링)
+      const response = await fetch(`/api/youtube/search?q=${encodeURIComponent(channelName)}&maxResults=50`);
+      const data = await response.json();
+
+      if (data.videos && data.videos.length > 0) {
+        const allVideos = data.videos.map((video: any) => ({
+          videoId: video.videoId,
+          title: video.title,
+          channelTitle: video.channelTitle,
+          thumbnail: video.thumbnail,
+          folderId: null,
+          addedAt: new Date().toISOString(),
+          publishedAt: video.publishedAt
+        }));
+
+        // 채널명으로 필터링 (입력한 채널명과 정확히 일치하는 영상만)
+        const filteredVideos = allVideos.filter((video) =>
+          video.channelTitle.toLowerCase().includes(channelName.toLowerCase())
+        );
+
+        // 최신순으로 정렬 (publishedAt 기준 내림차순)
+        filteredVideos.sort((a, b) => {
+          if (!a.publishedAt) return 1;
+          if (!b.publishedAt) return -1;
+          return new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime();
+        });
+
+        // 상위 25개만 표시
+        const top25Videos = filteredVideos.slice(0, 25);
+
+        if (top25Videos.length > 0) {
+          setChannelVideos(top25Videos);
+          showNotification?.(`${top25Videos.length}개 영상을 불러왔습니다.`, 'success');
+        } else {
+          showNotification?.('해당 채널의 영상을 찾을 수 없습니다.', 'info');
+        }
+      } else {
+        showNotification?.('검색 결과가 없습니다.', 'info');
+      }
+    } catch (error) {
+      console.error('채널 영상 로딩 에러:', error);
+      showNotification?.('영상을 불러오는데 실패했습니다.', 'error');
+    } finally {
+      setLoadingChannelVideos(false);
+    }
+  };
+
+  // 채널 뷰로 돌아가기
+  const backToChannelList = () => {
+    setSelectedChannel(null);
+    setChannelVideos([]);
   };
 
   const currentVideos = getCurrentVideos();
@@ -318,10 +437,146 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
 
               {tabsList.map((tab) => (
                 <TabsContent key={tab.id} value={tab.id} className="mt-4">
-                  <div className="max-h-96 overflow-y-auto space-y-2">
-                    {getCurrentVideos().map((video) => {
-                      const folderInfo = getFolderInfo(video.folderId);
-                      return (
+                  {tab.id === "channels" ? (
+                    // 구독 채널 탭 콘텐츠
+                    <div className="max-h-96 overflow-y-auto space-y-2">
+                      {selectedChannel ? (
+                        // 채널 영상 목록 표시
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={backToChannelList}
+                              className="text-xs"
+                            >
+                              ← 채널 목록으로
+                            </Button>
+                            <span className="text-sm text-gray-600">{selectedChannel}</span>
+                          </div>
+
+                          {loadingChannelVideos ? (
+                            <div className="text-center py-8 text-gray-500">
+                              영상을 불러오는 중...
+                            </div>
+                          ) : channelVideos.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                              영상을 찾을 수 없습니다.
+                            </div>
+                          ) : (
+                            channelVideos.map((video) => (
+                              <div
+                                key={video.videoId}
+                                className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50"
+                                onClick={() => handleVideoPlay(video.videoId)}
+                              >
+                                <img
+                                  src={video.thumbnail}
+                                  alt={video.title}
+                                  className="w-24 h-16 object-cover rounded flex-shrink-0"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="text-sm font-medium line-clamp-2 mb-1">
+                                    {video.title}
+                                  </h3>
+                                  <div className="flex items-center gap-2 text-xs text-gray-500">
+                                    <span>{video.channelTitle}</span>
+                                    {video.publishedAt && (
+                                      <>
+                                        <span>•</span>
+                                        <span>{formatDate(video.publishedAt)}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      ) : (
+                        // 채널 목록 표시
+                        <div>
+                          {channels.length === 0 ? (
+                            <div className="text-center py-8 text-gray-500">
+                              등록된 채널이 없습니다.
+                            </div>
+                          ) : (
+                            channels.map((channel) => (
+                              <div
+                                key={channel.id}
+                                className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50"
+                              >
+                                <button
+                                  className="flex-1 text-left"
+                                  onClick={() => loadChannelVideos(channel.name)}
+                                >
+                                  <div className="text-sm font-medium">{channel.name}</div>
+                                  <div className="text-xs text-gray-500">{formatDate(channel.addedAt)}</div>
+                                </button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => deleteChannel(channel.id)}
+                                  className="text-xs px-2 py-1 h-6"
+                                  title="채널 삭제"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            ))
+                          )}
+
+                          {/* 채널 추가 UI */}
+                          <div className="mt-4">
+                            {isAddingChannel ? (
+                              <div className="flex gap-2">
+                                <Input
+                                  value={newChannelName}
+                                  onChange={(e) => setNewChannelName(e.target.value)}
+                                  placeholder="채널명 입력 (예: 침착맨)"
+                                  className="flex-1 text-sm"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') addChannel();
+                                    if (e.key === 'Escape') {
+                                      setIsAddingChannel(false);
+                                      setNewChannelName("");
+                                    }
+                                  }}
+                                  autoFocus
+                                />
+                                <Button size="sm" onClick={addChannel}>추가</Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setIsAddingChannel(false);
+                                    setNewChannelName("");
+                                  }}
+                                >
+                                  취소
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setIsAddingChannel(true)}
+                                className="w-full"
+                              >
+                                <Plus className="h-4 w-4 mr-1" />
+                                채널 추가
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // 기존 영상 탭 콘텐츠
+                    <div className="max-h-96 overflow-y-auto space-y-2">
+                      {getCurrentVideos().map((video) => {
+                        const folderInfo = getFolderInfo(video.folderId);
+                        return (
                         <div
                           key={video.videoId}
                           className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 ${
@@ -378,9 +633,10 @@ const FavoriteManager: React.FC<FavoriteManagerProps> = ({
                             </Button>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </TabsContent>
               ))}
             </Tabs>

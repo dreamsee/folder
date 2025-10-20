@@ -17,7 +17,7 @@ UI 컴포넌트:
 - client/src/components/OverlayInput.tsx: 오버레이 입력 패널
 - client/src/components/ChapterBar.tsx: YouTube 챕터 바
 - client/src/components/TimeSkipControls.tsx: 영상 건너뛰기
-- client/src/components/FavoriteManager.tsx: 즐겨찾기 관리
+- client/src/components/FavoriteManager.tsx: 즐겨찾기 및 구독 채널 관리
 - client/src/components/ScreenLock.tsx: 화면 잠금
 
 모달 및 입력:
@@ -162,6 +162,25 @@ UI 컴포넌트:
 - YouTubePlayer.tsx:onPlayerStateChange 재생 상태 변화 처리
 - FavoriteManager.tsx:handleVideoPlay 즐겨찾기 영상 재생
 - HomePage.tsx:currentVideoId currentVideoId 상태 관리
+
+📺 구독 채널 시스템:
+- FavoriteManager.tsx:49 channels 상태 (FavoriteChannel 배열)
+- FavoriteManager.tsx:79-81 loadData() 구독 채널 localStorage 로드
+- FavoriteManager.tsx:246-272 addChannel() 채널 추가 함수 (중복 확인 포함)
+- FavoriteManager.tsx:275-281 deleteChannel() 채널 삭제 함수
+- FavoriteManager.tsx:288-339 loadChannelVideos() 채널 영상 검색 및 필터링 (최대 50개 검색 후 채널명 필터링, 최신순 정렬, 상위 25개 표시)
+- FavoriteManager.tsx:342-345 backToChannelList() 채널 목록으로 돌아가기
+- FavoriteManager.tsx:214 createTabsList() 구독 채널 탭 추가
+- FavoriteManager.tsx:420-544 구독 채널 탭 UI (채널 목록, 채널 추가 입력창, 영상 목록)
+- FavoriteManager.tsx:461-469 채널 영상에 날짜 표시 (channelTitle · publishedAt)
+- server/routes.ts:30 maxResults 파라미터 지원 (기본값 50)
+- server/routes.ts:101 publishedAt 필드 추가 (영상 게시 날짜)
+- localStorage: favoriteChannels 배열로 채널 저장
+→ 수정 시 주의:
+  1. 채널명 필터링은 대소문자 구분 없이 includes() 사용
+  2. 검색은 50개 수행 후 필터링하여 25개 확보
+  3. 최신순 정렬은 publishedAt 기준 내림차순
+  4. 채널명이 짧으면 다른 채널 포함 가능성 있음
 
 ⚙️ 설정 관리:
 - SettingsPanel.tsx:전체컴포넌트 모든 설정 UI
