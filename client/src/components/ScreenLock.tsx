@@ -171,12 +171,14 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
               )}
             </Button>
 
-            {/* 확대 안내 메시지 */}
+            {/* 확대 안내 메시지 (모바일에서는 홀드 메시지만 표시) */}
             {isLocked && (
               <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  {magnifierSettings.mode === 'toggle'
+                  {isMobile
+                    ? `누르고 있으면 ${magnifierSettings.zoom.toFixed(1)}x 확대`
+                    : magnifierSettings.mode === 'toggle'
                     ? `클릭시 ${magnifierSettings.zoom.toFixed(1)}x 확대/축소`
                     : `누르고 있으면 ${magnifierSettings.zoom.toFixed(1)}x 확대`}
                 </span>
@@ -221,36 +223,38 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
                   <div className="space-y-4">
                     <h3 className="font-medium text-sm">확대 설정</h3>
 
-                    {/* 확대 모드 선택 */}
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm">확대 모드</label>
-                      <div className="flex gap-2">
-                        <Button
-                          variant={magnifierSettings.mode === 'toggle' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() =>
-                            onMagnifierSettingsChange({
-                              ...magnifierSettings,
-                              mode: 'toggle',
-                            })
-                          }
-                        >
-                          클릭시 확대/축소
-                        </Button>
-                        <Button
-                          variant={magnifierSettings.mode === 'hold' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() =>
-                            onMagnifierSettingsChange({
-                              ...magnifierSettings,
-                              mode: 'hold',
-                            })
-                          }
-                        >
-                          홀드시 확대
-                        </Button>
+                    {/* 확대 모드 선택 (모바일에서는 홀드시 확대만 사용) */}
+                    {!isMobile && (
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm">확대 모드</label>
+                        <div className="flex gap-2">
+                          <Button
+                            variant={magnifierSettings.mode === 'toggle' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() =>
+                              onMagnifierSettingsChange({
+                                ...magnifierSettings,
+                                mode: 'toggle',
+                              })
+                            }
+                          >
+                            클릭시 확대/축소
+                          </Button>
+                          <Button
+                            variant={magnifierSettings.mode === 'hold' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() =>
+                              onMagnifierSettingsChange({
+                                ...magnifierSettings,
+                                mode: 'hold',
+                              })
+                            }
+                          >
+                            홀드시 확대
+                          </Button>
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* 배율 조절 */}
                     <div className="space-y-2">

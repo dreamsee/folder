@@ -435,13 +435,13 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
         setTouchPosition({ x: relativeX, y: relativeY });
         setOverlayPosition({ x: touch.clientX, y: touch.clientY });
 
-        // 300ms 후 확대 시작
+        // 50ms 후 확대 시작 (즉각 반응)
         touchTimerRef.current = setTimeout(() => {
           setIsTouchHolding(true);
           if (navigator.vibrate) {
             navigator.vibrate(50);
           }
-        }, 300);
+        }, 50);
       }
     };
 
@@ -560,70 +560,71 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           ref={playerContainerRef}
           className="relative w-full aspect-video bg-black youtube-player-container"
         >
-          {/* 재생 컨트롤 버튼 (좌측 하단) - 재생컨트롤.전체표시가 false이고 패널이 닫혀있을 때만 표시 */}
-          {uiSettings && !uiSettings.재생컨트롤?.전체표시 && !isControlsModalOpen && (
-            <Button
-              onClick={() => {
-                // 패널 열 때 현재 플레이어 볼륨/속도 가져오기
-                if (player && isPlayerReady) {
-                  setCurrentVolume(player.getVolume());
-                  setCurrentSpeed(player.getPlaybackRate());
-                }
-                setIsControlsModalOpen(true);
-              }}
-              className="absolute bottom-4 left-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40"
-              size="sm"
-              variant="ghost"
-              title="재생 컨트롤"
-            >
-              <Settings2 className="w-5 h-5" />
-            </Button>
-          )}
+          {/* 버튼 컨테이너 - DOM 구조 안정화 */}
+          <div className="absolute inset-0 pointer-events-none z-40">
+            {/* 재생 컨트롤 버튼 (좌측 하단) - 재생컨트롤.전체표시가 false이고 패널이 닫혀있을 때만 표시 */}
+            {uiSettings && !uiSettings.재생컨트롤?.전체표시 && !isControlsModalOpen && (
+              <Button
+                onClick={() => {
+                  // 패널 열 때 현재 플레이어 볼륨/속도 가져오기
+                  if (player && isPlayerReady) {
+                    setCurrentVolume(player.getVolume());
+                    setCurrentSpeed(player.getPlaybackRate());
+                  }
+                  setIsControlsModalOpen(true);
+                }}
+                className="absolute bottom-4 left-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all pointer-events-auto"
+                size="sm"
+                variant="ghost"
+                title="재생 컨트롤"
+              >
+                <Settings2 className="w-5 h-5" />
+              </Button>
+            )}
 
-          {/* 전체화면 버튼 */}
-          {(재생기본값?.fullscreenButtonVisible ?? true) && (
-            <Button
-              onClick={toggleFullscreen}
-              className="absolute p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40"
-              style={{
-                bottom: `${재생기본값?.fullscreenButtonPosition?.bottom ?? 16}px`,
-                right: `${재생기본값?.fullscreenButtonPosition?.right ?? 16}px`
-              }}
-              size="sm"
-              variant="ghost"
-              title={isFullscreen ? "전체화면 종료" : "전체화면"}
-            >
-              {isFullscreen ? (
-                <Minimize2 className="w-5 h-5" />
-              ) : (
-                <Maximize2 className="w-5 h-5" />
-              )}
-            </Button>
-          )}
+            {/* 전체화면 버튼 */}
+            {(재생기본값?.fullscreenButtonVisible ?? true) && (
+              <Button
+                onClick={toggleFullscreen}
+                className="absolute p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all pointer-events-auto"
+                style={{
+                  bottom: `${재생기본값?.fullscreenButtonPosition?.bottom ?? 16}px`,
+                  right: `${재생기본값?.fullscreenButtonPosition?.right ?? 16}px`
+                }}
+                size="sm"
+                variant="ghost"
+                title={isFullscreen ? "전체화면 종료" : "전체화면"}
+              >
+                {isFullscreen ? (
+                  <Minimize2 className="w-5 h-5" />
+                ) : (
+                  <Maximize2 className="w-5 h-5" />
+                )}
+              </Button>
+            )}
 
-          {/* 댓글창 열기 버튼 (전체화면일 때만 표시) */}
-          {(재생기본값?.commentButtonVisible ?? true) && (
-            <Button
-              onClick={() => {
-                // CommentSidePanel의 setIsOpen을 직접 호출할 수 없으므로
-                // 임시로 이벤트 발생시켜 열기
-                const event = new CustomEvent('openCommentPanel');
-                window.dispatchEvent(event);
-              }}
-              className={`absolute p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40 ${
-                isFullscreen ? 'block' : 'hidden'
-              }`}
-              style={{
-                bottom: `${재생기본값?.commentButtonPosition?.bottom ?? 16}px`,
-                right: `${재생기본값?.commentButtonPosition?.right ?? 80}px`
-              }}
-              size="sm"
-              variant="ghost"
-              title="댓글 열기"
-            >
-              <MessageCircle className="w-5 h-5" />
-            </Button>
-          )}
+            {/* 댓글창 열기 버튼 (전체화면일 때만 표시) */}
+            {isFullscreen && (재생기본값?.commentButtonVisible ?? true) && (
+              <Button
+                onClick={() => {
+                  // CommentSidePanel의 setIsOpen을 직접 호출할 수 없으므로
+                  // 임시로 이벤트 발생시켜 열기
+                  const event = new CustomEvent('openCommentPanel');
+                  window.dispatchEvent(event);
+                }}
+                className="absolute p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all pointer-events-auto"
+                style={{
+                  bottom: `${재생기본값?.commentButtonPosition?.bottom ?? 16}px`,
+                  right: `${재생기본값?.commentButtonPosition?.right ?? 80}px`
+                }}
+                size="sm"
+                variant="ghost"
+                title="댓글 열기"
+              >
+                <MessageCircle className="w-5 h-5" />
+              </Button>
+            )}
+          </div>
 
           <div id="player" className="w-full h-full">
             <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">
