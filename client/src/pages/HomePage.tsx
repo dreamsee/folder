@@ -83,7 +83,14 @@ const HomePage = () => {
     노트영역: { 표시: true },
     화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
-    재생기본값: { defaultVolume: 100, defaultPlaybackRate: 1.0 },
+    재생기본값: {
+      defaultVolume: 100,
+      defaultPlaybackRate: 1.0,
+      fullscreenButtonVisible: true,
+      fullscreenButtonPosition: { bottom: 16, right: 16 }, // px 단위
+      commentButtonVisible: true,
+      commentButtonPosition: { bottom: 16, right: 80 } // px 단위
+    },
   });
 
   // 즐겨찾기 관련 상태
@@ -354,6 +361,7 @@ const HomePage = () => {
           바설정={uiSettings.바설정}
           currentTime={currentPlayTime}
           uiSettings={uiSettings}
+          재생기본값={uiSettings.재생기본값}
         />
       </div>
 

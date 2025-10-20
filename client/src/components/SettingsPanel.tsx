@@ -622,230 +622,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   />
                 </div>
 
-                {/* 상단부 설정 */}
-                <div className="space-y-3">
-                  <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">제목 표시</span>
-                      <Switch
-                        checked={settings.상단부.제목표시}
-                        onCheckedChange={(값) => 설정업데이트("상단부", "제목표시", 값)}
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">부제목 표시</span>
-                      <Switch
-                        checked={settings.상단부.부제목표시}
-                        onCheckedChange={(값) => 설정업데이트("상단부", "부제목표시", 값)}
-                      />
-                    </div>
-                    {settings.상단부.부제목표시 && (
-                      <div className="ml-4">
-                        <span className="text-xs text-gray-600">부제목 내용:</span>
-                        <Input
-                          value={settings.상단부.부제목내용 || "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요"}
-                          onChange={(e) => 설정업데이트("상단부", "부제목내용", e.target.value)}
-                          className="mt-1 text-xs"
-                          placeholder="부제목을 입력하세요"
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <span className="text-sm">{settings.검색창?.유지 ? "검색창 유지" : "팝업창 모드"}</span>
-                        <span className="text-xs text-gray-500">
-                          {settings.검색창?.유지 ? "" : "상단에 검색 아이콘"}
-                        </span>
-                      </div>
-                      <Switch
-                        checked={settings.검색창?.유지 ?? true}
-                        onCheckedChange={(값) => 설정업데이트("검색창", "유지", 값)}
-                      />
-                    </div>
-                    {settings.검색창?.유지 && (
-                      <div className="ml-6 flex justify-between items-center">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-gray-500">검색_목록 유지</span>
-                        </div>
-                        <Switch
-                          checked={settings.검색창?.목록유지 ?? false}
-                          onCheckedChange={(값) => 설정업데이트("검색창", "목록유지", 값)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* 바 설정 */}
-                <div className="space-y-3">
-                  <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <span className="text-sm">커스텀 바</span>
-                        <span className="text-xs text-gray-500">타임스탬프 하이라이트 표시</span>
-                      </div>
-                      <Switch
-                        checked={settings.바설정?.커스텀바 ?? true}
-                        onCheckedChange={(값) => handleSettingChange("바설정", {
-                          ...settings.바설정,
-                          커스텀바: 값
-                        })}
-                      />
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex flex-col">
-                        <span className="text-sm">챕터 바</span>
-                        <span className="text-xs text-gray-500">챕터구간 표시</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={settings.바설정?.챕터바개수 ?? ''}
-                          onChange={(e) => {
-                            const 입력값 = e.target.value;
-                            if (입력값 === '') {
-                              handleSettingChange("바설정", {
-                                ...settings.바설정,
-                                챕터바개수: ''
-                              });
-                            } else {
-                              const 값 = parseInt(입력값);
-                              if (!isNaN(값)) {
-                                handleSettingChange("바설정", {
-                                  ...settings.바설정,
-                                  챕터바개수: 값
-                                });
-                              }
-                            }
-                          }}
-                          onBlur={(e) => {
-                            if (e.target.value === '') {
-                              handleSettingChange("바설정", {
-                                ...settings.바설정,
-                                챕터바개수: 1
-                              });
-                            }
-                          }}
-                          className="w-10 h-8 text-sm text-center"
-                          min={1}
-                          max={9999999999}
-                        />
-                        <Switch
-                          checked={settings.바설정?.챕터바 ?? true}
-                          onCheckedChange={(값) => handleSettingChange("바설정", {
-                            ...settings.바설정,
-                            챕터바: 값
-                          })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 재생 컨트롤 설정 */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center pb-2">
-                    <div className="flex flex-col">
-                      <h3 className="text-sm font-medium">
-                        {settings.재생컨트롤.전체표시 ? "재생 컨트롤" : "플레이어 내장"}
-                      </h3>
-                      <span className="text-xs text-gray-500">
-                        {settings.재생컨트롤.전체표시 ? "(영상 건너뛰기)" : "버튼 클릭으로 컨트롤 표시"}
-                      </span>
-                    </div>
-                    <Switch
-                      checked={settings.재생컨트롤.전체표시}
-                      onCheckedChange={(값) => 설정업데이트("재생컨트롤", "전체표시", 값)}
-                    />
-                  </div>
-
-
-                  {settings.재생컨트롤.전체표시 && (
-                    <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-around items-start">
-                        <div className="flex flex-col items-center space-y-2">
-                          <span className="text-sm font-medium" style={{ color: '#3B82F6' }}>볼륨</span>
-                          <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
-                            <Switch
-                              checked={settings.재생컨트롤.볼륨}
-                              onCheckedChange={(값) => 설정업데이트("재생컨트롤", "볼륨", 값)}
-                              style={{
-                                backgroundColor: settings.재생컨트롤.볼륨 ? '#3B82F6' : '#E5E7EB'
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center space-y-2">
-                          <span className="text-sm font-medium" style={{ color: '#10B981' }}>속도</span>
-                          <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
-                            <Switch
-                              checked={settings.재생컨트롤.속도}
-                              onCheckedChange={(값) => 설정업데이트("재생컨트롤", "속도", 값)}
-                              style={{
-                                backgroundColor: settings.재생컨트롤.속도 ? '#10B981' : '#E5E7EB'
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center space-y-2">
-                          <span className="text-sm font-medium" style={{ color: '#EF4444' }}>녹화</span>
-                          <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
-                            <Switch
-                              checked={settings.재생컨트롤.녹화}
-                              onCheckedChange={(값) => 설정업데이트("재생컨트롤", "녹화", 값)}
-                              style={{
-                                backgroundColor: settings.재생컨트롤.녹화 ? '#EF4444' : '#E5E7EB'
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center space-y-2">
-                          <span className="text-sm font-medium" style={{ color: '#8B5CF6' }}>도장</span>
-                          <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
-                            <Switch
-                              checked={settings.재생컨트롤.도장}
-                              onCheckedChange={(값) => 설정업데이트("재생컨트롤", "도장", 값)}
-                              style={{
-                                backgroundColor: settings.재생컨트롤.도장 ? '#8B5CF6' : '#E5E7EB'
-                              }}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-center space-y-2">
-                          <span className="text-sm font-medium" style={{ color: '#F59E0B' }}>편집</span>
-                          <div style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
-                            <Switch
-                              checked={settings.재생컨트롤.편집}
-                              onCheckedChange={(값) => 설정업데이트("재생컨트롤", "편집", 값)}
-                              style={{
-                                backgroundColor: settings.재생컨트롤.편집 ? '#F59E0B' : '#E5E7EB'
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 왼쪽 탭 레이아웃 설정 */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex flex-col">
-                      <span className="text-sm">왼쪽 탭</span>
-                      <span className="text-xs text-gray-500">노트/화면글자/돋보기</span>
-                    </div>
-                    <Switch
-                      checked={settings.왼쪽탭레이아웃?.사용 ?? false}
-                      onCheckedChange={(값) => handleSettingChange("왼쪽탭레이아웃", {
-                        ...settings.왼쪽탭레이아웃,
-                        사용: 값
-                      })}
-                    />
-                  </div>
-                </div>
-
                 {/* 노트/화면글자/돋보기 탭 그룹 */}
                 <div className="space-y-3" id="content-tabs-section">
                   <div className="bg-gray-50/30 border border-gray-200 rounded-lg p-1">
@@ -1158,10 +934,24 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   />
                 </div>
 
-                {/* 전체화면 버튼 위치 */}
+                {/* 전체화면 버튼 */}
                 <div>
-                  <Label className="text-sm font-medium">전체화면 버튼 위치 (px)</Label>
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-sm font-medium">전체화면 버튼</Label>
+                    <Switch
+                      checked={settings.재생기본값?.fullscreenButtonVisible ?? true}
+                      onCheckedChange={(값) =>
+                        handleSettingChange('재생기본값', {
+                          ...settings.재생기본값,
+                          fullscreenButtonVisible: 값
+                        })
+                      }
+                    />
+                  </div>
+                  {settings.재생기본값?.fullscreenButtonVisible && (
+                    <>
+                      <Label className="text-xs text-gray-500">버튼 위치 (px)</Label>
+                      <div className="flex gap-2 mt-1">
                     <div className="flex-1">
                       <Label htmlFor="fullscreen-bottom" className="text-xs text-gray-500">하단(bottom)</Label>
                       <Input
@@ -1201,12 +991,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       />
                     </div>
                   </div>
+                    </>
+                  )}
                 </div>
 
-                {/* 댓글 버튼 위치 */}
+                {/* 댓글 버튼 */}
                 <div>
-                  <Label className="text-sm font-medium">댓글 버튼 위치 (px)</Label>
-                  <div className="flex gap-2 mt-2">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-sm font-medium">댓글 버튼</Label>
+                    <Switch
+                      checked={settings.재생기본값?.commentButtonVisible ?? true}
+                      onCheckedChange={(값) =>
+                        handleSettingChange('재생기본값', {
+                          ...settings.재생기본값,
+                          commentButtonVisible: 값
+                        })
+                      }
+                    />
+                  </div>
+                  {settings.재생기본값?.commentButtonVisible && (
+                    <>
+                      <Label className="text-xs text-gray-500">버튼 위치 (px)</Label>
+                      <div className="flex gap-2 mt-1">
                     <div className="flex-1">
                       <Label htmlFor="comment-bottom" className="text-xs text-gray-500">하단(bottom)</Label>
                       <Input
@@ -1246,6 +1052,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                       />
                     </div>
                   </div>
+                    </>
+                  )}
                 </div>
 
                 <div className="text-xs text-gray-500 bg-blue-50 p-2 rounded">

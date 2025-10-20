@@ -37,6 +37,10 @@ interface YouTubePlayerProps {
       플레이어내장: boolean;
     };
   };
+  재생기본값?: {
+    fullscreenButtonPosition?: { bottom: number; right: number };
+    commentButtonPosition?: { bottom: number; right: number };
+  };
 }
 
 const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
@@ -54,7 +58,8 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   magnifierSettings = { enabled: true, zoom: 2.0, size: 2 },
   바설정 = { 커스텀바: true, 챕터바: true },
   currentTime: propCurrentTime = 0, // 외부에서 전달된 현재 시간
-  uiSettings
+  uiSettings,
+  재생기본값
 }) => {
   const [availableRates, setAvailableRates] = useState<number[]>([]);
   const [currentRate, setCurrentRate] = useState(1);
@@ -576,37 +581,49 @@ const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           )}
 
           {/* 전체화면 버튼 */}
-          <Button
-            onClick={toggleFullscreen}
-            className="absolute bottom-4 right-4 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40"
-            size="sm"
-            variant="ghost"
-            title={isFullscreen ? "전체화면 종료" : "전체화면"}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="w-5 h-5" />
-            ) : (
-              <Maximize2 className="w-5 h-5" />
-            )}
-          </Button>
+          {(재생기본값?.fullscreenButtonVisible ?? true) && (
+            <Button
+              onClick={toggleFullscreen}
+              className="absolute p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40"
+              style={{
+                bottom: `${재생기본값?.fullscreenButtonPosition?.bottom ?? 16}px`,
+                right: `${재생기본값?.fullscreenButtonPosition?.right ?? 16}px`
+              }}
+              size="sm"
+              variant="ghost"
+              title={isFullscreen ? "전체화면 종료" : "전체화면"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="w-5 h-5" />
+              ) : (
+                <Maximize2 className="w-5 h-5" />
+              )}
+            </Button>
+          )}
 
           {/* 댓글창 열기 버튼 (전체화면일 때만 표시) */}
-          <Button
-            onClick={() => {
-              // CommentSidePanel의 setIsOpen을 직접 호출할 수 없으므로
-              // 임시로 이벤트 발생시켜 열기
-              const event = new CustomEvent('openCommentPanel');
-              window.dispatchEvent(event);
-            }}
-            className={`absolute bottom-4 right-20 p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40 ${
-              isFullscreen ? 'block' : 'hidden'
-            }`}
-            size="sm"
-            variant="ghost"
-            title="댓글 열기"
-          >
-            <MessageCircle className="w-5 h-5" />
-          </Button>
+          {(재생기본값?.commentButtonVisible ?? true) && (
+            <Button
+              onClick={() => {
+                // CommentSidePanel의 setIsOpen을 직접 호출할 수 없으므로
+                // 임시로 이벤트 발생시켜 열기
+                const event = new CustomEvent('openCommentPanel');
+                window.dispatchEvent(event);
+              }}
+              className={`absolute p-2 bg-black bg-opacity-50 hover:bg-opacity-70 rounded-full text-white transition-all z-40 ${
+                isFullscreen ? 'block' : 'hidden'
+              }`}
+              style={{
+                bottom: `${재생기본값?.commentButtonPosition?.bottom ?? 16}px`,
+                right: `${재생기본값?.commentButtonPosition?.right ?? 80}px`
+              }}
+              size="sm"
+              variant="ghost"
+              title="댓글 열기"
+            >
+              <MessageCircle className="w-5 h-5" />
+            </Button>
+          )}
 
           <div id="player" className="w-full h-full">
             <div className="flex items-center justify-center h-full bg-gray-800 text-white rounded">
