@@ -42,16 +42,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const mockVideos = [];
         const startIndex = pageToken ? parseInt(pageToken) * maxResults : 0;
         for (let i = 0; i < maxResults; i++) {
-          const daysAgo = Math.floor(Math.random() * 30);
-          const publishDate = new Date();
-          publishDate.setDate(publishDate.getDate() - daysAgo);
+          const daysAgo = Math.floor(Math.random() * 365); // 0-365일 전
+          const publishedDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
 
           mockVideos.push({
             videoId: `video_${startIndex + i}_${Date.now()}`,
             title: `${query} 검색 결과 ${startIndex + i + 1}`,
             thumbnail: `https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg`,
             channelTitle: `채널 ${(startIndex + i) % 5 + 1}`,
-            publishedAt: publishDate.toISOString()
+            publishedAt: publishedDate
           });
         }
         return res.json({
@@ -92,12 +91,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const data = await response.json() as any;
-      console.log("API 응답 데이터:", data);
 
       if (!data.items || data.items.length === 0) {
         return res.status(404).json({ message: "검색 결과가 없습니다." });
       }
 
+<<<<<<< HEAD
       const videos = data.items.map((item: any) => ({
         videoId: item.id.videoId,
         title: item.snippet.title,
@@ -105,8 +104,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         channelTitle: item.snippet.channelTitle,
         publishedAt: item.snippet.publishedAt
       }));
+=======
+      // HTML 엔티티 디코딩 함수 (개선된 버전)
+      const decodeHtmlEntities = (text: string): string => {
+        return text
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/&#x27;/g, "'")
+          .replace(/&apos;/g, "'")
+          .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+      };
+>>>>>>> 49a3255550b579b6eaaa3cf794d9fd8e63f7e5d1
 
-      return res.json({ 
+      const videos = data.items.map((item: any) => {
+        const decodedTitle = decodeHtmlEntities(item.snippet.title);
+        const decodedChannel = decodeHtmlEntities(item.snippet.channelTitle);
+
+        return {
+          videoId: item.id.videoId,
+          title: decodedTitle,
+          thumbnail: item.snippet.thumbnails.medium.url,
+          channelTitle: decodedChannel,
+          publishedAt: item.snippet.publishedAt
+        };
+      });
+
+      return res.json({
         videos,
         nextPageToken: data.nextPageToken || null
       });
@@ -135,7 +161,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({
           title: `목업 영상 제목 - ${videoId}`,
           channelTitle: "목업 채널",
-          thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"
+          thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg",
+          description: "0:00 인트로\n1:30 메인 내용\n5:00 마무리" // 목업 챕터
         });
       }
 
@@ -161,7 +188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({
         title: videoInfo.snippet.title,
         channelTitle: videoInfo.snippet.channelTitle,
-        thumbnail: videoInfo.snippet.thumbnails.medium?.url || videoInfo.snippet.thumbnails.default?.url
+        thumbnail: videoInfo.snippet.thumbnails.medium?.url || videoInfo.snippet.thumbnails.default?.url,
+        description: videoInfo.snippet.description || ''
       });
 
     } catch (error) {
@@ -310,15 +338,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteTimestamp(id);
-      
+
       if (!success) {
         return res.status(404).json({ message: "타임스탬프를 찾을 수 없습니다." });
       }
-      
+
       res.json({ message: "타임스탬프가 삭제되었습니다." });
     } catch (error) {
       console.error("타임스탬프 삭제 에러:", error);
       return res.status(400).json({ message: "잘못된 요청입니다." });
+    }
+  });
+
+  // YouTube 댓글 API
+  app.get("/api/youtube/comments/:videoId", async (req, res) => {
+    try {
+      const videoId = req.params.videoId;
+      const order = req.query.order as string || 'relevance';
+
+      console.log("댓글 요청:", videoId, "정렬:", order);
+
+      if (!apiKey) {
+        console.error("YouTube API 키가 설정되지 않음");
+        return res.status(500).json({ message: "YouTube API 키가 설정되지 않았습니다." });
+      }
+
+      // YouTube API에서 사용하는 정렬 옵션으로 변환
+      let apiOrder = 'relevance';
+      switch (order) {
+        case 'newest':
+          apiOrder = 'time';
+          break;
+        case 'popular':
+          apiOrder = 'relevance';
+          break;
+        case 'timestamp':
+        case 'relevance':
+        default:
+          apiOrder = 'relevance';
+          break;
+      }
+
+      // YouTube Data API v3 댓글 조회
+      const url = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&order=${apiOrder}&maxResults=50&key=${apiKey}`;
+
+      console.log("API 호출 URL:", url.replace(apiKey, '***'));
+
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("YouTube API 댓글 에러:", response.status, response.statusText);
+        console.error("에러 응답:", errorText);
+
+        // 더 구체적인 에러 메시지 반환
+        let errorMessage = "댓글을 가져올 수 없습니다.";
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message;
+          }
+        } catch (e) {
+          // JSON 파싱 실패시 원본 텍스트 사용
+          errorMessage = errorText;
+        }
+
+        return res.status(response.status).json({ message: errorMessage });
+      }
+
+      const data = await response.json();
+      res.json(data);
+
+    } catch (error) {
+      console.error("댓글 조회 에러:", error);
+      return res.status(500).json({ message: "서버 에러가 발생했습니다." });
     }
   });
 

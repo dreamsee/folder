@@ -1,6 +1,199 @@
 YouTube 노트 앱 변경사항 기록
 ==========================================
 
+2025-10-04: 챕터바 개수 설정 기능 추가
+- SettingsPanel.tsx: UISettings 인터페이스에 챕터바개수 필드 추가 (line 25)
+- SettingsPanel.tsx: 기본설정 및 전체모드에 챕터바개수: 3 기본값 설정 (lines 207, 293)
+- SettingsPanel.tsx: 챕터바 설정 UI 수정 (lines 623-651)
+  * 부제목 변경: "영상의 챕터별 구간을 표시" → "챕터구간 표시"
+  * 숫자 입력칸 추가: w-10 크기, 토글 왼쪽 배치
+  * 빈칸 허용: 입력 중 빈칸 가능, 포커스 아웃시 1로 자동 설정
+  * 좌우 배치: 제목/부제목(왼쪽) + 숫자입력+토글(오른쪽)
+- ChapterBar.tsx: chaptersPerPageSetting prop 추가 (lines 5-11, 18)
+- ChapterBar.tsx: 설정값 우선 사용 로직 구현 (lines 21-22)
+- ChapterBar.tsx: 설정값 변경시 자동 업데이트 useEffect (lines 33-38)
+- YouTubePlayer.tsx: 바설정 인터페이스에 챕터바개수 필드 추가 (line 31)
+- YouTubePlayer.tsx: ChapterBar에 챕터바개수 전달 (line 805)
+- 기능: 설정 패널에서 챕터바 표시 개수 실시간 조절 가능
+주요 성과: 사용자가 원하는 챕터 개수를 직접 설정할 수 있어 유연성 향상
+
+2025-10-04: 챕터바 동적 폭 할당 및 스마트 텍스트 절단 시스템 구현
+- ChapterBar.tsx: 전체 챕터 모드와 페이지 모드의 폭 할당 방식 분리
+  * 전체 챕터 모드: 시간 비율 기반 폭 할당 (기존 방식 유지)
+  * 페이지 모드: 텍스트 길이 기반 동적 폭 할당 (새로운 방식)
+- ChapterBar.tsx: 텍스트 폭 측정 함수 measureTextWidth 구현 (캐싱 포함)
+  * DOM 기반 정확한 텍스트 폭 측정 (span 요소 임시 생성)
+  * Map 기반 캐싱으로 성능 최적화
+  * 12px 폰트, sans-serif, 4px padding 적용
+- ChapterBar.tsx: 스마트 텍스트 절단 함수 smartTruncate 구현
+  * 이진 탐색으로 최대 길이 찾기 (O(log n) 시간 복잡도)
+  * 단어 경계에서 절단 (공백, 괄호, 특수문자 기준)
+  * 10글자 범위 내에서 최적 절단점 탐색
+- ChapterBar.tsx: 동일 줄 충돌 감지 로직 (getMaxWidth 함수)
+  * 같은 줄(even/odd)의 다음 챕터와만 충돌 검사
+  * 반대 줄 챕터는 수직 위치가 달라 충돌 무시
+  * 컨테이너 폭 기준 픽셀 계산으로 정확한 충돌 판단
+- ChapterBar.tsx: 표시 형식 변경 - "[28]챕터 표시 3"
+  * [28]챕터: 클릭 가능한 버튼 (전체 챕터 보기)
+  * 표시: 일반 텍스트
+  * 3: 숫자 입력 필드 (챕터 개수 조정)
+- ChapterBar.tsx: 기본 표시 개수 변경 - 전체 → 3개
+  * useState(3) 초기값 설정
+  * 사용자가 필요시 전체 보기로 전환 가능
+- ChapterBar.tsx: 네비게이션 버튼 폭 확대 (px-2 → px-4)
+  * 모바일 터치 접근성 개선
+- ChapterBar.tsx: overflow-visible로 말줄임표 가시성 보장
+  * 절단된 텍스트의 "..." 완전 표시
+핵심 설계 원칙:
+  * 시간 비율은 전체 보기에서만 의미 있음 (영상 흐름 파악)
+  * 페이지 모드에서는 텍스트 가독성이 우선 (짧은 제목 → 좁은 바, 긴 제목 → 넓은 바)
+  * 공간 효율: 짧은 제목이 절약한 공간을 긴 제목에 재분배
+  * 충돌 방지: 위/아래 줄은 별도 공간이므로 서로 영향 없음
+주요 성과: 챕터바 공간 활용도 극대화 및 텍스트 절단 품질 향상
+
+2025-10-04: 댓글 사이드 패널 프로필 이미지 제거
+- CommentSidePanel.tsx: 프로필 이미지 div 제거 (lines 413-414)
+- CommentSidePanel.tsx: 불필요한 flex 레이아웃 간소화 (gap-3 제거)
+- 기능: 댓글 UI 간소화, 전체 너비 활용으로 가독성 향상
+주요 성과: 작고 보이지 않는 프로필 이미지 제거로 댓글 공간 효율 개선
+
+2025-10-04: 코드 정리 - 디버그 로그 및 중복 파일 제거
+- VideoLoader.tsx: 디버그 콘솔 로그 제거 (127-128줄)
+- server/routes.ts: 서버 측 디버그 로그 제거 (115-116줄)
+- hooks2 폴더 전체 삭제 (중복된 hooks 파일들)
+  * use-mobile.tsx, use-toast.ts, useMagnifier.ts, useVirtualKeyboard.ts
+- 기능: 불필요한 디버그 코드 제거, 중복 파일 정리
+주요 성과: 351줄 삭제, 코드베이스 정리 및 유지보수성 향상
+
+2025-10-04: 검색 결과 HTML 엔티티 디코딩 수정
+- VideoLoader.tsx: 클라이언트 측 HTML 엔티티 디코딩 함수 추가 (lines 106-116)
+- VideoLoader.tsx: 서버 응답 후 title과 channelTitle 디코딩 처리 (lines 119-125)
+- VideoLoader.tsx: 디코딩 후 콘솔 로그 추가 (line 128)
+- 기능: 검색 결과에서 &#39; → ', &quot; → " 등 특수문자 정상 표시
+주요 성과: 서버 디코딩 실패 문제를 클라이언트 측 디코딩으로 해결
+
+2025-10-04: 검색 시스템 개선 및 화면 잠금 확대 UX 개선
+- VideoLoader.tsx: 안 본 영상 날짜순 정렬 기능 추가 (none/desc/asc 순환)
+- VideoLoader.tsx: 중복 영상 제거 로직 추가 (videoId 기준)
+- VideoLoader.tsx: 디버그 로그 추가 (중복 제거, 정렬 상태 확인)
+- server/routes.ts: HTML 엔티티 디코딩 함수 추가 (&#39; → ', &quot; → " 등)
+- server/routes.ts: 영상 제목 및 채널명 디코딩 적용
+- shared/schema.ts: youtubeVideoSchema에서 viewCount 필드 제거
+- ScreenLock.tsx: 확대 시 그림자 효과 제거 (::after 가상 요소 제거)
+- ScreenLock.tsx: 모바일 확대 설정 버튼 표시 (배율 슬라이더 접근 가능)
+- ScreenLock.tsx: 확대 설정 버튼을 화면 잠금 활성화 시에만 표시
+- YouTubePlayer.tsx: 모바일 터치 홀드 오버레이 어두운 효과 제거 (radial-gradient 제거)
+- 기능: 안 본 영상 정렬 - 기본(관련성순) → 최신순 ↓ → 오래된순 ↑ → 기본 순환
+- 기능: 검색 결과에서 HTML 특수문자 정상 표시
+- 기능: 더 많은 영상 불러오기 시 중복 방지
+- 기능: 화면 잠금 확대 시 깔끔한 확대 (그림자/어두운 효과 없음)
+- 기능: 모바일에서도 확대 배율 조정 가능
+주요 성과: 검색 UX 개선 및 화면 확대 기능 최적화
+
+2025-10-04: 전체화면 모드 댓글 패널 접근성 개선
+- CommentSidePanel.tsx: isFullscreen prop 추가 및 조건부 positioning 구현 (fixed/absolute)
+- CommentSidePanel.tsx: 전체화면 시 트리거 영역 제거 (터치 블로킹 문제 해결)
+- CommentSidePanel.tsx: CustomEvent 리스너 추가 (openCommentPanel 이벤트 감지)
+- CommentSidePanel.tsx: 배경 오버레이 및 패널 조건부 positioning (lines 272, 280)
+- YouTubePlayer.tsx: MessageCircle 버튼 추가 (전체화면 전용, 우측 하단 right-20 위치)
+- YouTubePlayer.tsx: CommentSidePanel 컴포넌트 이동 (playerContainerRef 내부로 이동)
+- YouTubePlayer.tsx: isFullscreen prop 전달 (CommentSidePanel에 전달)
+- HomePage.tsx: 중복 CommentSidePanel 제거 (YouTubePlayer로 통합)
+- 기능: 전체화면에서 MessageCircle 버튼 클릭으로 댓글 패널 열기
+- 기능: 일반 모드에서는 좌측 스와이프로 댓글 패널 열기 유지
+- 기능: 전체화면 시 화면 터치 및 비디오 컨트롤 정상 작동
+주요 성과: 전체화면 모드에서 댓글 패널 접근성 문제 완전 해결
+
+2025-10-04: 드로잉 시스템 색상 편집 및 타임스탬프 관리 기능 개선
+- TestDrawingPage.tsx: HSL 슬라이더 색상 편집 시스템 구현 (색조/채도/명도 0-360, 0-100, 0-100)
+- TestDrawingPage.tsx: Hex 색상 코드 직접 입력 기능 추가 (#000000 형식, 자동 검증)
+- TestDrawingPage.tsx: 색상 편집 UI 개선 (제목 옆 텍스트 입력창 8:2 비율 배치)
+- TestDrawingPage.tsx: 실시간 색상 미리보기 추가 (HSL 값 변경시 즉시 반영)
+- TestDrawingPage.tsx: 올가미(Lasso) 채우기 도구 추가 (자유곡선 그리고 자동 닫힘)
+- TestDrawingPage.tsx: 올가미 투명도 조절 (그리는 중 반투명, 완료 후 불투명)
+- TestDrawingPage.tsx: 되돌리기 버튼 추가 (마지막 스트로크 제거, 개수 표시)
+- TestDrawingPage.tsx: 12색 팔레트 편집 기능 (편집 모드에서 각 색상 개별 수정)
+- TestDrawingPage.tsx: 목록에서 시간 수정 기능 추가 (시작/종료 시간 직접 입력)
+- TestDrawingPage.tsx: 시간 입력시 영상 자동 이동 (player.seekTo 연동)
+- TestDrawingPage.tsx: 지속시간을 종료시간으로 변경 (사용자 친화적 표시)
+- TestDrawingPage.tsx: RGB↔HSL 변환 로직 구현 (색상 선택시 자동 변환)
+- TestDrawingPage.tsx: 모바일 디버그 로그 시스템 추가 (화면 상단 노란 배경)
+- 데이터 구조: Stroke 인터페이스에 filled 속성 추가 (올가미 채우기용)
+→ 주요 성과: 직관적인 색상 편집 시스템과 타임스탬프 관리 기능 완성
+
+2025-10-03: 드로잉 오버레이 시스템 구현 완료
+- TestDrawingPage.tsx: Canvas 기반 그리기 시스템 신규 생성 (5가지 도구)
+- TestDrawingPage.tsx: 그리기 도구 - 펜, 화살표, 사각형, 원, 지우개
+- TestDrawingPage.tsx: 색상 선택 (10가지 색상) 및 굵기 조절 (1-20px)
+- TestDrawingPage.tsx: 타임스탬프 기반 표시/숨김 시스템 (시작시간 + 지속시간)
+- TestDrawingPage.tsx: 여러 스트로크를 하나의 DrawingData로 통합 저장 (용량 효율화)
+- TestDrawingPage.tsx: localStorage 기반 videoId별 그리기 데이터 저장/로드
+- TestDrawingPage.tsx: 그리기 모드 토글 버튼 (영상 터치 vs 그리기 활성화)
+- TestDrawingPage.tsx: 터치 좌표 스케일 보정 (Canvas 실제 크기와 표시 크기 비율)
+- TestDrawingPage.tsx: 시간바 컨트롤러 추가 (영상 탐색 기능)
+- TestDrawingPage.tsx: 임시 스트로크 누적 시스템 (저장 전까지 화면에 유지)
+- App.tsx: /test-drawing 라우트 추가
+- CLAUDE.md: 드로잉 파일 별칭 추가 및 모바일 디버깅 가이드 작성
+- 데이터 구조: Stroke 인터페이스 (type, points, color, thickness)
+- 데이터 구조: DrawingData 인터페이스 (id, strokes[], startTime, duration)
+주요 성과: YouTube 영상 위에 타임스탬프 기반 그림 오버레이 시스템 구현 완료
+
+2025-10-03: 댓글 사이드 패널 HTML 파싱 및 UX 개선
+- CommentSidePanel.tsx: textOriginal 필드 사용으로 HTML 태그 표시 문제 해결
+- CommentSidePanel.tsx: 스와이프 트리거 영역 확대 (24px -> 50px)
+- CommentSidePanel.tsx: YouTube API textDisplay 대신 textOriginal 우선 사용
+- server/routes.ts: 댓글 API 엔드포인트 정상 작동 확인 (commentThreads)
+- 기능: HTML 엔티티 및 태그 (<br>, &quot; 등)가 깨끗한 텍스트로 표시됨
+- 기능: 4가지 정렬 옵션 정상 작동 (관련성순, 최신순, 인기순, 타임스탬프 우선)
+주요 성과: 댓글 표시 품질 개선 및 사용자 경험 향상
+
+2025-10-03: 댓글 사이드 패널 시스템 구현 완료
+- CommentSidePanel.tsx: 왼쪽에서 슬라이드인되는 댓글 패널 신규 생성 (320px 너비)
+- CommentSidePanel.tsx: 스와이프 제스처로 패널 열기/닫기 기능 (모바일 50px 임계값)
+- CommentSidePanel.tsx: 마우스 호버로 패널 자동 열기 (데스크톱 300ms 지연)
+- CommentSidePanel.tsx: 타임스탬프 자동 추출 및 파싱 (HH:MM:SS, MM:SS 형식 지원)
+- CommentSidePanel.tsx: 타임스탬프 클릭시 영상 시간 이동 기능
+- CommentSidePanel.tsx: 4가지 정렬 옵션 (최신순, 인기순, 타임스탬프 우선, 관련성순)
+- CommentSidePanel.tsx: 타임스탬프 댓글 우선 표시 (파란색 배경 강조)
+- HomePage.tsx: CommentSidePanel 컴포넌트 통합 및 조건부 렌더링
+- NoteArea.tsx: RecordingSessionList props 오류 수정 (onConvertToNote → onApplyToNote)
+- 기능: 완전한 YouTube 스타일 댓글 시스템 + 타임스탬프 네비게이션 통합
+→ 주요 성과: 몰입형 영상 시청 환경과 댓글 기반 탐색 시스템 구축 완료
+
+2025-10-01: 타임스탬프 가져오기 버튼 세로 배치 및 레이아웃 개선
+- NoteArea.tsx: 타임스탬프 가져오기 버튼을 노트 영역 상단에서 우측 세로 배치로 변경
+- NoteArea.tsx: 아이콘 제거 후 Clock 아이콘으로 교체하여 도장 기능과 통일성 확보
+- NoteArea.tsx: 버튼 텍스트를 "전체 도장 가져오기"로 간소화
+- NoteArea.tsx: 세로 쓰기 모드 적용 (writingMode: vertical-rl)
+- NoteArea.tsx: 버튼 크기 최적화 (140px 높이, 30px 너비)
+- NoteArea.tsx: 은은한 회색 스타일 적용 (bg-gray-50, hover:bg-gray-100)
+- NoteArea.tsx: 노트 영역과 flex 레이아웃으로 배치하여 영역 위아래 움직임 방지
+- NoteArea.tsx: 시계 아이콘을 텍스트 뒤에 배치하여 세로 읽기 순서 최적화
+→ 주요 성과: 노트 영역 레이아웃 안정화 및 공간 효율적인 세로 버튼 시스템 구현
+
+2025-10-01: 설정 패널 UI 개선 및 문서 시스템 완성
+- SettingsPanel.tsx: 상단부/바 설정/레이아웃 제목 제거하여 UI 간소화
+- SettingsPanel.tsx: 왼쪽 탭 레이아웃을 왼쪽 탭으로 이름 변경
+- SettingsPanel.tsx: 왼쪽 탭 설정에서 네모 영역 제거하여 다른 설정과 일관성 유지
+- SettingsPanel.tsx: 노트영역/화면텍스트/돋보기를 노트/화면글자/돋보기로 이름 변경
+- SettingsPanel.tsx: 노트/화면글자/돋보기 탭을 네모 박스로 묶어 그룹화 (p-1 최소 여백)
+- SettingsPanel.tsx: 탭 제목들과 하위 메뉴 전체를 하나의 네모 영역으로 통합
+- 수정주의.txt: 신규 파일 생성 - 코딩 가이드라인과 수정시 주의사항 통합 관리
+- CLAUDE.md: 수정주의.txt 파일 별칭 시스템 추가 및 5개 파일 자동 업데이트 지침 완성
+→ 주요 성과: 설정 패널 UI 개선 및 완전한 문서 관리 시스템 구축
+
+2025-10-01: 왼쪽탭 레이아웃 시스템 구현 완료
+- LeftSidebarTabs.tsx: 왼쪽 세로 탭 컴포넌트 신규 생성 (노트/화면글자/돋보기 탭)
+- ZoomContent.tsx: 돋보기 탭 전용 컨텐츠 컴포넌트 신규 생성 (좌표입력/목록관리 하위 탭)
+- NoteArea.tsx: 왼쪽탭 레이아웃 조건부 렌더링 시스템 구현 (uiSettings?.왼쪽탭레이아웃?.사용 기반)
+- SettingsPanel.tsx: 왼쪽탭 레이아웃 토글 설정 추가 (재생컨트롤과 기능 탭 사이 위치)
+- HomePage.tsx: 왼쪽탭 레이아웃 기본값 설정 추가 (사용: false)
+- NoteTabs.tsx: 최소화 상태에서 스크롤바 숨김 처리 (overflow-x: hidden, scrollbar-width: none)
+- 디자인 시스템: 각 탭별 고유 색상 적용 (노트: #8b5cf6, 화면글자: #10b981, 돋보기: #f59e0b, opacity: 0.7)
+- 레이아웃 최적화: 탭 크기 27px×48px, 우측 컨텐츠 간격 4px, 폰트 9px, 라운드 처리
+→ 주의: 왼쪽탭 레이아웃 수정시 NoteArea.tsx, LeftSidebarTabs.tsx, SettingsPanel.tsx 연동 확인 필요
+→ 주요 성과: 세로 스크롤 문제 해결 및 컴팩트한 탭 기반 UI 전환 완료
+
 2025-09-19: TestOverlayPage 고급 위치 제어 및 전체화면 시스템 완성
 - TestOverlayPage.tsx: 좌표 직접 입력 기능 추가 (X, Y 숫자 입력으로 정밀 위치 조정)
 - TestOverlayPage.tsx: 텍스트 정렬 기능 추가 (좌측/중앙/우측 정렬 선택 버튼)

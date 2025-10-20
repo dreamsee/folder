@@ -49,10 +49,49 @@ localStorage나 상태 구조 변경사항
 - 새로 추가된 기능 목록
 
 작업내역 저장 경로:
-/data/data/com.termux/files/home/folder/유튜브노트/작업내역/
+/data/data/com.termux/files/home/folder/유튜브노트_브랜치/작업내역/
+
+작업 업데이트 지침:
+
+사용자가 "작업한거 업데이트해줘" 또는 유사한 명령을 내릴 때, 다음과 같이 분류하여 각 파일에 업데이트하세요:
+
+1. 디자인 관련 변경사항 → 디자인.txt 파일에 업데이트
+   - 색상 코드 변경 (배경색, 텍스트색, 테두리색 등)
+   - 마진/패딩 값 변경 (spacing, layout 간격)
+   - 폰트 크기/두께 변경
+   - border-radius, box-shadow 등 스타일 속성
+   - 애니메이션 및 transition 효과
+   - 레이아웃 배치 및 정렬 방식
+
+2. 기능 위치 관련 변경사항 → 주요파일위치.txt 파일에 업데이트
+   - 새로운 컴포넌트 생성 시 파일 위치 추가
+   - 기존 기능의 코드 위치 변경 (리팩토링, 이동)
+   - 함수명 변경 시 새로운 위치 정보
+   - import/export 관계 변경
+
+3. 시스템 동작 방식 변경사항 → 작동로직.txt 파일에 업데이트
+   - 기능의 작동 원리나 알고리즘 변경
+   - 데이터 흐름이나 상태 관리 방식 변경
+   - 이벤트 처리 로직 변경
+   - API 호출 방식이나 데이터 처리 로직 변경
+
+4. 모든 변경사항의 이력 → 변경사항.txt 파일에 업데이트
+   - 날짜별 변경 이력 기록
+   - 수정 시 주의사항 및 영향 범위
+   - 연관 파일들과의 의존 관계
+   - 향후 수정 시 참고해야 할 사항
+
+5. 새로운 주의사항이나 Best Practice → 수정주의.txt 파일에 업데이트
+   - 새로운 버그 패턴이나 실수 방지 사항 발견
+   - 코딩 가이드라인 개선 사항
+   - 수정 시 주의해야 할 새로운 연관관계 발견
+   - 문서 관리 방식 개선 사항
+   - 작업 중 발견한 중요한 주의점
+
+업데이트 시 각 파일의 기존 형식과 구조를 유지하며, 중복 내용은 피하고 해당 파일의 목적에 맞는 내용만 기록하세요.
 
 프로젝트 구조 및 시스템 이해:
-기능을 찾거나 파일 위치가 궁금할 때는 먼저 '/data/data/com.termux/files/home/folder/유튜브노트/주요파일위치.txt' 파일을 참조하세요.
+기능을 찾거나 파일 위치가 궁금할 때는 먼저 '/data/data/com.termux/files/home/folder/유튜브노트_브랜치/주요파일위치.txt' 파일을 참조하세요.
 새로운 기능이나 컴포넌트가 추가되면 반드시 해당 파일을 업데이트해주세요.
 
 문서 파일 업데이트 가이드:
@@ -105,8 +144,8 @@ localStorage나 상태 구조 변경사항
 - 함수 분리나 통합 시: 위치 매핑 재정리
 
 중요: 타임스탬프 관련 작업을 시작하기 전에 반드시 다음 파일들을 읽고 이해한 후 작업하세요:
-1. '/data/data/com.termux/files/home/folder/유튜브노트/주요파일위치.txt' - 파일 위치 및 시스템 구조
-2. '/data/data/com.termux/files/home/folder/유튜브노트/작동로직.txt' - 타임스탬프 시스템 완전 작동 원리
+1. '/data/data/com.termux/files/home/folder/유튜브노트_브랜치/주요파일위치.txt' - 파일 위치 및 시스템 구조
+2. '/data/data/com.termux/files/home/folder/유튜브노트_브랜치/작동로직.txt' - 타임스탬프 시스템 완전 작동 원리
 
 작동로직.txt 파일에는 다음이 포함되어 있습니다:
 - 6단계 파이프라인 (파싱 → 감지 → 진입 → 이탈 → 자동점프 → 사용자설정관리)
@@ -127,18 +166,29 @@ localStorage나 상태 구조 변경사항
 - 테탐: TestTimestampPage.tsx (http://localhost:5174/test-timestamp)
 - 텍오버: TestOverlayPage.tsx (http://localhost:5174/test-overlay)
 - 텍줌: TestZoomPage.tsx (http://localhost:5174/test-zoom)
+- 드로잉: TestDrawingPage.tsx (http://localhost:5174/test-drawing) - 캔버스 드로잉 오버레이 시스템
 
 파일 명칭 별칭:
 - 주요파일위치.txt는 다음과 같이 불릴 수 있습니다:
   * 위치파일, 위치추적파일, 파일위치, 파일추적위치
   * 구조파일, 구조추적파일, 파일구조, 파일매핑
   * 위치매핑, 위치정보, 파일정보 등
-- 이 모든 명칭은 '/data/data/com.termux/files/home/folder/유튜브노트/주요파일위치.txt' 파일을 가리킵니다.
+- 이 모든 명칭은 '/data/data/com.termux/files/home/folder/유튜브노트_브랜치/주요파일위치.txt' 파일을 가리킵니다.
 - 작동로직.txt는 다음과 같이 불릴 수 있습니다:
   * 로직파일, 작동파일, 시스템로직, 타임스탬프로직
   * 작동원리, 동작로직, 시스템동작, 로직문서
   * 로직추적, 로직추적파일 등
-- 이 모든 명칭은 '/data/data/com.termux/files/home/folder/유튜브노트/작동로직.txt' 파일을 가리킵니다.
+- 이 모든 명칭은 '/data/data/com.termux/files/home/folder/유튜브노트_브랜치/작동로직.txt' 파일을 가리킵니다.
+- 디자인.txt는 다음과 같이 불릴 수 있습니다:
+  * 디자인파일, 스타일파일, 디자인문서, 스타일문서
+  * 색상파일, 마진파일, 레이아웃파일, UI파일
+  * 디자인시스템, 스타일시스템, 디자인가이드 등
+- 이 모든 명칭은 '/data/data/com.termux/files/home/folder/유튜브노트_브랜치/디자인.txt' 파일을 가리킵니다.
+- 수정주의.txt는 다음과 같이 불릴 수 있습니다:
+  * 주의파일, 주의사항, 주의사항파일, 수정주의사항
+  * Best Practice파일, 베스트프랙티스, 코딩가이드
+  * 주의점, 수정가이드, 코딩주의사항 등
+- 이 모든 명칭은 '/data/data/com.termux/files/home/folder/유튜브노트_브랜치/수정주의.txt' 파일을 가리킵니다.
 
 테스트 파일 관리 방침:
 
@@ -329,3 +379,38 @@ git push
 - 로컬에는 유튜브노트만 있지만 GitHub에는 여러 프로젝트가 있음
 - 다른 폴더들은 컴퓨터에서 관리함
 - 여기서는 유튜브노트만 작업하고 그것만 업데이트
+
+모바일 디버깅 가이드:
+
+모바일 환경에서는 브라우저 콘솔(F12)을 사용할 수 없으므로, 화면 안에 디버그 정보를 표시하는 방법을 사용합니다.
+
+방법:
+1. 디버그 로그 state 생성:
+   const [debugLog, setDebugLog] = useState<string[]>([]);
+
+2. 확인하고 싶은 정보를 배열에 추가:
+   const logs: string[] = [];
+   logs.push(`확인할 값: ${someValue}`);
+   logs.push(`객체 내용: ${JSON.stringify(someObject)}`);
+   setDebugLog(logs);
+
+3. 화면에 표시할 UI 추가:
+   {debugLog.length > 0 && (
+     <div className="bg-yellow-100 border border-yellow-400 rounded p-2 text-xs">
+       <div className="font-bold mb-1">디버그 정보:</div>
+       {debugLog.map((log, i) => (
+         <div key={i}>{log}</div>
+       ))}
+     </div>
+   )}
+
+활용 예시:
+- API 응답 내용 확인
+- 객체의 메서드 목록 확인 (Object.getOwnPropertyNames)
+- 옵션 값 확인 (getOption 결과)
+- 에러 메시지 표시
+
+주의사항:
+- 디버깅 완료 후 관련 코드는 제거할 것
+- 노란색 배경으로 눈에 띄게 표시
+- text-xs로 작은 글씨 사용하여 공간 절약

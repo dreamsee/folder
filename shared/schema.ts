@@ -129,6 +129,7 @@ export const youtubeVideoSchema = z.object({
   title: z.string(),
   thumbnail: z.string(),
   channelTitle: z.string(),
+  publishedAt: z.string().optional(), // 업로드 날짜
 });
 
 export const youtubeSearchResponseSchema = z.object({
