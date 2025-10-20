@@ -36,6 +36,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   const magnifierRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [clickPosition, setClickPosition] = useState({ x: 0, y: 0 });
+  const [lastReleasePosition, setLastReleasePosition] = useState({ x: 50, y: 50 }); // 마우스를 뗀 마지막 위치
   const [isClicked, setIsClicked] = useState(false);
 
   useEffect(() => {
@@ -55,29 +56,54 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
       return;
     }
 
-    const handleClick = (e: MouseEvent) => {
-      // 영상 영역 클릭인지 확인 (YouTube player 영역)
+    // 마우스 다운: 확대 시작
+    const handleMouseDown = (e: MouseEvent) => {
       const playerElement = document.querySelector('.youtube-player-container');
       if (playerElement && playerElement.contains(e.target as Node)) {
-        if (magnifierSettings.enabled && isLocked && !isMobile) {
-          setClickPosition({ x: e.clientX, y: e.clientY });
+        if (magnifierSettings.enabled && isLocked) {
+          const rect = playerElement.getBoundingClientRect();
+          const relativeX = ((e.clientX - rect.left) / rect.width) * 100;
+          const relativeY = ((e.clientY - rect.top) / rect.height) * 100;
+
+          setClickPosition({ x: relativeX, y: relativeY });
           setIsClicked(true);
-          // 2초 후 자동으로 확대 해제
-          setTimeout(() => {
-            setIsClicked(false);
-          }, 2000);
         }
       }
     };
 
-    if (magnifierSettings.enabled && !isMobile) {
-      document.addEventListener('click', handleClick);
+    // 마우스 무브: 드래그 중 확대 위치 이동
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isClicked && magnifierSettings.enabled && isLocked) {
+        const playerElement = document.querySelector('.youtube-player-container');
+        if (playerElement) {
+          const rect = playerElement.getBoundingClientRect();
+          const relativeX = ((e.clientX - rect.left) / rect.width) * 100;
+          const relativeY = ((e.clientY - rect.top) / rect.height) * 100;
+
+          setClickPosition({ x: relativeX, y: relativeY });
+        }
+      }
+    };
+
+    // 마우스 업: 확대 해제 (마지막 위치 저장)
+    const handleMouseUp = () => {
+      // 마우스를 뗀 위치를 저장하여 줌아웃 시 해당 위치 기준으로 복귀
+      setLastReleasePosition({ x: clickPosition.x, y: clickPosition.y });
+      setIsClicked(false);
+    };
+
+    if (magnifierSettings.enabled) {
+      document.addEventListener('mousedown', handleMouseDown);
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
     }
 
     return () => {
-      document.removeEventListener('click', handleClick);
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isLocked, magnifierSettings.enabled, isMobile]);
+  }, [isLocked, magnifierSettings.enabled, isClicked]);
 
   const magnifierSizes = {
     1: 100, // 소
@@ -111,21 +137,14 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
               )}
             </Button>
 
-            {/* PC에서 확대 설정 표시 */}
-            {!isMobile && isLocked && (
+            {/* 확대 안내 메시지 */}
+            {isLocked && (
               <div className="flex items-center gap-2">
                 <Search className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  클릭하여 {magnifierSettings.zoom.toFixed(1)}x 확대
+                  {isMobile ? '영상을 길게 눌러서' : '클릭하여'} {magnifierSettings.zoom.toFixed(1)}x 확대
                 </span>
               </div>
-            )}
-
-            {/* 모바일 안내 메시지 */}
-            {isMobile && isLocked && (
-              <span className="text-sm text-muted-foreground">
-                영상을 길게 눌러서 확대
-              </span>
             )}
           </div>
 
@@ -166,24 +185,22 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
                   <div className="space-y-4">
                     <h3 className="font-medium text-sm">확대 설정</h3>
 
-                    {/* PC만 확대 활성화 토글 표시 */}
-                    {!isMobile && (
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm">클릭 확대 사용</label>
-                        <Button
-                          variant={magnifierSettings.enabled ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() =>
-                            onMagnifierSettingsChange({
-                              ...magnifierSettings,
-                              enabled: !magnifierSettings.enabled,
-                            })
-                          }
-                        >
-                          {magnifierSettings.enabled ? '켜짐' : '꺼짐'}
-                        </Button>
-                      </div>
-                    )}
+                    {/* 확대 활성화 토글 */}
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm">{isMobile ? '터치' : '클릭'} 확대 사용</label>
+                      <Button
+                        variant={magnifierSettings.enabled ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() =>
+                          onMagnifierSettingsChange({
+                            ...magnifierSettings,
+                            enabled: !magnifierSettings.enabled,
+                          })
+                        }
+                      >
+                        {magnifierSettings.enabled ? '켜짐' : '꺼짐'}
+                      </Button>
+                    </div>
 
                     {/* 배율 조절 */}
                     <div className="space-y-2">
@@ -216,28 +233,34 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
         </div>
       </div>
 
-      {/* PC 클릭 확대 효과 - 영상 영역만 확대 */}
-      {!isMobile && isLocked && magnifierSettings.enabled && isClicked && (
+      {/* 클릭 확대 효과 - 영상 영역 내부에서만 확대 (컨테이너 overflow hidden) */}
+      {isLocked && magnifierSettings.enabled && isClicked && (
         <style>
           {`
             .youtube-player-container {
-              transform: scale(${magnifierSettings.zoom});
-              transform-origin: ${clickPosition.x}px ${clickPosition.y - 64}px;
-              transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-              z-index: 50;
+              overflow: hidden !important;
               position: relative;
+            }
+            .youtube-player-container iframe {
+              transform: scale(${magnifierSettings.zoom});
+              transform-origin: ${clickPosition.x}% ${clickPosition.y}%;
+              transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             }
           `}
         </style>
       )}
-      
+
       {/* 확대되지 않은 상태의 기본 스타일 */}
-      {!isMobile && isLocked && magnifierSettings.enabled && !isClicked && (
+      {isLocked && magnifierSettings.enabled && !isClicked && (
         <style>
           {`
             .youtube-player-container {
+              overflow: hidden !important;
+            }
+            .youtube-player-container iframe {
               transform: scale(1);
-              transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+              transform-origin: ${lastReleasePosition.x}% ${lastReleasePosition.y}%;
+              transition: transform 0.9s cubic-bezier(0, 0.6, 0, 0.9);
             }
           `}
         </style>
@@ -245,18 +268,22 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
       
       {/* 모바일 터치 홀드 확대 효과는 YouTubePlayer에서 처리됨 */}
       
-      {/* PC 클릭 위치 표시 */}
-      {!isMobile && isClicked && magnifierSettings.enabled && (
-        <div 
-          className="fixed pointer-events-none z-[60] animate-pulse"
-          style={{
-            left: clickPosition.x - 30,
-            top: clickPosition.y - 30,
-            width: 60,
-            height: 60,
-          }}
-        >
-          <div className="w-full h-full rounded-full border-2 border-blue-500 opacity-50" />
+      {/* 클릭/터치 위치 표시 (확대 중심점 시각화) */}
+      {isClicked && magnifierSettings.enabled && (
+        <div className="fixed pointer-events-none z-[60]">
+          <div
+            className="absolute animate-ping"
+            style={{
+              left: `${clickPosition.x}%`,
+              top: `${clickPosition.y}%`,
+              width: 40,
+              height: 40,
+              marginLeft: -20,
+              marginTop: -20,
+            }}
+          >
+            <div className="w-full h-full rounded-full border-2 border-blue-500 opacity-50" />
+          </div>
         </div>
       )}
     </>
