@@ -21,6 +21,7 @@ interface ScreenLockProps {
   onFavoritesOpen?: () => void;
   onSearchOpen?: () => void;
   showSearchIcon?: boolean;
+  isControlsModalOpen?: boolean;
 }
 
 const ScreenLock: React.FC<ScreenLockProps> = ({
@@ -31,6 +32,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   onFavoritesOpen,
   onSearchOpen,
   showSearchIcon = false,
+  isControlsModalOpen = false,
 }) => {
   const [showMagnifier, setShowMagnifier] = useState(false);
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 });
@@ -41,6 +43,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   const [isClicked, setIsClicked] = useState(false); // 홀드 모드: 마우스 다운 상태
   const [isToggled, setIsToggled] = useState(false); // 토글 모드: 확대 고정 상태
   const [mouseDownPosition, setMouseDownPosition] = useState({ x: 0, y: 0 }); // 마우스 다운 위치 (드래그 감지용)
+  const [toggleStartPosition, setToggleStartPosition] = useState({ x: 50, y: 50 }); // 토글 모드: 확대 시작 위치 (축소 시 사용)
 
   useEffect(() => {
     // 모바일 감지
@@ -53,7 +56,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
   }, []);
 
   useEffect(() => {
-    if (!isLocked) {
+    if (!isLocked || isControlsModalOpen) {
       setShowMagnifier(false);
       setIsClicked(false);
       return;
@@ -61,6 +64,12 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
 
     // 마우스 다운: 확대 시작
     const handleMouseDown = (e: MouseEvent) => {
+      // 플레이어 버튼 클릭인지 확인
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-player-button]')) {
+        return; // 버튼 클릭이면 확대 로직 실행 안 함
+      }
+
       const playerElement = document.querySelector('.youtube-player-container');
       if (playerElement && playerElement.contains(e.target as Node)) {
         if (isLocked) {
@@ -70,9 +79,10 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
 
           // 마우스 다운 위치 저장 (드래그 감지용)
           setMouseDownPosition({ x: relativeX, y: relativeY });
-          setClickPosition({ x: relativeX, y: relativeY });
 
+          // 홀드 모드에서만 클릭 위치 업데이트 (토글 모드는 마우스 업에서 처리)
           if (magnifierSettings.mode === 'hold') {
+            setClickPosition({ x: relativeX, y: relativeY });
             // 홀드 모드: 마우스 다운 시 확대
             setIsClicked(true);
           }
@@ -96,6 +106,12 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
 
     // 마우스 업: 확대 해제 또는 토글
     const handleMouseUp = (e: MouseEvent) => {
+      // 플레이어 버튼 클릭인지 확인
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-player-button]')) {
+        return; // 버튼 클릭이면 확대 로직 실행 안 함
+      }
+
       const playerElement = document.querySelector('.youtube-player-container');
       if (playerElement && playerElement.contains(e.target as Node)) {
         const rect = playerElement.getBoundingClientRect();
@@ -115,6 +131,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
             // 토글 시 클릭 위치를 새로 설정 (축소→확대 시)
             if (!isToggled) {
               setClickPosition({ x: relativeX, y: relativeY });
+              setToggleStartPosition({ x: relativeX, y: relativeY }); // 확대 시작 위치 저장
             }
           }
         }
@@ -137,7 +154,7 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isLocked, magnifierSettings.enabled, magnifierSettings.mode, isClicked, isToggled, mouseDownPosition]);
+  }, [isLocked, isControlsModalOpen, magnifierSettings.enabled, magnifierSettings.mode, isClicked, isToggled, mouseDownPosition]);
 
   const magnifierSizes = {
     1: 100, // 소
@@ -342,9 +359,24 @@ const ScreenLock: React.FC<ScreenLockProps> = ({
       {isLocked && magnifierSettings.mode === 'toggle' && !isToggled && (
         <style>
           {`
+            body {
+              overflow-y: scroll;
+              height: calc(100vh + 1px);
+            }
+            body::-webkit-scrollbar {
+              display: none;
+            }
+            body {
+              -ms-overflow-style: none;
+              scrollbar-width: none;
+            }
+            .youtube-player-container {
+              position: relative;
+              z-index: 100;
+            }
             .youtube-player-container iframe {
               transform: scale(1);
-              transform-origin: ${lastReleasePosition.x}% ${lastReleasePosition.y}%;
+              transform-origin: ${toggleStartPosition.x}% ${toggleStartPosition.y}%;
               transition: transform 0.9s cubic-bezier(0.5, 0.3, 0, 0.99);
             }
           `}

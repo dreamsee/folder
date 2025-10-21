@@ -17,87 +17,59 @@ export const LeftSidebarTabs: React.FC<LeftSidebarTabsProps> = ({
   ];
 
   return (
-    <div className="left-sidebar-tabs">
-      {tabs.map((tab) => (
+    <div style={{ display: 'flex', flexDirection: 'column', width: '27px', background: 'transparent', borderRight: 'none' }}>
+      {tabs.map((tab, index) => (
         <button
           key={tab.id}
-          className={`sidebar-tab ${activeTab === tab.id ? 'active' : ''} ${activeTab === tab.id ? `active-${tab.id}` : ''}`}
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '48px',
+            border: '1px solid #e5e7eb',
+            borderBottom: index === tabs.length - 1 ? '1px solid #e5e7eb' : 'none',
+            background: activeTab === tab.id
+              ? (tab.id === 'note' ? '#8b5cf6' : tab.id === 'overlay' ? '#10b981' : '#f59e0b')
+              : '#f8f9fa',
+            color: activeTab === tab.id ? 'white' : 'inherit',
+            borderColor: activeTab === tab.id
+              ? (tab.id === 'note' ? '#8b5cf6' : tab.id === 'overlay' ? '#10b981' : '#f59e0b')
+              : '#e5e7eb',
+            opacity: activeTab === tab.id ? 0.7 : 1,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            borderRadius: '8px 0 0 8px',
+            margin: 0,
+            padding: 0
+          }}
+          onMouseOver={(e) => {
+            if (activeTab !== tab.id) {
+              e.currentTarget.style.background = '#f3f4f6';
+              e.currentTarget.style.borderColor = '#d1d5db';
+            }
+          }}
+          onMouseOut={(e) => {
+            if (activeTab !== tab.id) {
+              e.currentTarget.style.background = '#f8f9fa';
+              e.currentTarget.style.borderColor = '#e5e7eb';
+            }
+          }}
           onClick={() => onTabChange(tab.id)}
         >
-          <div className="tab-label">{tab.label}</div>
+          <div style={{
+            fontSize: '9px',
+            fontWeight: 500,
+            writingMode: 'vertical-rl',
+            textOrientation: 'mixed',
+            whiteSpace: 'nowrap',
+            margin: 0,
+            padding: 0
+          }}>
+            {tab.label}
+          </div>
         </button>
       ))}
-
-      <style jsx>{`
-        .left-sidebar-tabs {
-          display: flex;
-          flex-direction: column;
-          width: 27px;
-          background: transparent;
-          border-right: none;
-        }
-
-        .sidebar-tab {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 48px;
-          border: 1px solid #e5e7eb;
-          border-bottom: none;
-          background: #f8f9fa;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          border-radius: 8px 0 0 8px;
-          margin: 0;
-          padding: 0;
-        }
-
-        .sidebar-tab:last-child {
-          border-bottom: 1px solid #e5e7eb;
-        }
-
-        .sidebar-tab:hover {
-          background: #f3f4f6;
-          border-color: #d1d5db;
-        }
-
-        .sidebar-tab.active-note {
-          background: #8b5cf6;
-          color: white;
-          border-color: #8b5cf6;
-          opacity: 0.7;
-        }
-
-        .sidebar-tab.active-overlay {
-          background: #10b981;
-          color: white;
-          border-color: #10b981;
-          opacity: 0.7;
-        }
-
-        .sidebar-tab.active-zoom {
-          background: #f59e0b;
-          color: white;
-          border-color: #f59e0b;
-          opacity: 0.7;
-        }
-
-        .tab-icon {
-          font-size: 20px;
-          margin-bottom: 4px;
-        }
-
-        .tab-label {
-          font-size: 9px;
-          font-weight: 500;
-          writing-mode: vertical-rl;
-          text-orientation: mixed;
-          white-space: nowrap;
-          margin: 0;
-          padding: 0;
-        }
-      `}</style>
     </div>
   );
 };

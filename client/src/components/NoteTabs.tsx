@@ -232,7 +232,7 @@ export const NoteTabs: React.FC<NoteTabsProps> = ({
         </div>
       </div>
 
-      <style jsx>{`
+      <style>{`
         .note-tabs-container {
           position: relative;
           margin-bottom: -1px;

@@ -75,21 +75,25 @@ const HomePage = () => {
     mode: 'hold' as 'hold' | 'toggle', // hold: 홀드시 확대, toggle: 클릭시 확대/축소
   });
   const [uiSettings, setUiSettings] = useState<UISettings>({
-    상단부: { 제목표시: true, 부제목표시: true, 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
+    상단부: { 제목표시: true, 제목내용: "유튜브 노트", 부제목내용: "동영상을 보면서 타임스탬프와 함께 노트를 작성하세요" },
     검색창: { 유지: true, 목록유지: false },
-    바설정: { 커스텀바: true, 챕터바: true },
-    재생컨트롤: { 전체표시: true, 볼륨: true, 속도: true, 도장: true, 녹화: true },
+    바설정: { 커스텀바: true, 챕터바: true, 챕터바개수: 3 },
+    재생컨트롤: { 전체표시: true, 플레이어내장: false, 볼륨: true, 속도: true, 도장: true, 편집: true },
     왼쪽탭레이아웃: { 사용: false },
     노트영역: { 표시: true },
-    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙" },
+    화면텍스트: { 패널표시: true, 좌표설정: true, 스타일설정: true, 빠른설정: true, 빠른설정위치: "정중앙", 지속시간: true, 글자크기여백: true, 색상설정: true, 배경투명도: true },
     프리셋: { 최소모드명: "최소 모드", 노트모드명: "노트 모드" },
     재생기본값: {
       defaultVolume: 100,
       defaultPlaybackRate: 1.0,
       fullscreenButtonVisible: true,
-      fullscreenButtonPosition: { bottom: 16, right: 16 }, // px 단위
+      fullscreenButtonPosition: { bottom: 3, right: 17 }, // px 단위 - 일반 화면
+      fullscreenButtonPositionFullscreen: { bottom: 8, right: 35 }, // px 단위 - 전체 화면
       commentButtonVisible: true,
-      commentButtonPosition: { bottom: 16, right: 80 } // px 단위
+      commentButtonPosition: { bottom: 8, right: 80 }, // px 단위
+      playerControlButtonVisible: true,
+      playerControlButtonPosition: { bottom: 3, left: 18 }, // px 단위 - 일반 화면
+      playerControlButtonPositionFullscreen: { bottom: 8, left: 41 } // px 단위 - 전체 화면
     },
   });
 
@@ -102,6 +106,9 @@ const HomePage = () => {
 
   // 디버그 로그 패널 상태
   const [isDebugLogOpen, setIsDebugLogOpen] = useState(false);
+
+  // 플레이어 컨트롤 모달 상태
+  const [isControlsModalOpen, setIsControlsModalOpen] = useState(false);
 
   // ESC 키로 팝업 닫기
   useEffect(() => {
@@ -220,6 +227,10 @@ const HomePage = () => {
     if (savedSettings) {
       try {
         const settings = JSON.parse(savedSettings);
+        // 기존 설정에 제목내용이 없으면 기본값 추가
+        if (settings.상단부 && !settings.상단부.제목내용) {
+          settings.상단부.제목내용 = "유튜브 노트";
+        }
         setUiSettings(settings);
       } catch (error) {
         console.error('UI 설정 로드 실패:', error);
@@ -285,6 +296,7 @@ const HomePage = () => {
         onFavoritesOpen={() => setIsFavoritesOpen(true)}
         onSearchOpen={() => setIsSearchPopupOpen(true)}
         showSearchIcon={!uiSettings.검색창.유지}
+        isControlsModalOpen={isControlsModalOpen}
       />
       
       <div 
@@ -293,16 +305,14 @@ const HomePage = () => {
           minHeight: isKeyboardVisible ? `calc(100vh - ${keyboardHeight}px)` : '100vh',
         }}
       >
-      {(uiSettings.상단부.제목표시 || uiSettings.상단부.부제목표시) && (
+      {uiSettings.상단부.제목표시 && (
         <header className="mb-4">
-          {uiSettings.상단부.제목표시 && (
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">유튜브 노트</h1>
-          )}
-          {uiSettings.상단부.부제목표시 && (
-            <p className="text-sm text-gray-600">
-              {uiSettings.상단부.부제목내용}
-            </p>
-          )}
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            {uiSettings.상단부.제목내용}
+          </h1>
+          <p className="text-sm text-gray-600">
+            {uiSettings.상단부.부제목내용}
+          </p>
         </header>
       )}
 
@@ -362,6 +372,8 @@ const HomePage = () => {
           currentTime={currentPlayTime}
           uiSettings={uiSettings}
           재생기본값={uiSettings.재생기본값}
+          isControlsModalOpen={isControlsModalOpen}
+          onControlsModalOpenChange={setIsControlsModalOpen}
         />
       </div>
 
