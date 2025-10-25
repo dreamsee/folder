@@ -580,10 +580,6 @@ function addDataRowTop(button) {
     const currentRows = container.querySelectorAll('.data-row').length;
     const columnCount = modal.querySelectorAll('.header-column').length;
 
-    if (currentRows >= 50) {
-        return;
-    }
-
     // 새 데이터 행 생성
     const newRow = document.createElement('div');
     newRow.className = 'data-row';
@@ -621,10 +617,6 @@ function addDataRowBottom(button) {
     const container = modal.querySelector('.data-rows-container');
     const currentRows = container.querySelectorAll('.data-row').length;
     const columnCount = modal.querySelectorAll('.header-column').length;
-
-    if (currentRows >= 50) {
-        return;
-    }
 
     // 새 데이터 행 생성
     const newRow = document.createElement('div');
@@ -690,10 +682,6 @@ function addRowBelow(button) {
     const container = modal.querySelector('.data-rows-container');
     const currentRows = container.querySelectorAll('.data-row').length;
     const columnCount = modal.querySelectorAll('.header-column').length;
-
-    if (currentRows >= 50) {
-        return;
-    }
 
     // 새 데이터 행 생성
     const newRow = document.createElement('div');
