@@ -17,19 +17,19 @@ function getInlineDiff(original: string, modified: string): string {
   if (!modified) {
     return `<span class="inline-diff-removed">${escapeHtml(original)}</span>`;
   }
-  
+
   // 단어 단위로 분할
   const originalWords = original.split(/(\s+)/);
   const modifiedWords = modified.split(/(\s+)/);
-  
+
   // 간단한 LCS 알고리즘으로 차이점 찾기
   const maxLength = Math.max(originalWords.length, modifiedWords.length);
   let result = '';
-  
+
   for (let i = 0; i < maxLength; i++) {
     const origWord = originalWords[i] || '';
     const modWord = modifiedWords[i] || '';
-    
+
     if (origWord === modWord) {
       result += escapeHtml(origWord);
     } else {
@@ -41,7 +41,54 @@ function getInlineDiff(original: string, modified: string): string {
       }
     }
   }
-  
+
+  return result || '&nbsp;';
+}
+
+// 라인별 diff - 공통 부분은 한 번만, 차이만 표시
+function getLineDiff(original: string, modified: string): string {
+  if (!original && !modified) return '&nbsp;';
+  if (!original) {
+    return `<span class="inline-diff-added">${escapeHtml(modified)}</span>`;
+  }
+  if (!modified) {
+    return `<span class="inline-diff-removed">${escapeHtml(original)}</span>`;
+  }
+
+  // 공통 접두사 찾기
+  let commonPrefixLen = 0;
+  const minLen = Math.min(original.length, modified.length);
+  while (commonPrefixLen < minLen && original[commonPrefixLen] === modified[commonPrefixLen]) {
+    commonPrefixLen++;
+  }
+
+  // 공통 접미사 찾기
+  let commonSuffixLen = 0;
+  while (
+    commonSuffixLen < minLen - commonPrefixLen &&
+    original[original.length - 1 - commonSuffixLen] === modified[modified.length - 1 - commonSuffixLen]
+  ) {
+    commonSuffixLen++;
+  }
+
+  // 부분 추출
+  const commonPrefix = original.substring(0, commonPrefixLen);
+  const commonSuffix = original.substring(original.length - commonSuffixLen);
+  const originalMiddle = original.substring(commonPrefixLen, original.length - commonSuffixLen);
+  const modifiedMiddle = modified.substring(commonPrefixLen, modified.length - commonSuffixLen);
+
+  // HTML 생성
+  let result = escapeHtml(commonPrefix);
+
+  if (originalMiddle) {
+    result += `<span class="inline-diff-removed">${escapeHtml(originalMiddle)}</span>`;
+  }
+  if (modifiedMiddle) {
+    result += `<span class="inline-diff-added">${escapeHtml(modifiedMiddle)}</span>`;
+  }
+
+  result += escapeHtml(commonSuffix);
+
   return result || '&nbsp;';
 }
 
@@ -71,6 +118,98 @@ function createLineHash(line: string): string {
     hash = hash & hash; // 32비트 정수로 변환
   }
   return hash.toString(36);
+}
+
+// 순서 무관 스마트 매칭
+function computeSmartMatching(original: string[], modified: string[]): Map<number, number> {
+  const matches = new Map<number, number>();
+  const usedModified = new Set<number>();
+
+  // 1단계: 완전 일치 매칭 (해시 기반)
+  const modifiedHashMap = new Map<string, number[]>();
+  for (let i = 0; i < modified.length; i++) {
+    const hash = createLineHash(modified[i]);
+    if (!modifiedHashMap.has(hash)) {
+      modifiedHashMap.set(hash, []);
+    }
+    modifiedHashMap.get(hash)!.push(i);
+  }
+
+  // 완전 일치하는 것들 먼저 매칭
+  for (let i = 0; i < original.length; i++) {
+    const hash = createLineHash(original[i]);
+    const candidates = modifiedHashMap.get(hash);
+
+    if (candidates && candidates.length > 0) {
+      // 아직 사용되지 않은 후보 중 가장 가까운 것 선택
+      let bestCandidate = -1;
+      let minDistance = Infinity;
+
+      for (const j of candidates) {
+        if (!usedModified.has(j)) {
+          const distance = Math.abs(i - j);
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestCandidate = j;
+          }
+        }
+      }
+
+      if (bestCandidate !== -1) {
+        matches.set(i, bestCandidate);
+        usedModified.add(bestCandidate);
+      }
+    }
+  }
+
+  // 2단계: 접두사/접미사 기반 유사 매칭
+  for (let i = 0; i < original.length; i++) {
+    if (matches.has(i)) continue; // 이미 매칭됨
+
+    const origLine = original[i];
+    if (origLine.length < 10) continue; // 너무 짧으면 스킵
+
+    let bestMatch = -1;
+    let bestSimilarity = 0;
+
+    // 접두사 추출 (최대 50자)
+    const origPrefix = origLine.substring(0, Math.min(50, origLine.length));
+
+    for (let j = 0; j < modified.length; j++) {
+      if (usedModified.has(j)) continue; // 이미 사용됨
+
+      const modLine = modified[j];
+      if (modLine.length < 10) continue;
+
+      // 접두사 유사도 계산
+      const modPrefix = modLine.substring(0, Math.min(50, modLine.length));
+      const commonPrefixLen = getCommonPrefixLength(origPrefix, modPrefix);
+      const similarity = commonPrefixLen / Math.max(origPrefix.length, modPrefix.length);
+
+      // 60% 이상 유사하면 후보로
+      if (similarity > 0.6 && similarity > bestSimilarity) {
+        bestSimilarity = similarity;
+        bestMatch = j;
+      }
+    }
+
+    if (bestMatch !== -1 && bestSimilarity > 0.6) {
+      matches.set(i, bestMatch);
+      usedModified.add(bestMatch);
+    }
+  }
+
+  return matches;
+}
+
+// 공통 접두사 길이 계산
+function getCommonPrefixLength(str1: string, str2: string): number {
+  let len = 0;
+  const minLen = Math.min(str1.length, str2.length);
+  while (len < minLen && str1[len] === str2[len]) {
+    len++;
+  }
+  return len;
 }
 
 // Myers 알고리즘의 간소화 버전
@@ -349,19 +488,39 @@ function performStreamingDiff(
   diffMode: 'line' | 'inline' = 'line'
 ) {
   console.log('스트리밍 모드로 처리:', pageOriginalLines.length, '줄');
-  
-  const maxPageLines = Math.max(pageOriginalLines.length, pageModifiedLines.length);
+
+  // 스마트 매칭 계산 (순서 무관)
+  const matches = computeSmartMatching(pageOriginalLines, pageModifiedLines);
+
+  // 매칭 정보를 역으로도 저장
+  const reverseMatches = new Map<number, number>();
+  matches.forEach((modIdx, origIdx) => {
+    reverseMatches.set(modIdx, origIdx);
+  });
+
+  // 이미 처리된 줄 추적
+  const processedOriginal = new Set<number>();
+  const processedModified = new Set<number>();
+
   let html = '';
-  
+
+  // 매칭된 줄들 먼저 처리 (순서대로)
+  const sortedMatches = Array.from(matches.entries()).sort((a, b) => a[1] - b[1]);
+
   // 청크 단위로 처리
-  for (let chunkStart = 0; chunkStart < maxPageLines; chunkStart += STREAM_CHUNK_SIZE) {
-    const chunkEnd = Math.min(chunkStart + STREAM_CHUNK_SIZE, maxPageLines);
-    
-    // 현재 청크 처리
-    for (let i = chunkStart; i < chunkEnd; i++) {
-      const lineNumber = startLine + i + 1;
-      const originalLine = pageOriginalLines[i] || '';
-      const modifiedLine = pageModifiedLines[i] || '';
+  const totalMatches = sortedMatches.length;
+  for (let chunkStart = 0; chunkStart < totalMatches; chunkStart += STREAM_CHUNK_SIZE) {
+    const chunkEnd = Math.min(chunkStart + STREAM_CHUNK_SIZE, totalMatches);
+
+    // 현재 청크의 매칭된 줄들 처리
+    for (let idx = chunkStart; idx < chunkEnd; idx++) {
+      const [origIdx, modIdx] = sortedMatches[idx];
+      const lineNumber = startLine + origIdx + 1;
+      const originalLine = pageOriginalLines[origIdx];
+      const modifiedLine = pageModifiedLines[modIdx];
+
+      processedOriginal.add(origIdx);
+      processedModified.add(modIdx);
       
       if (originalLine === modifiedLine) {
         // 동일한 라인
@@ -373,11 +532,11 @@ function performStreamingDiff(
       } else if (originalLine && modifiedLine) {
         // 두 줄 모두 있는 경우
         if (diffMode === 'inline') {
-          // 인라인 모드: 단어 단위 diff 표시
-          const inlineDiffContent = getInlineDiff(originalLine, modifiedLine);
+          // 인라인 모드: 공통 부분은 한 번만, 차이만 표시
+          const lineDiffContent = getLineDiff(originalLine, modifiedLine);
           html += `<div class="line-modified">
             <span class="line-number">${lineNumber}</span>
-            <span class="line-content">${inlineDiffContent}</span>
+            <span class="line-content">${lineDiffContent}</span>
           </div>\n`;
         } else {
           // 라인 모드: 삭제/추가 라인으로 표시
@@ -412,17 +571,55 @@ function performStreamingDiff(
     }
     
     // 진행률 전송 (중간 결과)
-    const progress = (chunkEnd / maxPageLines) * 100;
+    const progress = (chunkEnd / totalMatches) * 50; // 매칭 처리는 50%까지
     self.postMessage({
       type: 'paged-progress',
       data: {
         progress,
         partialHtml: html,
-        isComplete: chunkEnd >= maxPageLines
+        isComplete: false
       }
     } as DiffMessage);
   }
-  
+
+  // 매칭되지 않은 원본 줄들 (삭제된 줄)
+  for (let i = 0; i < pageOriginalLines.length; i++) {
+    if (!processedOriginal.has(i)) {
+      const lineNumber = startLine + i + 1;
+      const originalLine = pageOriginalLines[i];
+      const escapedOriginal = escapeHtml(originalLine);
+      html += `<div class="line-removed">
+        <span class="line-number">${lineNumber}-</span>
+        <span class="line-content">${escapedOriginal}</span>
+      </div>\n`;
+    }
+  }
+
+  // 75% 진행
+  self.postMessage({
+    type: 'paged-progress',
+    data: {
+      progress: 75,
+      partialHtml: html,
+      isComplete: false
+    }
+  } as DiffMessage);
+
+  // 매칭되지 않은 수정본 줄들 (추가된 줄)
+  for (let i = 0; i < pageModifiedLines.length; i++) {
+    if (!processedModified.has(i)) {
+      const lineNumber = startLine + i + 1;
+      const modifiedLine = pageModifiedLines[i];
+      const escapedModified = escapeHtml(modifiedLine);
+      html += `<div class="line-added">
+        <span class="line-number">${lineNumber}+</span>
+        <span class="line-content">${escapedModified}</span>
+      </div>\n`;
+    }
+  }
+
+  const maxPageLines = Math.max(pageOriginalLines.length, pageModifiedLines.length);
+
   // 최종 결과 전송
   self.postMessage({
     type: 'paged-complete',
@@ -483,13 +680,31 @@ function performNormalPagedDiff(
       return;
     }
     
-    // 페이지 단위로 간단한 diff 계산
+    // 스마트 매칭 계산 (순서 무관)
+    const matches = computeSmartMatching(pageOriginalLines, pageModifiedLines);
+
+    // 매칭 정보를 역으로도 저장 (수정본 → 원본)
+    const reverseMatches = new Map<number, number>();
+    matches.forEach((modIdx, origIdx) => {
+      reverseMatches.set(modIdx, origIdx);
+    });
+
+    // 이미 처리된 줄 추적
+    const processedOriginal = new Set<number>();
+    const processedModified = new Set<number>();
+
     let html = '';
-    
-    for (let i = 0; i < maxPageLines; i++) {
-      const lineNumber = startLine + i + 1;
-      const originalLine = pageOriginalLines[i] || '';
-      const modifiedLine = pageModifiedLines[i] || '';
+
+    // 매칭된 줄들 먼저 처리
+    const sortedMatches = Array.from(matches.entries()).sort((a, b) => a[1] - b[1]);
+
+    for (const [origIdx, modIdx] of sortedMatches) {
+      const lineNumber = startLine + origIdx + 1;
+      const originalLine = pageOriginalLines[origIdx];
+      const modifiedLine = pageModifiedLines[modIdx];
+
+      processedOriginal.add(origIdx);
+      processedModified.add(modIdx);
       
       if (originalLine === modifiedLine) {
         // 동일한 라인 (변경 없음)
@@ -501,11 +716,11 @@ function performNormalPagedDiff(
       } else if (originalLine && modifiedLine) {
         // 두 줄 모두 있는 경우
         if (diffMode === 'inline') {
-          // 인라인 모드: 단어 단위 diff 표시
-          const inlineDiffContent = getInlineDiff(originalLine, modifiedLine);
+          // 인라인 모드: 공통 부분은 한 번만, 차이만 표시
+          const lineDiffContent = getLineDiff(originalLine, modifiedLine);
           html += `<div class="line-modified">
             <span class="line-number">${lineNumber}</span>
-            <span class="line-content">${inlineDiffContent}</span>
+            <span class="line-content">${lineDiffContent}</span>
           </div>\n`;
         } else {
           // 라인 모드: 삭제/추가 라인으로 표시
@@ -538,7 +753,33 @@ function performNormalPagedDiff(
         }
       }
     }
-    
+
+    // 매칭되지 않은 원본 줄들 (삭제된 줄)
+    for (let i = 0; i < pageOriginalLines.length; i++) {
+      if (!processedOriginal.has(i)) {
+        const lineNumber = startLine + i + 1;
+        const originalLine = pageOriginalLines[i];
+        const escapedOriginal = escapeHtml(originalLine);
+        html += `<div class="line-removed">
+          <span class="line-number">${lineNumber}-</span>
+          <span class="line-content">${escapedOriginal}</span>
+        </div>\n`;
+      }
+    }
+
+    // 매칭되지 않은 수정본 줄들 (추가된 줄)
+    for (let i = 0; i < pageModifiedLines.length; i++) {
+      if (!processedModified.has(i)) {
+        const lineNumber = startLine + i + 1;
+        const modifiedLine = pageModifiedLines[i];
+        const escapedModified = escapeHtml(modifiedLine);
+        html += `<div class="line-added">
+          <span class="line-number">${lineNumber}+</span>
+          <span class="line-content">${escapedModified}</span>
+        </div>\n`;
+      }
+    }
+
     html = html || '<div class="text-gray-500">이 페이지에는 내용이 없습니다.</div>';
     
     // 결과 전송

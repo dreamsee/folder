@@ -9,19 +9,21 @@ import TextRegionManager from "@/components/TextRegionManager";
 import DiffModal from "@/components/DiffModal";
 import ApplyToOriginalModal from "@/components/ApplyToOriginalModal";
 import { JsonFileManager } from "@/components/JsonFileManager";
+import MultiFileCardManager from "@/components/MultiFileCardManager";
 import { compareTexts, compareTextsInline } from "@/lib/diffUtils";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { OriginalDocument, ModifiedDocument, ComparisonMode } from "@/lib/types";
-import { 
-  모든원본문서가져오기, 
-  ID로원본문서찾기, 
-  원본ID로수정된문서찾기, 
+import {
+  모든원본문서가져오기,
+  ID로원본문서찾기,
+  원본ID로수정된문서찾기,
   ID로수정된문서찾기
 } from "@/lib/localStorageUtils";
 
 export default function Home() {
   const { toast } = useToast();
+  const [appMode, setAppMode] = useState<'comparison' | 'multifile'>('comparison');
   const [isNewOriginalModalOpen, setIsNewOriginalModalOpen] = useState(false);
   const [isSaveModifiedModalOpen, setIsSaveModifiedModalOpen] = useState(false);
   const [isDiffModalOpen, setIsDiffModalOpen] = useState(false);
@@ -294,17 +296,47 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header onNewOriginalClick={openNewOriginalModal} />
-      
+
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {/* JSON 파일 관리 */}
+          {/* 모드 선택 탭 */}
           <div className="mb-6">
-            <JsonFileManager />
+            <div className="flex gap-2 border-b">
+              <button
+                className={`px-4 py-2 font-medium transition-colors ${
+                  appMode === 'comparison'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                onClick={() => setAppMode('comparison')}
+              >
+                2개 노트 비교
+              </button>
+              <button
+                className={`px-4 py-2 font-medium transition-colors ${
+                  appMode === 'multifile'
+                    ? 'border-b-2 border-blue-500 text-blue-600'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                onClick={() => setAppMode('multifile')}
+              >
+                3개 파일 매칭
+              </button>
+            </div>
           </div>
-          
-          {/* 컨트롤 패널 */}
-          <div className="bg-white rounded-lg shadow mb-6 p-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+
+          {appMode === 'multifile' ? (
+            <MultiFileCardManager />
+          ) : (
+            <>
+              {/* JSON 파일 관리 */}
+              <div className="mb-6">
+                <JsonFileManager />
+              </div>
+
+              {/* 컨트롤 패널 */}
+              <div className="bg-white rounded-lg shadow mb-6 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="flex items-center relative">
                   <span className="text-sm font-medium text-neutral-700 mr-2">원본 파일:</span>
@@ -452,10 +484,10 @@ export default function Home() {
               </div>
               
               <div className="flex flex-wrap items-center gap-3">
-                
+
                   <span className="text-sm font-medium text-neutral-700 mr-2">비교 방식:</span>
                   <div className="flex rounded-md p-0 inline-block">
-                    <Button 
+                    <Button
                       variant={comparisonMode === "side-by-side" ? "default" : "ghost"}
                       size="sm"
                       onClick={setModeToSideBySide}
@@ -463,7 +495,7 @@ export default function Home() {
                     >
                       ↔️ 좌우측
                     </Button>
-                    <Button 
+                    <Button
                       variant={comparisonMode === "top-bottom" ? "default" : "ghost"}
                       size="sm"
                       onClick={setModeToTopBottom}
@@ -472,11 +504,11 @@ export default function Home() {
                       ↕️ 상하
                     </Button>
                   </div>
-                
-                
+
+
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-neutral-700">차이점 표시:</span>
-                  <Button 
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => {
@@ -488,7 +520,7 @@ export default function Home() {
                   >
                     🔍 인라인
                   </Button>
-                  <Button 
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => {
@@ -499,11 +531,11 @@ export default function Home() {
                   >
                     📋 라인
                   </Button>
-                  
+
                   {/* 구분선 */}
                   <div className="h-4 w-px bg-neutral-300 mx-1"></div>
-                  
-                  <Button 
+
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => {
@@ -519,8 +551,8 @@ export default function Home() {
                       }
                     }}
                     className={`px-3 py-1 rounded border ${
-                      isPreviewMode 
-                        ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600' 
+                      isPreviewMode
+                        ? 'bg-blue-500 text-white border-blue-500 hover:bg-blue-600'
                         : 'border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
@@ -529,64 +561,64 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          </div>
-          
-          {comparisonMode === "edit-only" ? (
-            /* 편집 전용 모드 - 영역 관리만 표시 */
-            <div className="mt-8">
-              <TextRegionManager 
-                text={modifiedText}
-                onTextChange={setModifiedText}
-                modifiedDocumentId={selectedModifiedDocumentId !== "none" ? parseInt(selectedModifiedDocumentId) : undefined}
-                onRegionDataChange={setRegionData}
-                initialRegionData={regionData}
-              />
-            </div>
-          ) : (
-            <>
-              {/* 비교 영역 */}
-              <div id="compareContainer" className={comparisonMode}>
-                <ComparisonView
-                  key={`comparison-${comparisonMode}-${selectedDocumentId}`}
-                  originalText={originalText}
-                  modifiedText={modifiedText}
-                  onModifiedChange={setModifiedText}
-                  onReset={comparisonMode === "diff" && isPreviewMode ? returnToPreviousMode : resetModifiedText}
-                  mode={comparisonMode}
-                  originalDocumentId={selectedDocumentId ? parseInt(selectedDocumentId) : undefined}
-                  onOriginalUpdated={() => {
-                    if (selectedDocumentId) {
-                      getOriginalDocument(selectedDocumentId);
-                    }
-                  }}
-                />
               </div>
-              
 
-              
-              {/* 텍스트 영역 관리 시스템 */}
-              <div className="mt-8">
-                <TextRegionManager 
-                  text={modifiedText}
-                  onTextChange={setModifiedText}
-                  modifiedDocumentId={selectedModifiedDocumentId !== "none" ? parseInt(selectedModifiedDocumentId) : undefined}
-                  onRegionDataChange={setRegionData}
-                />
-              </div>
+              {comparisonMode === "edit-only" ? (
+                /* 편집 전용 모드 - 영역 관리만 표시 */
+                <div className="mt-8">
+                  <TextRegionManager
+                    text={modifiedText}
+                    onTextChange={setModifiedText}
+                    modifiedDocumentId={selectedModifiedDocumentId !== "none" ? parseInt(selectedModifiedDocumentId) : undefined}
+                    onRegionDataChange={setRegionData}
+                    initialRegionData={regionData}
+                  />
+                </div>
+              ) : (
+                <>
+                  {/* 비교 영역 */}
+                  <div id="compareContainer" className={comparisonMode}>
+                    <ComparisonView
+                      key={`comparison-${comparisonMode}-${selectedDocumentId}`}
+                      originalText={originalText}
+                      modifiedText={modifiedText}
+                      onModifiedChange={setModifiedText}
+                      onReset={comparisonMode === "diff" && isPreviewMode ? returnToPreviousMode : resetModifiedText}
+                      mode={comparisonMode}
+                      originalDocumentId={selectedDocumentId ? parseInt(selectedDocumentId) : undefined}
+                      onOriginalUpdated={() => {
+                        if (selectedDocumentId) {
+                          getOriginalDocument(selectedDocumentId);
+                        }
+                      }}
+                    />
+                  </div>
+
+                  {/* 텍스트 영역 관리 시스템 */}
+                  <div className="mt-8">
+                    <TextRegionManager
+                      text={modifiedText}
+                      onTextChange={setModifiedText}
+                      modifiedDocumentId={selectedModifiedDocumentId !== "none" ? parseInt(selectedModifiedDocumentId) : undefined}
+                      onRegionDataChange={setRegionData}
+                    />
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
       </main>
-      
+
       <Footer />
-      
+
       {/* 새 원본 추가 모달 */}
       <NewOriginalModal
         isOpen={isNewOriginalModalOpen}
         onClose={closeNewOriginalModal}
         onDocumentAdded={handleNewOriginalAdded}
       />
-      
+
       {/* 수정된 메모 저장 모달 */}
       <SaveModifiedModal
         isOpen={isSaveModifiedModalOpen}
@@ -596,7 +628,7 @@ export default function Home() {
         content={modifiedText}
         regionData={regionData}
       />
-      
+
       {/* 차이점 비교 모달 */}
       <DiffModal
         isOpen={isDiffModalOpen}
@@ -607,7 +639,7 @@ export default function Home() {
         modifiedText={modifiedText}
         onModifiedTextChange={setModifiedText}
       />
-      
+
       {/* 원본에 적용 모달 */}
       {selectedDocumentId && (
         <ApplyToOriginalModal
@@ -622,7 +654,6 @@ export default function Home() {
           }}
         />
       )}
-      
     </div>
   );
 }
