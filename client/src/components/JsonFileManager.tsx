@@ -20,11 +20,22 @@ export function JsonFileManager() {
       console.log('📦 [DEBUG] 내보내기 데이터:', 현재데이터);
       console.log('📦 [DEBUG] 원본문서 개수:', 현재데이터.원본문서목록.length);
       console.log('📦 [DEBUG] 수정된문서 개수:', 현재데이터.수정된문서목록.length);
-      
+      console.log('📦 [DEBUG] MultiFileCard 개수:', 현재데이터.multiFileCards?.length || 0);
+
       JSON파일로내보내기(현재데이터, '노트비교_데이터');
-      메시지설정('JSON 파일이 성공적으로 다운로드되었습니다.');
+
+      // 메시지 구성
+      const 메시지부분들 = [];
+      if (현재데이터.원본문서목록.length || 현재데이터.수정된문서목록.length) {
+        메시지부분들.push(`노트비교: 원본 ${현재데이터.원본문서목록.length}개, 수정본 ${현재데이터.수정된문서목록.length}개`);
+      }
+      if (현재데이터.multiFileCards?.length) {
+        메시지부분들.push(`MultiFileCard ${현재데이터.multiFileCards.length}개`);
+      }
+
+      메시지설정(`JSON 파일이 성공적으로 다운로드되었습니다. (${메시지부분들.join(', ')})`);
       오류메시지설정('');
-      
+
       // 3초 후 메시지 지우기
       setTimeout(() => 메시지설정(''), 3000);
     } catch (error) {
@@ -37,20 +48,34 @@ export function JsonFileManager() {
     try {
       로딩중설정(true);
       const 데이터 = await JSON파일에서가져오기();
-      
+
       // 가져온 데이터 디버깅
       console.log('📥 [JSON 가져오기] 전체 데이터:', 데이터);
       console.log('📥 [JSON 가져오기] 원본문서 개수:', 데이터.원본문서목록?.length || 0);
       console.log('📥 [JSON 가져오기] 수정된문서 개수:', 데이터.수정된문서목록?.length || 0);
-      
+      console.log('📥 [JSON 가져오기] MultiFileCard 개수:', 데이터.multiFileCards?.length || 0);
+
       // regionData 포함 여부 확인
       const regionDataCount = 데이터.수정된문서목록?.filter(doc => doc.영역데이터).length || 0;
       console.log('📥 [JSON 가져오기] regionData 포함된 문서 개수:', regionDataCount);
-      
+
       JSON데이터를로컬스토리지에저장(데이터);
-      메시지설정(`JSON 파일이 성공적으로 불러와졌습니다. (원본: ${데이터.원본문서목록?.length || 0}개, 수정본: ${데이터.수정된문서목록?.length || 0}개, 줄그룹화: ${regionDataCount}개) 페이지를 새로고침해주세요.`);
+
+      // 메시지 구성
+      const 메시지부분들 = [];
+      if (데이터.원본문서목록?.length || 데이터.수정된문서목록?.length) {
+        메시지부분들.push(`노트비교: 원본 ${데이터.원본문서목록?.length || 0}개, 수정본 ${데이터.수정된문서목록?.length || 0}개`);
+        if (regionDataCount > 0) {
+          메시지부분들.push(`줄그룹화 ${regionDataCount}개`);
+        }
+      }
+      if (데이터.multiFileCards?.length) {
+        메시지부분들.push(`MultiFileCard ${데이터.multiFileCards.length}개`);
+      }
+
+      메시지설정(`JSON 파일이 성공적으로 불러와졌습니다. (${메시지부분들.join(', ')}) 페이지를 새로고침해주세요.`);
       오류메시지설정('');
-      
+
       // 자동 새로고침 (선택사항)
       setTimeout(() => {
         window.location.reload();
@@ -112,8 +137,8 @@ export function JsonFileManager() {
       )}
       
       <div className="text-sm text-muted-foreground">
-        <p>• JSON 내보내기: 현재 데이터를 파일로 백업합니다</p>
-        <p>• JSON 가져오기: 백업 파일에서 데이터를 복원합니다</p>
+        <p>• JSON 내보내기: 현재 데이터를 파일로 백업합니다 (노트비교 + MultiFileCard)</p>
+        <p>• JSON 가져오기: 백업 파일에서 데이터를 복원합니다 (두 형식 모두 지원)</p>
       </div>
     </div>
   );

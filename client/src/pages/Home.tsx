@@ -40,6 +40,7 @@ export default function Home() {
   const [hoveredOriginalId, setHoveredOriginalId] = useState<string>("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isLoadingModifiedRef = useRef(false); // 수정본 로딩 중 플래그
   const [originalDocuments, setOriginalDocuments] = useState<OriginalDocument[]>([]);
   const [modifiedDocuments, setModifiedDocuments] = useState<ModifiedDocument[]>([]);
   const [hoveredModifiedDocuments, setHoveredModifiedDocuments] = useState<ModifiedDocument[]>([]);
@@ -71,15 +72,19 @@ export default function Home() {
   };
 
   // 특정 ID의 원본 문서 가져오기
-  const getOriginalDocument = async (id: string) => {
+  const getOriginalDocument = async (id: string, resetModified: boolean = true) => {
     if (!id) return;
     try {
       const document = ID로원본문서찾기(parseInt(id));
       if (document) {
         setOriginalText(document.content);
-        setModifiedText(document.content);
-        // 수정된 문서 선택 초기화
-        setSelectedModifiedDocumentId("none");
+
+        // resetModified가 true일 때만 수정본 초기화
+        if (resetModified) {
+          setModifiedText(document.content);
+          setSelectedModifiedDocumentId("none");
+        }
+
         // 해당 원본의 수정된 문서들 로드
         loadModifiedDocuments(id);
       }
@@ -182,7 +187,11 @@ export default function Home() {
   // 원본 문서 ID가 변경되면 해당 문서 로드
   useEffect(() => {
     if (selectedDocumentId) {
-      getOriginalDocument(selectedDocumentId);
+      console.log('📋 [DEBUG] selectedDocumentId 변경됨:', selectedDocumentId);
+      console.log('📋 [DEBUG] isLoadingModifiedRef.current:', isLoadingModifiedRef.current);
+
+      // resetModified: false로 설정하여 수정본 텍스트를 보존
+      getOriginalDocument(selectedDocumentId, false);
     }
   }, [selectedDocumentId]);
 
@@ -389,20 +398,21 @@ export default function Home() {
                                       key={modDoc.id}
                                       onClick={async (e) => {
                                         e.stopPropagation();
-                                        // 먼저 원본을 선택하여 수정본 목록을 업데이트 (수정된 텍스트 초기화 방지)
-                                        setSelectedDocumentId(doc.id.toString());
-                                        const originalDoc = ID로원본문서찾기(doc.id);
-                                        if (originalDoc) {
-                                          setOriginalText(originalDoc.content);
-                                          // 수정된 텍스트는 초기화하지 않음
-                                          setSelectedModifiedDocumentId("none");
-                                          loadModifiedDocuments(doc.id.toString());
+
+                                        // 원본 문서가 이미 선택되어 있지 않은 경우에만 원본 로드
+                                        if (selectedDocumentId !== doc.id.toString()) {
+                                          setSelectedDocumentId(doc.id.toString());
+                                          const originalDoc = ID로원본문서찾기(doc.id);
+                                          if (originalDoc) {
+                                            setOriginalText(originalDoc.content);
+                                            loadModifiedDocuments(doc.id.toString());
+                                          }
                                         }
-                                        
+
                                         // 수정본을 선택하고 로드
                                         setSelectedModifiedDocumentId(modDoc.id.toString());
                                         await getModifiedDocument(modDoc.id.toString());
-                                        
+
                                         setHoveredOriginalId("");
                                         setIsDropdownOpen(false);
                                       }}
