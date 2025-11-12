@@ -206,21 +206,132 @@ export function 모든필드파싱하기(matches: CardMatch[]): CardField[] {
 
 // ==================== 텍스트 업데이트 ====================
 
+// 고유 식별자 추출 (키워드 기반 매칭용)
+function 식별자추출(text: string): string | null {
+  const trimmed = text.trim();
+
+  // 패턴 1: m_aItemNames[123]= 형태
+  const arrayPattern = /^(m_a[A-Za-z]+\[[^\]]+\]\s*=)/;
+  const arrayMatch = trimmed.match(arrayPattern);
+  if (arrayMatch) return arrayMatch[1];
+
+  // 패턴 2: Characters=( 형태 (괄호 포함)
+  const functionPattern = /^([A-Za-z_][A-Za-z0-9_]*\s*=\s*\()/;
+  const functionMatch = trimmed.match(functionPattern);
+  if (functionMatch) return functionMatch[1];
+
+  // 패턴 3: Weapons=( 형태 (strName="" 등 내부 파라미터 있는 경우)
+  const configPattern = /^([A-Za-z_][A-Za-z0-9_]*\s*=\s*\(\s*[a-zA-Z_])/;
+  const configMatch = trimmed.match(configPattern);
+  if (configMatch) {
+    const baseMatch = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*\s*=\s*\()/);
+    if (baseMatch) return baseMatch[1];
+  }
+
+  // 패턴 4: 일반적인 KEY=VALUE 형태
+  const keyValuePattern = /^([A-Za-z_][A-Za-z0-9_]*\s*=)/;
+  const keyValueMatch = trimmed.match(keyValuePattern);
+  if (keyValueMatch) return keyValueMatch[1];
+
+  return null;
+}
+
+// 두 문자열의 유사도 계산 (0~1 사이 값)
+function 유사도계산(str1: string, str2: string): number {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+
+  if (longer.length === 0) return 1.0;
+
+  const editDistance = (s1: string, s2: string): number => {
+    s1 = s1.toLowerCase();
+    s2 = s2.toLowerCase();
+
+    const costs: number[] = [];
+    for (let i = 0; i <= s1.length; i++) {
+      let lastValue = i;
+      for (let j = 0; j <= s2.length; j++) {
+        if (i === 0) {
+          costs[j] = j;
+        } else if (j > 0) {
+          let newValue = costs[j - 1];
+          if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+          }
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+      if (i > 0) costs[s2.length] = lastValue;
+    }
+    return costs[s2.length];
+  };
+
+  return (longer.length - editDistance(longer, shorter)) / longer.length;
+}
+
 export function 원본에서내용찾기(fileContent: string, originalContent: string, oldLineNumber: number): number | null {
   const lines = fileContent.split('\n');
 
-  // 1. 원래 줄 번호에서 먼저 확인
+  // 0. 키워드 기반 매칭 (최우선)
+  const identifier = 식별자추출(originalContent);
+  if (identifier) {
+    // 고유 식별자가 있으면 전체 파일에서 검색
+    for (let i = 0; i < lines.length; i++) {
+      const lineIdentifier = 식별자추출(lines[i]);
+      if (lineIdentifier && lineIdentifier === identifier) {
+        return i + 1; // 1-based
+      }
+    }
+  }
+
+  // 1. 원래 줄 번호에서 정확히 확인
   if (oldLineNumber > 0 && oldLineNumber <= lines.length) {
     if (lines[oldLineNumber - 1].includes(originalContent)) {
       return oldLineNumber;
     }
   }
 
-  // 2. 전체 파일에서 검색
+  // 2. 주변 줄에서 유사도 검색 (±5줄)
+  const searchRange = 5;
+  const startIdx = Math.max(0, oldLineNumber - 1 - searchRange);
+  const endIdx = Math.min(lines.length - 1, oldLineNumber - 1 + searchRange);
+
+  let bestMatch: { line: number; similarity: number } | null = null;
+
+  for (let i = startIdx; i <= endIdx; i++) {
+    const similarity = 유사도계산(lines[i], originalContent);
+    if (similarity >= 0.7) {  // 70% 이상 유사
+      if (!bestMatch || similarity > bestMatch.similarity) {
+        bestMatch = { line: i + 1, similarity };
+      }
+    }
+  }
+
+  if (bestMatch) {
+    return bestMatch.line;
+  }
+
+  // 3. 전체 파일에서 정확히 검색
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes(originalContent)) {
       return i + 1; // 1-based
     }
+  }
+
+  // 4. 전체 파일에서 유사도 검색
+  bestMatch = null;
+  for (let i = 0; i < lines.length; i++) {
+    const similarity = 유사도계산(lines[i], originalContent);
+    if (similarity >= 0.7) {
+      if (!bestMatch || similarity > bestMatch.similarity) {
+        bestMatch = { line: i + 1, similarity };
+      }
+    }
+  }
+
+  if (bestMatch) {
+    return bestMatch.line;
   }
 
   return null; // 찾지 못함
