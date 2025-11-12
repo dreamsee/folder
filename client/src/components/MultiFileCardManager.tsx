@@ -659,6 +659,66 @@ export default function MultiFileCardManager() {
     URL.revokeObjectURL(url);
   };
 
+  // 전체 적용 및 다운로드
+  const handleApplyAllAndDownload = () => {
+    if (cards.length === 0) {
+      toast({
+        title: "카드가 없습니다",
+        description: "적용할 카드가 없습니다",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // 1. 모든 카드의 수정사항을 파일에 적용
+    let updatedFiles = [...files];
+    const updatedCards: MatchCard[] = [];
+
+    cards.forEach(card => {
+      // 각 카드를 파일에 적용
+      updatedFiles = 카드를파일에적용하기(card, updatedFiles);
+
+      // 카드의 originalContent를 modifiedContent로 업데이트
+      const updatedCard = {
+        ...card,
+        matches: card.matches.map(match => ({
+          ...match,
+          originalContent: match.modifiedContent
+        })),
+        fields: card.fields?.map(field => ({
+          ...field,
+          originalValue: field.modifiedValue
+        }))
+      };
+
+      updatedCards.push(updatedCard);
+      카드수정하기(updatedCard.id, updatedCard);
+    });
+
+    // 2. 파일 상태 업데이트 및 저장
+    setFiles(updatedFiles);
+    setCards(updatedCards);
+    파일저장하기(updatedFiles);
+
+    // 3. 모든 파일 다운로드
+    updatedFiles.forEach((file, index) => {
+      setTimeout(() => {
+        const blob = new Blob([file.content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, index * 300); // 각 파일마다 300ms 간격으로 다운로드
+    });
+
+    toast({
+      title: "전체 적용 완료",
+      description: `${cards.length}개 카드의 변경사항이 적용되었고, ${updatedFiles.length}개 파일이 다운로드됩니다`
+    });
+  };
+
   // 카테고리 접기/펼치기
   const toggleCategory = (categoryId: string) => {
     setCollapsedCategories(prev => {
@@ -771,28 +831,62 @@ export default function MultiFileCardManager() {
 
       // 2. 카드 완전 교체 (기존 카드 삭제, JSON의 카드만 사용)
       const importedCardsList: MatchCard[] = importedCards.map((mod: any) => {
-        // matches의 fileIndex를 현재 로드된 파일명으로 재매핑
+        // matches의 fileIndex를 현재 로드된 파일명으로 재매핑 + 현재 파일 내용으로 originalContent 갱신
         const remappedMatches = (mod.matches || []).map((match: any) => {
           const currentFile = files.find(f => f.name === match.fileName);
+          const fileIndex = currentFile?.index ?? match.fileIndex;
+
+          // 현재 파일에서 실제 내용 가져오기 (협업 대응)
+          let actualContent = match.originalContent; // 기본값
+          if (currentFile && match.lineNumber > 0 && match.lineNumber <= currentFile.lines.length) {
+            actualContent = currentFile.lines[match.lineNumber - 1]?.replace(/[\r\n]+$/, '') || match.originalContent;
+          }
+
           return {
-            fileIndex: currentFile?.index ?? match.fileIndex,
+            fileIndex: fileIndex,
             lineNumber: match.lineNumber,
-            originalContent: match.originalContent,
+            originalContent: actualContent,  // 현재 파일의 실제 내용으로 갱신
             modifiedContent: match.modifiedContent
           };
         });
 
-        // fields의 fileIndex도 재매핑
+        // fields의 fileIndex도 재매핑 + 현재 파일 내용으로 originalValue 갱신
         const remappedFields = mod.fields?.map((field: any) => {
           const currentFile = files.find(f => f.name === field.fileName);
+          const fileIndex = currentFile?.index ?? field.fileIndex;
+
+          // 현재 파일에서 실제 내용 가져오기 (협업 대응)
+          let actualValue = field.originalValue; // 기본값
+          if (currentFile && field.lineNumber > 0 && field.lineNumber <= currentFile.lines.length) {
+            const lineContent = currentFile.lines[field.lineNumber - 1]?.replace(/[\r\n]+$/, '');
+            if (lineContent) {
+              // 테이블 모드인 경우 파싱하여 해당 필드의 값 추출
+              if (mod.isTableMode) {
+                const parsed = 모든필드파싱하기(
+                  [lineContent],
+                  labelStartDelim,
+                  labelEndDelim,
+                  valueStartDelim,
+                  valueEndDelims
+                );
+                const matchingField = parsed.find((p: any) => p.label === field.label);
+                if (matchingField) {
+                  actualValue = matchingField.value;
+                }
+              } else {
+                actualValue = lineContent;
+              }
+            }
+          }
+
           return {
             id: field.id,
             label: field.label,
-            originalValue: field.originalValue,
+            originalValue: actualValue,  // 현재 파일의 실제 내용으로 갱신
             modifiedValue: field.modifiedValue,
-            fileIndex: currentFile?.index ?? field.fileIndex,
+            fileIndex: fileIndex,
             lineNumber: field.lineNumber,
-            isNumeric: /^-?\d+\.?\d*%?$/.test(field.originalValue)
+            isNumeric: /^-?\d+\.?\d*%?$/.test(actualValue)
           };
         });
 
@@ -951,7 +1045,18 @@ export default function MultiFileCardManager() {
       {/* 파일 업로드 섹션 */}
       <Card>
         <CardHeader>
-          <CardTitle>파일 업로드</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle>파일 업로드</CardTitle>
+            <Button
+              onClick={handleApplyAllAndDownload}
+              variant="default"
+              size="sm"
+              disabled={files.length === 0 || cards.length === 0}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              전체 적용 다운로드
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
