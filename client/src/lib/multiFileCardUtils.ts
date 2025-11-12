@@ -226,7 +226,13 @@ export function 원본에서내용찾기(fileContent: string, originalContent: s
   return null; // 찾지 못함
 }
 
-export function 텍스트교체하기(fileContent: string, lineNumber: number, oldContent: string, newContent: string): string {
+export function 텍스트교체하기(
+  fileContent: string,
+  lineNumber: number,
+  oldContent: string,
+  newContent: string,
+  replaceWholeLine: boolean = false
+): string {
   const lines = fileContent.split('\n');
 
   if (lineNumber < 1 || lineNumber > lines.length) {
@@ -235,49 +241,69 @@ export function 텍스트교체하기(fileContent: string, lineNumber: number, o
   }
 
   const lineIndex = lineNumber - 1;
-  lines[lineIndex] = lines[lineIndex].replace(oldContent, newContent);
+
+  if (replaceWholeLine) {
+    // 전체 줄 교체 (일반 모드)
+    lines[lineIndex] = newContent;
+  } else {
+    // 부분 문자열 교체 (테이블 모드)
+    lines[lineIndex] = lines[lineIndex].replace(oldContent, newContent);
+  }
 
   return lines.join('\n');
 }
 
 export function 카드를파일에적용하기(card: MatchCard, files: LoadedFile[]): LoadedFile[] {
-  const updatedFiles = [...files];
+  // React state 불변성 유지: map으로 새 객체 생성
+  return files.map(file => {
+    let newContent = file.content;
+    let hasChanges = false;
 
-  if (card.isTableMode && card.fields) {
-    // 테이블 모드: 필드별로 업데이트
-    card.fields.forEach(field => {
-      const file = updatedFiles.find(f => f.index === field.fileIndex);
-      if (!file) return;
+    if (card.isTableMode && card.fields) {
+      // 테이블 모드: 필드별로 업데이트
+      const fieldsForThisFile = card.fields.filter(f => f.fileIndex === file.index);
 
-      if (field.originalValue !== field.modifiedValue) {
-        file.content = 텍스트교체하기(
-          file.content,
-          field.lineNumber,
-          field.originalValue,
-          field.modifiedValue
-        );
-        file.lines = file.content.split('\n');
-      }
-    });
-  } else {
-    // 일반 모드: 매칭별로 업데이트
-    card.matches.forEach(match => {
-      const file = updatedFiles.find(f => f.index === match.fileIndex);
-      if (!file) return;
+      fieldsForThisFile.forEach(field => {
+        if (field.originalValue !== field.modifiedValue) {
+          newContent = 텍스트교체하기(
+            newContent,
+            field.lineNumber,
+            field.originalValue,
+            field.modifiedValue,
+            false  // 부분 교체
+          );
+          hasChanges = true;
+        }
+      });
+    } else {
+      // 일반 모드: 매칭별로 업데이트 (전체 줄 교체)
+      const matchesForThisFile = card.matches.filter(m => m.fileIndex === file.index);
 
-      if (match.originalContent !== match.modifiedContent) {
-        file.content = 텍스트교체하기(
-          file.content,
-          match.lineNumber,
-          match.originalContent,
-          match.modifiedContent
-        );
-        file.lines = file.content.split('\n');
-      }
-    });
-  }
+      matchesForThisFile.forEach(match => {
+        if (match.originalContent !== match.modifiedContent) {
+          newContent = 텍스트교체하기(
+            newContent,
+            match.lineNumber,
+            match.originalContent,
+            match.modifiedContent,
+            true  // 전체 줄 교체
+          );
+          hasChanges = true;
+        }
+      });
+    }
 
-  return updatedFiles;
+    // 변경사항이 있으면 새 객체 반환, 없으면 원본 반환
+    if (hasChanges) {
+      return {
+        ...file,
+        content: newContent,
+        lines: newContent.split('\n')
+      };
+    }
+
+    return file;
+  });
 }
 
 // ==================== 변경 감지 ====================
