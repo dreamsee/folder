@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, Copy, ChevronUp, ArrowUp, ArrowDown } from "lucide-react";
+import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, Copy, ChevronUp, ArrowUp, ArrowDown, Menu } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MatchCard, LoadedFile, CardMatch, CardCategory } from '@/lib/multiFileCardTypes';
 import {
@@ -100,6 +100,7 @@ export default function MultiFileCardManager() {
 
   // 카드 편집 다이얼로그 원본 보기/안보기
   const [showOriginal, setShowOriginal] = useState(true);
+  const [viewMode, setViewMode] = useState<'move' | 'expand'>('move');
 
   // 패턴 복제 폼
   const [cloneCount, setCloneCount] = useState(1);
@@ -1717,15 +1718,26 @@ export default function MultiFileCardManager() {
                     className="mt-1"
                   />
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setShowOriginal(!showOriginal)}
-                  className="h-8 mt-5"
-                >
-                  {showOriginal ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
-                  {showOriginal ? '원본 숨기기' : '원본 보기'}
-                </Button>
+                <div className="flex gap-2 mt-5">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowOriginal(!showOriginal)}
+                    className="h-8"
+                  >
+                    {showOriginal ? <EyeOff className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+                    {showOriginal ? '원본 숨기기' : '원본 보기'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setViewMode(prev => prev === 'move' ? 'expand' : 'move')}
+                    className="h-8"
+                  >
+                    {viewMode === 'move' ? <ArrowUp className="h-4 w-4 mr-1" /> : <Menu className="h-4 w-4 mr-1" />}
+                    {viewMode === 'move' ? '이동' : '확장'}
+                  </Button>
+                </div>
               </div>
             </DialogHeader>
 
@@ -1776,41 +1788,47 @@ export default function MultiFileCardManager() {
               <div className="space-y-3">
                 {selectedCard.matches.map((match, idx) => (
                   <div key={idx} className="flex gap-2">
-                    {/* 순서 변경 버튼 */}
-                    <div className="flex flex-col gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={idx === 0}
-                        onClick={() => {
-                          setCards(prev => prev.map(card => {
-                            if (card.id !== selectedCard.id) return card;
-                            const newMatches = [...card.matches];
-                            [newMatches[idx - 1], newMatches[idx]] = [newMatches[idx], newMatches[idx - 1]];
-                            return { ...card, matches: newMatches };
-                          }));
-                        }}
-                        className="h-7 w-7 p-0"
-                      >
-                        <ArrowUp className="h-3 w-3" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={idx === selectedCard.matches.length - 1}
-                        onClick={() => {
-                          setCards(prev => prev.map(card => {
-                            if (card.id !== selectedCard.id) return card;
-                            const newMatches = [...card.matches];
-                            [newMatches[idx], newMatches[idx + 1]] = [newMatches[idx + 1], newMatches[idx]];
-                            return { ...card, matches: newMatches };
-                          }));
-                        }}
-                        className="h-7 w-7 p-0"
-                      >
-                        <ArrowDown className="h-3 w-3" />
-                      </Button>
-                    </div>
+                    {/* 이동 모드: 순서 변경 버튼 / 확장 모드: 햄버거 아이콘 */}
+                    {viewMode === 'move' ? (
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={idx === 0}
+                          onClick={() => {
+                            setCards(prev => prev.map(card => {
+                              if (card.id !== selectedCard.id) return card;
+                              const newMatches = [...card.matches];
+                              [newMatches[idx - 1], newMatches[idx]] = [newMatches[idx], newMatches[idx - 1]];
+                              return { ...card, matches: newMatches };
+                            }));
+                          }}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ArrowUp className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={idx === selectedCard.matches.length - 1}
+                          onClick={() => {
+                            setCards(prev => prev.map(card => {
+                              if (card.id !== selectedCard.id) return card;
+                              const newMatches = [...card.matches];
+                              [newMatches[idx], newMatches[idx + 1]] = [newMatches[idx + 1], newMatches[idx]];
+                              return { ...card, matches: newMatches };
+                            }));
+                          }}
+                          className="h-7 w-7 p-0"
+                        >
+                          <ArrowDown className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center">
+                        <Menu className="h-4 w-4 text-gray-400" />
+                      </div>
+                    )}
 
                     {/* 매치 내용 */}
                     <div className={`flex-1 ${showOriginal ? "border rounded p-3" : ""}`}>
@@ -1830,26 +1848,48 @@ export default function MultiFileCardManager() {
                         )}
                         <div>
                           {showOriginal && <label className="text-xs font-medium">수정</label>}
-                          <div className="overflow-x-auto border border-gray-300 rounded bg-white [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-[#e5e5e5] [&::-webkit-scrollbar-track]:bg-[#fafafa]">
-                            <textarea
-                              value={match.modifiedContent}
-                              onChange={(e) => {
-                                setCards(prev => prev.map(card => {
-                                  if (card.id !== selectedCard.id) return card;
-                                  return {
-                                    ...card,
-                                    matches: card.matches.map((m, i) =>
-                                      i === idx ? { ...m, modifiedContent: e.target.value } : m
-                                    )
-                                  };
-                                }));
-                              }}
-                              rows={1}
-                              spellCheck={false}
-                              className="w-full text-sm px-3 py-0 border-0 outline-none resize-none whitespace-nowrap block"
-                              style={{ minWidth: '880px', height: '42px', overflowY: 'hidden' }}
-                            />
-                          </div>
+                          {viewMode === 'move' ? (
+                            <div className="overflow-x-auto border border-gray-300 rounded bg-white [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-thumb]:bg-[#e5e5e5] [&::-webkit-scrollbar-track]:bg-[#fafafa]">
+                              <textarea
+                                value={match.modifiedContent}
+                                onChange={(e) => {
+                                  setCards(prev => prev.map(card => {
+                                    if (card.id !== selectedCard.id) return card;
+                                    return {
+                                      ...card,
+                                      matches: card.matches.map((m, i) =>
+                                        i === idx ? { ...m, modifiedContent: e.target.value } : m
+                                      )
+                                    };
+                                  }));
+                                }}
+                                rows={1}
+                                spellCheck={false}
+                                className="w-full text-sm px-3 py-0 border-0 outline-none resize-none whitespace-nowrap block"
+                                style={{ minWidth: '880px', height: '42px', overflowY: 'hidden' }}
+                              />
+                            </div>
+                          ) : (
+                            <div className="border border-gray-300 rounded bg-white p-2">
+                              <textarea
+                                value={match.modifiedContent}
+                                onChange={(e) => {
+                                  setCards(prev => prev.map(card => {
+                                    if (card.id !== selectedCard.id) return card;
+                                    return {
+                                      ...card,
+                                      matches: card.matches.map((m, i) =>
+                                        i === idx ? { ...m, modifiedContent: e.target.value } : m
+                                      )
+                                    };
+                                  }));
+                                }}
+                                spellCheck={false}
+                                className="w-full text-sm border-0 outline-none resize-none whitespace-pre-wrap font-mono"
+                                style={{ minHeight: '60px' }}
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
