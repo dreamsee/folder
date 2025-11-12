@@ -105,6 +105,63 @@ export default function MultiFileCardManager() {
   // 각 매칭 항목의 확장 상태 (fileIndex-lineNumber로 식별)
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
 
+  // 매칭 항목 스크롤용 ref
+  const matchItemRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // 하이라이트된 항목 인덱스
+  const [highlightedMatchIndex, setHighlightedMatchIndex] = useState<number | null>(null);
+
+  // 키보드 이벤트로 하이라이트된 항목 이동
+  useEffect(() => {
+    if (!selectedCardId || highlightedMatchIndex === null) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const selectedCard = cards.find(c => c.id === selectedCardId);
+      if (!selectedCard) return;
+
+      if (e.key === 'ArrowUp' && highlightedMatchIndex > 0) {
+        e.preventDefault();
+        const newIdx = highlightedMatchIndex - 1;
+
+        const updatedCards = cards.map(card => {
+          if (card.id !== selectedCard.id) return card;
+          const newMatches = [...card.matches];
+          [newMatches[highlightedMatchIndex - 1], newMatches[highlightedMatchIndex]] =
+            [newMatches[highlightedMatchIndex], newMatches[highlightedMatchIndex - 1]];
+          return { ...card, matches: newMatches };
+        });
+
+        setCards(updatedCards);
+        const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
+        if (updatedCard) {
+          카드수정하기(updatedCard);
+        }
+        setHighlightedMatchIndex(newIdx);
+      } else if (e.key === 'ArrowDown' && highlightedMatchIndex < selectedCard.matches.length - 1) {
+        e.preventDefault();
+        const newIdx = highlightedMatchIndex + 1;
+
+        const updatedCards = cards.map(card => {
+          if (card.id !== selectedCard.id) return card;
+          const newMatches = [...card.matches];
+          [newMatches[highlightedMatchIndex], newMatches[highlightedMatchIndex + 1]] =
+            [newMatches[highlightedMatchIndex + 1], newMatches[highlightedMatchIndex]];
+          return { ...card, matches: newMatches };
+        });
+
+        setCards(updatedCards);
+        const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
+        if (updatedCard) {
+          카드수정하기(updatedCard);
+        }
+        setHighlightedMatchIndex(newIdx);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedCardId, highlightedMatchIndex, cards]);
+
   // 패턴 복제 폼
   const [cloneCount, setCloneCount] = useState(1);
   const [cloneOffset, setCloneOffset] = useState(1);
@@ -1794,7 +1851,25 @@ export default function MultiFileCardManager() {
                   const isExpanded = expandedMatches.has(matchId);
 
                   return (
-                    <div key={idx} className="flex gap-2">
+                    <div
+                      key={idx}
+                      className={`flex gap-2 p-2 rounded transition-colors cursor-pointer ${
+                        highlightedMatchIndex === idx ? 'bg-blue-100 border-2 border-blue-400' : ''
+                      }`}
+                      ref={(el) => {
+                        if (el) {
+                          matchItemRefs.current.set(idx, el);
+                        } else {
+                          matchItemRefs.current.delete(idx);
+                        }
+                      }}
+                      onClick={(e) => {
+                        // 버튼이나 입력칸 클릭이 아닐 때만 하이라이트 해제
+                        if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.flex-1')) {
+                          setHighlightedMatchIndex(null);
+                        }
+                      }}
+                    >
                       {/* 좌측 버튼: 이동 모드 = 화살표, 확장 모드 = 햄버거 */}
                       {viewMode === 'move' ? (
                         <div className="flex flex-col gap-1">
@@ -1803,12 +1878,24 @@ export default function MultiFileCardManager() {
                             size="sm"
                             disabled={idx === 0}
                             onClick={() => {
-                              setCards(prev => prev.map(card => {
+                              const newIdx = idx - 1;
+                              const updatedCards = cards.map(card => {
                                 if (card.id !== selectedCard.id) return card;
                                 const newMatches = [...card.matches];
                                 [newMatches[idx - 1], newMatches[idx]] = [newMatches[idx], newMatches[idx - 1]];
                                 return { ...card, matches: newMatches };
-                              }));
+                              });
+
+                              setCards(updatedCards);
+
+                              // localStorage에 저장
+                              const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
+                              if (updatedCard) {
+                                카드수정하기(updatedCard);
+                              }
+
+                              // 하이라이트 설정
+                              setHighlightedMatchIndex(newIdx);
                             }}
                             className="h-7 w-7 p-0"
                           >
@@ -1819,12 +1906,24 @@ export default function MultiFileCardManager() {
                             size="sm"
                             disabled={idx === selectedCard.matches.length - 1}
                             onClick={() => {
-                              setCards(prev => prev.map(card => {
+                              const newIdx = idx + 1;
+                              const updatedCards = cards.map(card => {
                                 if (card.id !== selectedCard.id) return card;
                                 const newMatches = [...card.matches];
                                 [newMatches[idx], newMatches[idx + 1]] = [newMatches[idx + 1], newMatches[idx]];
                                 return { ...card, matches: newMatches };
-                              }));
+                              });
+
+                              setCards(updatedCards);
+
+                              // localStorage에 저장
+                              const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
+                              if (updatedCard) {
+                                카드수정하기(updatedCard);
+                              }
+
+                              // 하이라이트 설정
+                              setHighlightedMatchIndex(newIdx);
                             }}
                             className="h-7 w-7 p-0"
                           >

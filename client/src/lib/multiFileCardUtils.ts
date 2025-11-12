@@ -265,14 +265,21 @@ export function 카드를파일에적용하기(card: MatchCard, files: LoadedFil
 
       fieldsForThisFile.forEach(field => {
         if (field.originalValue !== field.modifiedValue) {
-          newContent = 텍스트교체하기(
-            newContent,
-            field.lineNumber,
-            field.originalValue,
-            field.modifiedValue,
-            false  // 부분 교체
-          );
-          hasChanges = true;
+          // 실제 줄 번호 찾기 (텍스트 기반 검색)
+          const actualLineNumber = 원본에서내용찾기(newContent, field.originalValue, field.lineNumber);
+
+          if (actualLineNumber !== null) {
+            newContent = 텍스트교체하기(
+              newContent,
+              actualLineNumber,
+              field.originalValue,
+              field.modifiedValue,
+              false  // 부분 교체
+            );
+            hasChanges = true;
+          } else {
+            console.warn(`파일${file.index + 1}에서 원본 내용을 찾을 수 없습니다:`, field.originalValue);
+          }
         }
       });
     } else {
@@ -281,14 +288,21 @@ export function 카드를파일에적용하기(card: MatchCard, files: LoadedFil
 
       matchesForThisFile.forEach(match => {
         if (match.originalContent !== match.modifiedContent) {
-          newContent = 텍스트교체하기(
-            newContent,
-            match.lineNumber,
-            match.originalContent,
-            match.modifiedContent,
-            true  // 전체 줄 교체
-          );
-          hasChanges = true;
+          // 실제 줄 번호 찾기 (텍스트 기반 검색)
+          const actualLineNumber = 원본에서내용찾기(newContent, match.originalContent, match.lineNumber);
+
+          if (actualLineNumber !== null) {
+            newContent = 텍스트교체하기(
+              newContent,
+              actualLineNumber,
+              match.originalContent,
+              match.modifiedContent,
+              true  // 전체 줄 교체
+            );
+            hasChanges = true;
+          } else {
+            console.warn(`파일${file.index + 1}에서 원본 내용을 찾을 수 없습니다:`, match.originalContent);
+          }
         }
       });
     }
