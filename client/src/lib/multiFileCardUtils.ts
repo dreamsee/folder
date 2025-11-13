@@ -287,7 +287,9 @@ export function 텍스트교체하기(
   replaceWholeLine: boolean = false,
   lineEnding: '\r\n' | '\n' = '\n'
 ): string {
-  const lines = fileContent.split(/\r?\n/);
+  // lineEnding에 맞게 줄 분리
+  const lineEndingRegex = lineEnding === '\r\n' ? /\r\n/ : /\n/;
+  const lines = fileContent.split(lineEndingRegex);
 
   if (lineNumber < 1 || lineNumber > lines.length) {
     console.error('줄 번호가 범위를 벗어났습니다:', lineNumber);
@@ -333,10 +335,12 @@ export function 카드를파일에적용하기(card: MatchCard, files: LoadedFil
 
     // 변경사항이 있으면 새 객체 반환, 없으면 원본 반환
     if (hasChanges) {
+      // lineEnding에 맞게 줄 분리
+      const lineEndingRegex = file.lineEnding === '\r\n' ? /\r\n/ : /\n/;
       return {
         ...file,
         content: newContent,
-        lines: newContent.split(/\r?\n/)
+        lines: newContent.split(lineEndingRegex)
       };
     }
 

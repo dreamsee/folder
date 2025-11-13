@@ -253,7 +253,9 @@ export default function MultiFileCardManager() {
       lineEnding = '\r\n';
     }
 
-    const lines = content.split(/\r?\n/);
+    // lineEnding에 맞게 줄 분리
+    const lineEndingRegex = lineEnding === '\r\n' ? /\r\n/ : /\n/;
+    const lines = content.split(lineEndingRegex);
 
     const newFile: LoadedFile = {
       index: fileIndex,
