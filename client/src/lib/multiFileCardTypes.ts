@@ -12,25 +12,12 @@ export interface CardMatch {
   endChar: number;
 }
 
-// 테이블 형태의 필드
-export interface CardField {
-  id: string;
-  label: string;  // 예: "공격력", "CONVENTIONAL_MECH_TECH_COST"
-  originalValue: string;  // 원본 값
-  modifiedValue: string;  // 수정된 값
-  isNumeric: boolean;  // 숫자 필드인지 여부
-  fileIndex: 0 | 1 | 2;  // 어느 파일에서 왔는지
-  lineNumber: number;
-}
-
 // 매칭 카드
 export interface MatchCard {
   id: string;
   name: string;  // 카드 이름 (예: "검", "창")
   categoryId: string;
   matches: CardMatch[];  // 3개 파일의 매칭 정보
-  isTableMode: boolean;  // 테이블 모드 활성화 여부
-  fields?: CardField[];  // 테이블 모드일 때 사용
   createdAt: number;
   updatedAt: number;
 }
@@ -41,6 +28,9 @@ export interface LoadedFile {
   name: string;
   content: string;
   lines: string[];  // 줄 단위로 분리된 내용
+  rawData?: ArrayBuffer;  // 원본 바이너리 데이터 (인코딩 보존용)
+  encoding?: string;  // 감지된 인코딩 정보
+  lineEnding?: '\r\n' | '\n';  // 줄바꿈 문자 (Windows CRLF vs Unix LF)
 }
 
 // 카드 카테고리

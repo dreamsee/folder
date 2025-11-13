@@ -21,9 +21,7 @@ import {
   파일불러오기,
   파일내용가져오기,
   카드생성하기,
-  카드를파일에적용하기,
-  모든필드파싱하기,
-  숫자필드파싱하기
+  카드를파일에적용하기
 } from '@/lib/multiFileCardUtils';
 
 export default function MultiFileCardManager() {
@@ -48,14 +46,12 @@ export default function MultiFileCardManager() {
   // 새 카드 생성 폼
   const [newCardName, setNewCardName] = useState('');
   const [newCardCategory, setNewCardCategory] = useState('default');
-  const [newCardIsTableMode, setNewCardIsTableMode] = useState(false);
   const [newCardLines, setNewCardLines] = useState<{ file1: number[]; file2: number[]; file3: number[] }>({
     file1: [],
     file2: [],
     file3: []
   });
   const [linePreviews, setLinePreviews] = useState<{ [key: string]: string[] }>({});
-  const [parsedTablePreview, setParsedTablePreview] = useState<{ [key: string]: any[] }>({});
 
   // 파싱 규칙
   const [labelStartDelim, setLabelStartDelim] = useState(' ');
@@ -110,6 +106,46 @@ export default function MultiFileCardManager() {
 
   // 하이라이트된 항목 인덱스
   const [highlightedMatchIndex, setHighlightedMatchIndex] = useState<number | null>(null);
+
+  // 편집 다이얼로그 열릴 때 파일의 실제 내용으로 originalContent 갱신
+  useEffect(() => {
+    if (!selectedCardId) return;
+
+    const selectedCard = cards.find(c => c.id === selectedCardId);
+    if (!selectedCard) return;
+
+    let updated = false;
+    const updatedCard = { ...selectedCard };
+
+    // matches의 originalContent 갱신
+    if (selectedCard.matches) {
+      updatedCard.matches = selectedCard.matches.map(match => {
+        const file = files.find(f => f.index === match.fileIndex);
+        if (!file || match.lineNumber < 1 || match.lineNumber > file.lines.length) {
+          return match;
+        }
+
+        const actualContent = file.lines[match.lineNumber - 1];
+        if (actualContent !== match.originalContent) {
+          updated = true;
+          return { ...match, originalContent: actualContent };
+        }
+        return match;
+      });
+    }
+
+    // 변경사항이 있으면 카드 업데이트
+    if (updated) {
+      setCards(prev => prev.map(c => c.id === selectedCardId ? updatedCard : c));
+      카드수정하기(selectedCardId, updatedCard);
+
+      toast({
+        title: "원본 내용 갱신",
+        description: "파일의 현재 내용으로 원본이 갱신되었습니다",
+        duration: 2000
+      });
+    }
+  }, [selectedCardId]);
 
   // 키보드 이벤트로 하이라이트된 항목 이동
   useEffect(() => {
@@ -188,14 +224,45 @@ export default function MultiFileCardManager() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const content = await file.text();
+    // 바이너리로 읽기
+    const rawData = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(rawData);
+
+    // 인코딩 감지
+    let encoding = 'UTF-8';
+    let content = '';
+
+    // BOM 확인
+    if (uint8Array.length >= 2) {
+      if (uint8Array[0] === 0xFF && uint8Array[1] === 0xFE) {
+        encoding = 'UTF-16LE';
+      } else if (uint8Array[0] === 0xFE && uint8Array[1] === 0xFF) {
+        encoding = 'UTF-16BE';
+      } else if (uint8Array.length >= 3 && uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
+        encoding = 'UTF-8';
+      }
+    }
+
+    // 디코딩
+    const decoder = new TextDecoder(encoding);
+    content = decoder.decode(rawData);
+
+    // 줄바꿈 문자 감지
+    let lineEnding: '\r\n' | '\n' = '\n';
+    if (content.includes('\r\n')) {
+      lineEnding = '\r\n';
+    }
+
     const lines = content.split(/\r?\n/);
 
     const newFile: LoadedFile = {
       index: fileIndex,
       name: file.name,
       content,
-      lines
+      lines,
+      rawData,
+      encoding,
+      lineEnding
     };
 
     const updatedFiles = files.filter(f => f.index !== fileIndex);
@@ -207,7 +274,22 @@ export default function MultiFileCardManager() {
 
     toast({
       title: "파일 업로드 완료",
-      description: `파일${fileIndex + 1}: ${file.name} (${lines.length}줄)`
+      description: `파일${fileIndex + 1}: ${file.name} (${lines.length}줄, ${encoding})`
+    });
+  };
+
+  // 파일 삭제
+  const handleFileRemove = (fileIndex: 0 | 1 | 2) => {
+    const file = files.find(f => f.index === fileIndex);
+    if (!file) return;
+
+    const updatedFiles = files.filter(f => f.index !== fileIndex);
+    setFiles(updatedFiles);
+    파일저장하기(updatedFiles);
+
+    toast({
+      title: "파일 삭제 완료",
+      description: `파일${fileIndex + 1}: ${file.name}이(가) 삭제되었습니다`
     });
   };
 
@@ -288,39 +370,6 @@ export default function MultiFileCardManager() {
     return fields;
   };
 
-  // 테이블 모드일 때 파싱 미리보기
-  useEffect(() => {
-    if (!newCardIsTableMode) {
-      setParsedTablePreview({});
-      return;
-    }
-
-    const parsed: { [key: string]: any[] } = {};
-
-    if (newCardLines.file1.length > 0 && linePreviews.file1) {
-      parsed.file1 = newCardLines.file1.map((lineNum, idx) => {
-        const content = linePreviews.file1[idx];
-        const fields = customParse(content, 0, lineNum);
-        return { lineNum, content, fields };
-      });
-    }
-    if (newCardLines.file2.length > 0 && linePreviews.file2) {
-      parsed.file2 = newCardLines.file2.map((lineNum, idx) => {
-        const content = linePreviews.file2[idx];
-        const fields = customParse(content, 1, lineNum);
-        return { lineNum, content, fields };
-      });
-    }
-    if (newCardLines.file3.length > 0 && linePreviews.file3) {
-      parsed.file3 = newCardLines.file3.map((lineNum, idx) => {
-        const content = linePreviews.file3[idx];
-        const fields = customParse(content, 2, lineNum);
-        return { lineNum, content, fields };
-      });
-    }
-
-    setParsedTablePreview(parsed);
-  }, [newCardIsTableMode, newCardLines, linePreviews, labelStartDelim, labelEndDelim, valueStartDelim, valueEndDelims]);
 
   // 카드 생성
   const handleCreateCard = () => {
@@ -398,8 +447,7 @@ export default function MultiFileCardManager() {
     const newCard = 카드생성하기(
       newCardName.trim(),
       newCardCategory,
-      matches,
-      newCardIsTableMode
+      matches
     );
 
     카드추가하기(newCard);
@@ -408,7 +456,6 @@ export default function MultiFileCardManager() {
     // 폼 초기화
     setNewCardName('');
     setNewCardCategory('default');
-    setNewCardIsTableMode(false);
     setNewCardLines({ file1: [], file2: [], file3: [] });
     setLinePreviews({});
     setShowNewCardDialog(false);
@@ -536,39 +583,6 @@ export default function MultiFileCardManager() {
         };
       });
 
-      // fields 복제 및 줄 번호 오프셋 적용 + 실제 파일 내용 가져오기 (테이블 모드인 경우)
-      const newFields = sourceCard.fields?.map(field => {
-        const newLineNumber = field.lineNumber + offsetAmount;
-        const file = files.find(f => f.index === field.fileIndex);
-        const newContent = (file?.lines[newLineNumber - 1]?.replace(/[\r\n]+$/, '')) || field.originalValue;
-
-        // 필드 값 파싱 (테이블 모드)
-        let parsedValue = newContent;
-        if (sourceCard.isTableMode && newContent) {
-          const parsed = 모든필드파싱하기(
-            [newContent],
-            labelStartDelim,
-            labelEndDelim,
-            valueStartDelim,
-            valueEndDelims
-          );
-          if (parsed.length > 0) {
-            const matchingField = parsed.find(p => p.label === field.label);
-            if (matchingField) {
-              parsedValue = matchingField.value;
-            }
-          }
-        }
-
-        return {
-          ...field,
-          id: `field-${Date.now()}-${Math.random()}`,
-          lineNumber: newLineNumber,
-          originalValue: parsedValue,
-          modifiedValue: parsedValue
-        };
-      });
-
       // 이름이 비어있으면 자동 생성
       const cardName = cloneCardNames[i]?.trim() || `${sourceCard.name}_복제${i + 1}`;
 
@@ -577,8 +591,8 @@ export default function MultiFileCardManager() {
         name: cardName,
         categoryId: sourceCard.categoryId,
         matches: newMatches,
-        isTableMode: sourceCard.isTableMode,
-        fields: newFields
+        createdAt: Date.now(),
+        updatedAt: Date.now()
       };
 
       newCards.push(newCard);
@@ -596,19 +610,6 @@ export default function MultiFileCardManager() {
     setShowPatternCloneDialog(false);
   };
 
-  // 카드 편집 - 필드 값 변경
-  const handleFieldChange = (cardId: string, fieldId: string, newValue: string) => {
-    setCards(prev => prev.map(card => {
-      if (card.id !== cardId) return card;
-
-      return {
-        ...card,
-        fields: card.fields?.map(field =>
-          field.id === fieldId ? { ...field, modifiedValue: newValue } : field
-        )
-      };
-    }));
-  };
 
   // 카드를 파일에 적용
   const handleApplyCardToFiles = (cardId: string) => {
@@ -626,10 +627,6 @@ export default function MultiFileCardManager() {
       matches: card.matches.map(match => ({
         ...match,
         originalContent: match.modifiedContent
-      })),
-      fields: card.fields?.map(field => ({
-        ...field,
-        originalValue: field.modifiedValue
       }))
     };
 
@@ -650,7 +647,42 @@ export default function MultiFileCardManager() {
     const file = files.find(f => f.index === fileIndex);
     if (!file) return;
 
-    const blob = new Blob([file.content], { type: 'text/plain' });
+    // rawData가 있으면 원본 바이너리 사용, 없으면 content를 인코딩
+    let blob: Blob;
+    if (file.rawData) {
+      // content가 수정되었을 수 있으므로 다시 인코딩
+      const encoder = new TextEncoder();
+      if (file.encoding === 'UTF-16LE') {
+        // UTF-16LE로 인코딩
+        const encoded = new Uint8Array(file.content.length * 2 + 2);
+        encoded[0] = 0xFF; // BOM
+        encoded[1] = 0xFE;
+        for (let i = 0; i < file.content.length; i++) {
+          const code = file.content.charCodeAt(i);
+          encoded[i * 2 + 2] = code & 0xFF;
+          encoded[i * 2 + 3] = (code >> 8) & 0xFF;
+        }
+        blob = new Blob([encoded], { type: 'application/octet-stream' });
+      } else if (file.encoding === 'UTF-16BE') {
+        // UTF-16BE로 인코딩
+        const encoded = new Uint8Array(file.content.length * 2 + 2);
+        encoded[0] = 0xFE; // BOM
+        encoded[1] = 0xFF;
+        for (let i = 0; i < file.content.length; i++) {
+          const code = file.content.charCodeAt(i);
+          encoded[i * 2 + 2] = (code >> 8) & 0xFF;
+          encoded[i * 2 + 3] = code & 0xFF;
+        }
+        blob = new Blob([encoded], { type: 'application/octet-stream' });
+      } else {
+        // UTF-8 (기본)
+        blob = new Blob([encoder.encode(file.content)], { type: 'application/octet-stream' });
+      }
+    } else {
+      // 호환성: rawData 없으면 기존 방식
+      blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -684,10 +716,6 @@ export default function MultiFileCardManager() {
         matches: card.matches.map(match => ({
           ...match,
           originalContent: match.modifiedContent
-        })),
-        fields: card.fields?.map(field => ({
-          ...field,
-          originalValue: field.modifiedValue
         }))
       };
 
@@ -703,7 +731,42 @@ export default function MultiFileCardManager() {
     // 3. 모든 파일 다운로드
     updatedFiles.forEach((file, index) => {
       setTimeout(() => {
-        const blob = new Blob([file.content], { type: 'text/plain' });
+        // rawData가 있으면 원본 인코딩 사용, 없으면 content를 인코딩
+        let blob: Blob;
+        if (file.rawData) {
+          // content가 수정되었을 수 있으므로 다시 인코딩
+          const encoder = new TextEncoder();
+          if (file.encoding === 'UTF-16LE') {
+            // UTF-16LE로 인코딩
+            const encoded = new Uint8Array(file.content.length * 2 + 2);
+            encoded[0] = 0xFF; // BOM
+            encoded[1] = 0xFE;
+            for (let i = 0; i < file.content.length; i++) {
+              const code = file.content.charCodeAt(i);
+              encoded[i * 2 + 2] = code & 0xFF;
+              encoded[i * 2 + 3] = (code >> 8) & 0xFF;
+            }
+            blob = new Blob([encoded], { type: 'application/octet-stream' });
+          } else if (file.encoding === 'UTF-16BE') {
+            // UTF-16BE로 인코딩
+            const encoded = new Uint8Array(file.content.length * 2 + 2);
+            encoded[0] = 0xFE; // BOM
+            encoded[1] = 0xFF;
+            for (let i = 0; i < file.content.length; i++) {
+              const code = file.content.charCodeAt(i);
+              encoded[i * 2 + 2] = (code >> 8) & 0xFF;
+              encoded[i * 2 + 3] = code & 0xFF;
+            }
+            blob = new Blob([encoded], { type: 'application/octet-stream' });
+          } else {
+            // UTF-8 (기본)
+            blob = new Blob([encoder.encode(file.content)], { type: 'application/octet-stream' });
+          }
+        } else {
+          // 호환성: rawData 없으면 기존 방식
+          blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+        }
+
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -745,7 +808,6 @@ export default function MultiFileCardManager() {
         id: card.id,
         name: card.name,
         categoryId: card.categoryId,
-        isTableMode: card.isTableMode,
         matches: card.matches.map(match => {
           const file = files.find(f => f.index === match.fileIndex);
           return {
@@ -754,18 +816,6 @@ export default function MultiFileCardManager() {
             lineNumber: match.lineNumber,
             originalContent: match.originalContent,
             modifiedContent: match.modifiedContent
-          };
-        }),
-        fields: card.fields?.map(field => {
-          const file = files.find(f => f.index === field.fileIndex);
-          return {
-            id: field.id,
-            label: field.label,
-            originalValue: field.originalValue,
-            modifiedValue: field.modifiedValue,
-            fileName: file?.name || `파일${field.fileIndex + 1}`,
-            fileIndex: field.fileIndex,
-            lineNumber: field.lineNumber
           };
         })
       }))
@@ -850,53 +900,11 @@ export default function MultiFileCardManager() {
           };
         });
 
-        // fields의 fileIndex도 재매핑 + 현재 파일 내용으로 originalValue 갱신
-        const remappedFields = mod.fields?.map((field: any) => {
-          const currentFile = files.find(f => f.name === field.fileName);
-          const fileIndex = currentFile?.index ?? field.fileIndex;
-
-          // 현재 파일에서 실제 내용 가져오기 (협업 대응)
-          let actualValue = field.originalValue; // 기본값
-          if (currentFile && field.lineNumber > 0 && field.lineNumber <= currentFile.lines.length) {
-            const lineContent = currentFile.lines[field.lineNumber - 1]?.replace(/[\r\n]+$/, '');
-            if (lineContent) {
-              // 테이블 모드인 경우 파싱하여 해당 필드의 값 추출
-              if (mod.isTableMode) {
-                const parsed = 모든필드파싱하기(
-                  [lineContent],
-                  labelStartDelim,
-                  labelEndDelim,
-                  valueStartDelim,
-                  valueEndDelims
-                );
-                const matchingField = parsed.find((p: any) => p.label === field.label);
-                if (matchingField) {
-                  actualValue = matchingField.value;
-                }
-              } else {
-                actualValue = lineContent;
-              }
-            }
-          }
-
-          return {
-            id: field.id,
-            label: field.label,
-            originalValue: actualValue,  // 현재 파일의 실제 내용으로 갱신
-            modifiedValue: field.modifiedValue,
-            fileIndex: fileIndex,
-            lineNumber: field.lineNumber,
-            isNumeric: /^-?\d+\.?\d*%?$/.test(actualValue)
-          };
-        });
-
         return {
           id: mod.id,
           name: mod.name,
           categoryId: mod.categoryId || 'default',
-          isTableMode: mod.isTableMode || false,
           matches: remappedMatches,
-          fields: remappedFields || undefined,
           createdAt: mod.createdAt || Date.now(),
           updatedAt: Date.now()
         };
@@ -1008,8 +1016,7 @@ export default function MultiFileCardManager() {
         const card = 카드생성하기(
           subCategoryName,
           quickTagCategoryId,
-          matches,
-          false
+          matches
         );
         카드추가하기(card);
         createdCount++;
@@ -1068,7 +1075,7 @@ export default function MultiFileCardManager() {
                   <div className="flex items-center gap-2">
                     <Input
                       type="file"
-                      accept=".txt,.ini,.xml,.json"
+                      accept=".txt,.ini,.xml,.json,.kor,.int"
                       onChange={(e) => handleFileUpload(index as 0 | 1 | 2, e)}
                       className="text-xs"
                     />
@@ -1077,15 +1084,25 @@ export default function MultiFileCardManager() {
                     <div className="text-xs text-gray-600 space-y-1">
                       <div>{file.name}</div>
                       <div>{file.lines.length}줄</div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleDownloadFile(index as 0 | 1 | 2)}
-                        className="h-6 text-xs"
-                      >
-                        <Save className="h-3 w-3 mr-1" />
-                        다운로드
-                      </Button>
+                      <div className="flex gap-3">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDownloadFile(index as 0 | 1 | 2)}
+                          className="h-6 text-xs flex-1"
+                        >
+                          <Save className="h-3 w-3 mr-1" />
+                          다운로드
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => handleFileRemove(index as 0 | 1 | 2)}
+                          className="h-6 text-xs"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1243,12 +1260,6 @@ export default function MultiFileCardManager() {
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-sm">{card.name}</CardTitle>
                           <div className="flex items-center gap-1">
-                            {card.isTableMode && (
-                              <Badge variant="outline" className="text-xs">
-                                <Grid className="h-3 w-3 mr-1" />
-                                테이블
-                              </Badge>
-                            )}
                             <Button
                               size="sm"
                               variant="ghost"
@@ -1393,16 +1404,6 @@ export default function MultiFileCardManager() {
             </div>
 
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={newCardIsTableMode}
-                  onChange={(e) => setNewCardIsTableMode(e.target.checked)}
-                  className="rounded"
-                />
-                <label className="text-sm font-medium">테이블 모드 (숫자 편집 최적화)</label>
-              </div>
-
               <Button
                 size="sm"
                 variant={quickTagMode ? "default" : "outline"}
@@ -1444,85 +1445,6 @@ export default function MultiFileCardManager() {
                       </div>
                     );
                   })}
-                </div>
-              </div>
-            )}
-
-            {newCardIsTableMode && (
-              <div className="bg-gray-50 p-3 rounded-md space-y-3 border border-gray-200">
-                <div className="text-sm font-medium text-gray-700">파싱 규칙 설정</div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-gray-600">제목 열 시작</label>
-                    <Input
-                      value={labelStartDelim}
-                      onChange={(e) => setLabelStartDelim(e.target.value)}
-                      placeholder="예: 띄어쓰기"
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">제목 열 끝</label>
-                    <Input
-                      value={labelEndDelim}
-                      onChange={(e) => setLabelEndDelim(e.target.value)}
-                      placeholder="예: ="
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">값 시작</label>
-                    <Input
-                      value={valueStartDelim}
-                      onChange={(e) => setValueStartDelim(e.target.value)}
-                      placeholder="예: ="
-                      className="h-8 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-600">값 끝 구분자</label>
-                    <div className="space-y-1">
-                      {valueEndDelims.map((delim, idx) => (
-                        <div key={idx} className="flex gap-1">
-                          <Input
-                            value={delim}
-                            onChange={(e) => {
-                              const newDelims = [...valueEndDelims];
-                              newDelims[idx] = e.target.value;
-                              setValueEndDelims(newDelims);
-                            }}
-                            placeholder="예: ,"
-                            className="h-8 text-xs flex-1"
-                          />
-                          {valueEndDelims.length > 1 && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setValueEndDelims(valueEndDelims.filter((_, i) => i !== idx))}
-                              className="h-8 px-2"
-                            >
-                              -
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setValueEndDelims([...valueEndDelims, ')'])}
-                        className="h-8 text-xs w-full"
-                      >
-                        + 구분자 추가
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-xs text-gray-500 pt-2 border-t">
-                  예시: "BalanceMods_Easy=( eType=eChar_Sectoid, iDamage=-1 )" 에서<br/>
-                  제목 열: " " ~ "=" 사이 (eType, iDamage)<br/>
-                  값: "=" ~ "," 또는 ")" 사이 (eChar_Sectoid, -1)
                 </div>
               </div>
             )}
@@ -1689,48 +1611,11 @@ export default function MultiFileCardManager() {
                       <div className="text-xs bg-blue-50 p-3 rounded border border-blue-200 space-y-2">
                         <div className="font-medium">선택된 내용:</div>
 
-                        {!newCardIsTableMode ? (
-                          // 일반 모드: 텍스트만 표시
-                          linePreviews[key].map((preview, idx) => (
-                            <div key={idx} className="overflow-x-auto whitespace-nowrap">
-                              {selectedLines[idx]}: {preview}
-                            </div>
-                          ))
-                        ) : (
-                          // 테이블 모드: 원본 + 파싱된 테이블 표시
-                          parsedTablePreview[key] && parsedTablePreview[key].map((parsed, idx) => (
-                            <div key={idx} className="space-y-1 border-t first:border-t-0 pt-2 first:pt-0">
-                              <div className="font-medium text-gray-600">줄 {parsed.lineNum}:</div>
-                              <div className="overflow-x-auto whitespace-nowrap text-gray-500 mb-1">
-                                {parsed.content}
-                              </div>
-                              {parsed.fields.length > 0 && (
-                                <div className="overflow-x-auto">
-                                  <table className="text-xs border-collapse">
-                                    <thead>
-                                      <tr className="bg-gray-100">
-                                        {parsed.fields.map((field: any, fieldIdx: number) => (
-                                          <th key={fieldIdx} className="border border-gray-300 px-2 py-1 whitespace-nowrap">
-                                            {field.label}=
-                                          </th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      <tr>
-                                        {parsed.fields.map((field: any, fieldIdx: number) => (
-                                          <td key={fieldIdx} className="border border-gray-300 px-2 py-1 text-center">
-                                            {field.originalValue}
-                                          </td>
-                                        ))}
-                                      </tr>
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-                          ))
-                        )}
+                        {linePreviews[key].map((preview, idx) => (
+                          <div key={idx} className="overflow-x-auto whitespace-nowrap">
+                            {selectedLines[idx]}: {preview}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </TabsContent>
@@ -1906,51 +1791,7 @@ export default function MultiFileCardManager() {
               </div>
             </DialogHeader>
 
-            {selectedCard.isTableMode && selectedCard.fields ? (
-              // 테이블 모드
-              <div className="space-y-4">
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-gray-50">
-                        <th className="border border-gray-300 px-3 py-2 text-left">항목</th>
-                        {showOriginal && <th className="border border-gray-300 px-3 py-2 text-left">원본</th>}
-                        <th className="border border-gray-300 px-3 py-2 text-left">수정</th>
-                        {showOriginal && <th className="border border-gray-300 px-3 py-2 text-left">파일</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedCard.fields.map(field => (
-                        <tr key={field.id}>
-                          <td className="border border-gray-300 px-3 py-2 font-medium">
-                            {field.label}
-                          </td>
-                          {showOriginal && (
-                            <td className="border border-gray-300 px-3 py-2 text-gray-600">
-                              {field.originalValue}
-                            </td>
-                          )}
-                          <td className="border border-gray-300 px-3 py-2">
-                            <Input
-                              value={field.modifiedValue}
-                              onChange={(e) => handleFieldChange(selectedCard.id, field.id, e.target.value)}
-                              className="h-8"
-                            />
-                          </td>
-                          {showOriginal && (
-                            <td className="border border-gray-300 px-3 py-2 text-xs text-gray-500">
-                              파일{field.fileIndex + 1} {field.lineNumber}줄
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
-              // 일반 모드
-              <div className="space-y-3">
+            <div className="space-y-3">
                 {selectedCard.matches.map((match, idx) => {
                   const matchId = `${match.fileIndex}-${match.lineNumber}`;
                   const isExpanded = expandedMatches.has(matchId);
@@ -2135,7 +1976,6 @@ export default function MultiFileCardManager() {
                   );
                 })}
               </div>
-            )}
 
             {/* 매치 추가 폼 */}
             <div className="border-t pt-4">

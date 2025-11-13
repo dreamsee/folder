@@ -1,6 +1,6 @@
 // 3개 파일 매칭 시스템 유틸 함수
 
-import { MatchCard, CardMatch, CardField, LoadedFile, CardCategory, ChangeDetection } from './multiFileCardTypes';
+import { MatchCard, CardMatch, LoadedFile, CardCategory, ChangeDetection } from './multiFileCardTypes';
 
 // localStorage 키
 const STORAGE_KEY_CARDS = 'multiFileCards';
@@ -10,7 +10,9 @@ const STORAGE_KEY_FILES = 'multiFileLoadedFiles';
 // ==================== 파일 관리 ====================
 
 export function 파일저장하기(files: LoadedFile[]): void {
-  localStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(files));
+  // rawData는 ArrayBuffer이므로 localStorage에 저장 불가 (제외)
+  const filesToSave = files.map(({ rawData, ...rest }) => rest);
+  localStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(filesToSave));
 }
 
 export function 파일불러오기(): LoadedFile[] {
@@ -101,108 +103,6 @@ export function 카드삭제하기(cardId: string): void {
   카드저장하기(filtered);
 }
 
-// ==================== 숫자 필드 파싱 ====================
-
-export function 숫자필드파싱하기(text: string, fileIndex: 0 | 1 | 2, lineNumber: number): CardField[] {
-  const fields: CardField[] = [];
-
-  // 패턴 1: 함수 호출 형태 파싱 (예: BalanceMods_Easy=( eType=eChar_Sectoid, iDamage=-1, ... ))
-  // 공백과 '=' 사이를 라벨로, '='와 ',' 또는 ')' 사이를 값으로
-  const functionPattern = /\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([^,)]+)/g;
-  let funcMatch;
-  while ((funcMatch = functionPattern.exec(text)) !== null) {
-    const value = funcMatch[2].trim();
-    fields.push({
-      id: `field_${Date.now()}_${fields.length}`,
-      label: funcMatch[1],
-      originalValue: value,
-      modifiedValue: value,
-      isNumeric: /^-?\d+\.?\d*%?$/.test(value),
-      fileIndex,
-      lineNumber
-    });
-  }
-
-  // 패턴 2: 간단한 KEY=VALUE (예: ATK=10, CONVENTIONAL_COST=15)
-  if (fields.length === 0) {
-    const pattern1 = /([A-Z_]+)\s*=\s*(\d+\.?\d*%?)/g;
-    let match1;
-    while ((match1 = pattern1.exec(text)) !== null) {
-      fields.push({
-        id: `field_${Date.now()}_${fields.length}`,
-        label: match1[1],
-        originalValue: match1[2],
-        modifiedValue: match1[2],
-        isNumeric: true,
-        fileIndex,
-        lineNumber
-      });
-    }
-  }
-
-  // 패턴 3: 한글키=값 (예: 공격력=10, 철=5)
-  if (fields.length === 0) {
-    const pattern2 = /([\u4e00-\u9fa5\uac00-\ud7a3]+)\s*=\s*(\d+\.?\d*%?)/g;
-    let match2;
-    while ((match2 = pattern2.exec(text)) !== null) {
-      fields.push({
-        id: `field_${Date.now()}_${fields.length}`,
-        label: match2[1],
-        originalValue: match2[2],
-        modifiedValue: match2[2],
-        isNumeric: true,
-        fileIndex,
-        lineNumber
-      });
-    }
-  }
-
-  // 패턴 4: "라벨: 숫자" (예: Attack: 10)
-  if (fields.length === 0) {
-    const pattern3 = /([^:,]+):\s*(\d+\.?\d*%?)/g;
-    let match3;
-    while ((match3 = pattern3.exec(text)) !== null) {
-      const label = match3[1].trim();
-      if (label && label.length < 50) {
-        fields.push({
-          id: `field_${Date.now()}_${fields.length}`,
-          label,
-          originalValue: match3[2],
-          modifiedValue: match3[2],
-          isNumeric: true,
-          fileIndex,
-          lineNumber
-        });
-      }
-    }
-  }
-
-  return fields;
-}
-
-export function 모든필드파싱하기(matches: CardMatch[]): CardField[] {
-  const allFields: CardField[] = [];
-
-  matches.forEach(match => {
-    const numericFields = 숫자필드파싱하기(match.originalContent, match.fileIndex, match.lineNumber);
-    allFields.push(...numericFields);
-
-    // 텍스트 필드도 추가 (숫자가 없는 경우)
-    if (numericFields.length === 0) {
-      allFields.push({
-        id: `field_${Date.now()}_${allFields.length}`,
-        label: `파일${match.fileIndex + 1}_줄${match.lineNumber}`,
-        originalValue: match.originalContent,
-        modifiedValue: match.modifiedContent,
-        isNumeric: false,
-        fileIndex: match.fileIndex,
-        lineNumber: match.lineNumber
-      });
-    }
-  });
-
-  return allFields;
-}
 
 // ==================== 텍스트 업데이트 ====================
 
@@ -287,8 +187,29 @@ export function 원본에서내용찾기(fileContent: string, originalContent: s
 
   // 1. 원래 줄 번호에서 정확히 확인
   if (oldLineNumber > 0 && oldLineNumber <= lines.length) {
-    if (lines[oldLineNumber - 1].includes(originalContent)) {
+    const currentLine = lines[oldLineNumber - 1];
+
+    // 1-1. 전체 라인이 정확히 일치하는지 확인 (trim 후)
+    if (currentLine.trim() === originalContent.trim()) {
       return oldLineNumber;
+    }
+
+    // 1-2. originalContent가 전체 라인을 포함하는지 확인 (일반 모드용)
+    if (originalContent.includes(currentLine.trim())) {
+      return oldLineNumber;
+    }
+
+    // 1-3. 부분 매칭은 정확한 경우만 (앞뒤 문자가 구분자인 경우)
+    if (currentLine.includes(originalContent)) {
+      const index = currentLine.indexOf(originalContent);
+      const before = index > 0 ? currentLine[index - 1] : '';
+      const after = index + originalContent.length < currentLine.length ? currentLine[index + originalContent.length] : '';
+
+      // 앞뒤가 구분자이거나 없으면 매칭
+      const isSeparator = (char: string) => !char || /[\s=,;()[\]{}]/.test(char);
+      if (isSeparator(before) && isSeparator(after)) {
+        return oldLineNumber;
+      }
     }
   }
 
@@ -314,8 +235,29 @@ export function 원본에서내용찾기(fileContent: string, originalContent: s
 
   // 3. 전체 파일에서 정확히 검색
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].includes(originalContent)) {
+    const currentLine = lines[i];
+
+    // 3-1. 전체 라인이 정확히 일치하는지 확인 (trim 후)
+    if (currentLine.trim() === originalContent.trim()) {
       return i + 1; // 1-based
+    }
+
+    // 3-2. originalContent가 전체 라인을 포함하는지 확인 (일반 모드용)
+    if (originalContent.includes(currentLine.trim())) {
+      return i + 1;
+    }
+
+    // 3-3. 부분 매칭은 정확한 경우만 (앞뒤 문자가 구분자인 경우)
+    if (currentLine.includes(originalContent)) {
+      const index = currentLine.indexOf(originalContent);
+      const before = index > 0 ? currentLine[index - 1] : '';
+      const after = index + originalContent.length < currentLine.length ? currentLine[index + originalContent.length] : '';
+
+      // 앞뒤가 구분자이거나 없으면 매칭
+      const isSeparator = (char: string) => !char || /[\s=,;()[\]{}]/.test(char);
+      if (isSeparator(before) && isSeparator(after)) {
+        return i + 1;
+      }
     }
   }
 
@@ -342,9 +284,10 @@ export function 텍스트교체하기(
   lineNumber: number,
   oldContent: string,
   newContent: string,
-  replaceWholeLine: boolean = false
+  replaceWholeLine: boolean = false,
+  lineEnding: '\r\n' | '\n' = '\n'
 ): string {
-  const lines = fileContent.split('\n');
+  const lines = fileContent.split(/\r?\n/);
 
   if (lineNumber < 1 || lineNumber > lines.length) {
     console.error('줄 번호가 범위를 벗어났습니다:', lineNumber);
@@ -361,7 +304,7 @@ export function 텍스트교체하기(
     lines[lineIndex] = lines[lineIndex].replace(oldContent, newContent);
   }
 
-  return lines.join('\n');
+  return lines.join(lineEnding);
 }
 
 export function 카드를파일에적용하기(card: MatchCard, files: LoadedFile[]): LoadedFile[] {
@@ -370,60 +313,30 @@ export function 카드를파일에적용하기(card: MatchCard, files: LoadedFil
     let newContent = file.content;
     let hasChanges = false;
 
-    if (card.isTableMode && card.fields) {
-      // 테이블 모드: 필드별로 업데이트
-      const fieldsForThisFile = card.fields.filter(f => f.fileIndex === file.index);
+    // 매칭별로 업데이트 (전체 줄 교체)
+    const matchesForThisFile = card.matches.filter(m => m.fileIndex === file.index);
 
-      fieldsForThisFile.forEach(field => {
-        if (field.originalValue !== field.modifiedValue) {
-          // 실제 줄 번호 찾기 (텍스트 기반 검색)
-          const actualLineNumber = 원본에서내용찾기(newContent, field.originalValue, field.lineNumber);
-
-          if (actualLineNumber !== null) {
-            newContent = 텍스트교체하기(
-              newContent,
-              actualLineNumber,
-              field.originalValue,
-              field.modifiedValue,
-              false  // 부분 교체
-            );
-            hasChanges = true;
-          } else {
-            console.warn(`파일${file.index + 1}에서 원본 내용을 찾을 수 없습니다:`, field.originalValue);
-          }
-        }
-      });
-    } else {
-      // 일반 모드: 매칭별로 업데이트 (전체 줄 교체)
-      const matchesForThisFile = card.matches.filter(m => m.fileIndex === file.index);
-
-      matchesForThisFile.forEach(match => {
+    matchesForThisFile.forEach(match => {
         if (match.originalContent !== match.modifiedContent) {
-          // 실제 줄 번호 찾기 (텍스트 기반 검색)
-          const actualLineNumber = 원본에서내용찾기(newContent, match.originalContent, match.lineNumber);
-
-          if (actualLineNumber !== null) {
-            newContent = 텍스트교체하기(
-              newContent,
-              actualLineNumber,
-              match.originalContent,
-              match.modifiedContent,
-              true  // 전체 줄 교체
-            );
-            hasChanges = true;
-          } else {
-            console.warn(`파일${file.index + 1}에서 원본 내용을 찾을 수 없습니다:`, match.originalContent);
-          }
+          // 줄번호 기준으로 직접 변경 (원본 내용 검증 없음)
+          newContent = 텍스트교체하기(
+            newContent,
+            match.lineNumber,
+            match.originalContent,
+            match.modifiedContent,
+            true,  // 전체 줄 교체
+            file.lineEnding || '\n'
+          );
+          hasChanges = true;
         }
       });
-    }
 
     // 변경사항이 있으면 새 객체 반환, 없으면 원본 반환
     if (hasChanges) {
       return {
         ...file,
         content: newContent,
-        lines: newContent.split('\n')
+        lines: newContent.split(/\r?\n/)
       };
     }
 
@@ -489,22 +402,16 @@ export function 변경사항감지하기(oldFiles: LoadedFile[], newFiles: Loade
 export function 카드생성하기(
   name: string,
   categoryId: string,
-  matches: CardMatch[],
-  isTableMode: boolean
+  matches: CardMatch[]
 ): MatchCard {
   const card: MatchCard = {
     id: `card_${Date.now()}`,
     name,
     categoryId,
     matches,
-    isTableMode,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };
-
-  if (isTableMode) {
-    card.fields = 모든필드파싱하기(matches);
-  }
 
   return card;
 }
