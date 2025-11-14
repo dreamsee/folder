@@ -645,53 +645,89 @@ export default function MultiFileCardManager() {
   };
 
   // 파일 다운로드
-  const handleDownloadFile = (fileIndex: 0 | 1 | 2) => {
-    const file = files.find(f => f.index === fileIndex);
-    if (!file) return;
+ const handleDownloadFile = (fileIndex: 0 | 1 | 2) => {
+  const file = files.find(f => f.index === fileIndex);
+  if (!file) return;
 
-    // rawData가 있으면 원본 바이너리 사용, 없으면 content를 인코딩
-    let blob: Blob;
-    if (file.rawData) {
-      // content가 수정되었을 수 있으므로 다시 인코딩
-      const encoder = new TextEncoder();
-      if (file.encoding === 'UTF-16LE') {
-        // UTF-16LE로 인코딩
-        const encoded = new Uint8Array(file.content.length * 2 + 2);
-        encoded[0] = 0xFF; // BOM
-        encoded[1] = 0xFE;
-        for (let i = 0; i < file.content.length; i++) {
-          const code = file.content.charCodeAt(i);
-          encoded[i * 2 + 2] = code & 0xFF;
-          encoded[i * 2 + 3] = (code >> 8) & 0xFF;
-        }
-        blob = new Blob([encoded], { type: 'application/octet-stream' });
-      } else if (file.encoding === 'UTF-16BE') {
-        // UTF-16BE로 인코딩
-        const encoded = new Uint8Array(file.content.length * 2 + 2);
-        encoded[0] = 0xFE; // BOM
-        encoded[1] = 0xFF;
-        for (let i = 0; i < file.content.length; i++) {
-          const code = file.content.charCodeAt(i);
-          encoded[i * 2 + 2] = (code >> 8) & 0xFF;
-          encoded[i * 2 + 3] = code & 0xFF;
-        }
-        blob = new Blob([encoded], { type: 'application/octet-stream' });
-      } else {
-        // UTF-8 (기본)
-        blob = new Blob([encoder.encode(file.content)], { type: 'application/octet-stream' });
-      }
-    } else {
-      // 호환성: rawData 없으면 기존 방식
-      blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
+  // lines 배열을 lineEnding으로 정확히 재구성
+  const finalContent = file.lines.join(file.lineEnding || '\n');
+
+  let blob: Blob;
+  const encoding = file.encoding || 'UTF-8';
+
+  if (encoding === 'UTF-16LE') {
+    // UTF-16LE로 인코딩 (서로게이트 페어 처리)
+    const utf16Codes: number[] = [];
+    for (let i = 0; i < finalContent.length; i++) {
+      utf16Codes.push(finalContent.charCodeAt(i));
     }
 
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+    // 바이트 배열 생성 (BOM + 데이터)
+    const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+    bytes[0] = 0xFF; // BOM LE
+    bytes[1] = 0xFE;
+
+    for (let i = 0; i < utf16Codes.length; i++) {
+      const code = utf16Codes[i];
+      bytes[(i + 1) * 2] = code & 0xFF;
+      bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
+    }
+
+    blob = new Blob([bytes], { type: 'application/octet-stream' });
+  } else if (encoding === 'UTF-16BE') {
+    // UTF-16BE로 인코딩 (서로게이트 페어 처리)
+    const utf16Codes: number[] = [];
+    for (let i = 0; i < finalContent.length; i++) {
+      utf16Codes.push(finalContent.charCodeAt(i));
+    }
+
+    // 바이트 배열 생성 (BOM + 데이터)
+    const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+    bytes[0] = 0xFE; // BOM BE
+    bytes[1] = 0xFF;
+
+    for (let i = 0; i < utf16Codes.length; i++) {
+      const code = utf16Codes[i];
+      bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
+      bytes[(i + 1) * 2 + 1] = code & 0xFF;
+    }
+
+    blob = new Blob([bytes], { type: 'application/octet-stream' });
+  } else {
+    // UTF-8 인코딩
+    const encoder = new TextEncoder();
+    const encoded = encoder.encode(finalContent);
+
+    // 원본에 BOM이 있었는지 확인
+    let hasBOM = false;
+    if (file.rawData) {
+      const uint8Array = new Uint8Array(file.rawData);
+      hasBOM = uint8Array.length >= 3 &&
+               uint8Array[0] === 0xEF &&
+               uint8Array[1] === 0xBB &&
+               uint8Array[2] === 0xBF;
+    }
+
+    if (hasBOM) {
+      // BOM 추가
+      const withBOM = new Uint8Array(encoded.length + 3);
+      withBOM[0] = 0xEF;
+      withBOM[1] = 0xBB;
+      withBOM[2] = 0xBF;
+      withBOM.set(encoded, 3);
+      blob = new Blob([withBOM], { type: 'application/octet-stream' });
+    } else {
+      blob = new Blob([encoded], { type: 'application/octet-stream' });
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = file.name;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
   // 전체 적용 및 다운로드
   const handleApplyAllAndDownload = () => {
@@ -709,10 +745,8 @@ export default function MultiFileCardManager() {
     const updatedCards: MatchCard[] = [];
 
     cards.forEach(card => {
-      // 각 카드를 파일에 적용
       updatedFiles = 카드를파일에적용하기(card, updatedFiles);
 
-      // 카드의 originalContent를 modifiedContent로 업데이트
       const updatedCard = {
         ...card,
         matches: card.matches.map(match => ({
@@ -729,59 +763,13 @@ export default function MultiFileCardManager() {
     setFiles(updatedFiles);
     setCards(updatedCards);
     파일저장하기(updatedFiles);
-
+    
     // 3. 모든 파일 다운로드
     updatedFiles.forEach((file, index) => {
-      setTimeout(() => {
-        // rawData가 있으면 원본 인코딩 사용, 없으면 content를 인코딩
-        let blob: Blob;
-        if (file.rawData) {
-          // content가 수정되었을 수 있으므로 다시 인코딩
-          const encoder = new TextEncoder();
-          if (file.encoding === 'UTF-16LE') {
-            // UTF-16LE로 인코딩
-            const encoded = new Uint8Array(file.content.length * 2 + 2);
-            encoded[0] = 0xFF; // BOM
-            encoded[1] = 0xFE;
-            for (let i = 0; i < file.content.length; i++) {
-              const code = file.content.charCodeAt(i);
-              encoded[i * 2 + 2] = code & 0xFF;
-              encoded[i * 2 + 3] = (code >> 8) & 0xFF;
-            }
-            blob = new Blob([encoded], { type: 'application/octet-stream' });
-          } else if (file.encoding === 'UTF-16BE') {
-            // UTF-16BE로 인코딩
-            const encoded = new Uint8Array(file.content.length * 2 + 2);
-            encoded[0] = 0xFE; // BOM
-            encoded[1] = 0xFF;
-            for (let i = 0; i < file.content.length; i++) {
-              const code = file.content.charCodeAt(i);
-              encoded[i * 2 + 2] = (code >> 8) & 0xFF;
-              encoded[i * 2 + 3] = code & 0xFF;
-            }
-            blob = new Blob([encoded], { type: 'application/octet-stream' });
-          } else {
-            // UTF-8 (기본)
-            blob = new Blob([encoder.encode(file.content)], { type: 'application/octet-stream' });
-          }
-        } else {
-          // 호환성: rawData 없으면 기존 방식
-          blob = new Blob([file.content], { type: 'text/plain;charset=utf-8' });
-        }
-
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        a.click();
-        URL.revokeObjectURL(url);
-      }, index * 300); // 각 파일마다 300ms 간격으로 다운로드
-    });
-
-    toast({
-      title: "전체 적용 완료",
-      description: `${cards.length}개 카드의 변경사항이 적용되었고, ${updatedFiles.length}개 파일이 다운로드됩니다`
-    });
+    setTimeout(() => {
+      handleDownloadFile(file.index);
+    }, index * 300);
+  });
   };
 
   // 카테고리 접기/펼치기
