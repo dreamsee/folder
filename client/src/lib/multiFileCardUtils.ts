@@ -348,6 +348,56 @@ export function 카드를파일에적용하기(card: MatchCard, files: LoadedFil
   });
 }
 
+// 여러 카드를 한 번에 파일에 적용
+export function 모든카드를파일에적용하기(cards: MatchCard[], files: LoadedFile[]): LoadedFile[] {
+  // 파일별로 모든 매치를 모음
+  const matchesByFile = new Map<number, CardMatch[]>();
+
+  cards.forEach(card => {
+    card.matches.forEach(match => {
+      if (!matchesByFile.has(match.fileIndex)) {
+        matchesByFile.set(match.fileIndex, []);
+      }
+      matchesByFile.get(match.fileIndex)!.push(match);
+    });
+  });
+
+  // 각 파일에 대해 한 번에 적용
+  return files.map(file => {
+    const matchesForThisFile = matchesByFile.get(file.index);
+    if (!matchesForThisFile || matchesForThisFile.length === 0) {
+      return file;
+    }
+
+    // lines 배열 복사
+    const lineEndingRegex = file.lineEnding === '\r\n' ? /\r\n/ : /\n/;
+    const newLines = [...file.lines];
+    let hasChanges = false;
+
+    // 각 매치에 대해 직접 lines 배열 수정
+    matchesForThisFile.forEach(match => {
+      if (match.originalContent !== match.modifiedContent) {
+        const lineIndex = match.lineNumber - 1;
+        if (lineIndex >= 0 && lineIndex < newLines.length) {
+          newLines[lineIndex] = match.modifiedContent;
+          hasChanges = true;
+        }
+      }
+    });
+
+    if (hasChanges) {
+      const newContent = newLines.join(file.lineEnding || '\n');
+      return {
+        ...file,
+        content: newContent,
+        lines: newLines
+      };
+    }
+
+    return file;
+  });
+}
+
 // ==================== 변경 감지 ====================
 
 export function 변경사항감지하기(oldFiles: LoadedFile[], newFiles: LoadedFile[], cards: MatchCard[]): ChangeDetection[] {

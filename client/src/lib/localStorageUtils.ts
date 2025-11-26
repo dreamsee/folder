@@ -123,3 +123,61 @@ export function 데이터존재확인(): boolean {
   const 원본목록 = 모든원본문서가져오기();
   return 원본목록.length > 0;
 }
+
+// 로컬스토리지 용량 정보
+export interface StorageInfo {
+  used: number;           // 현재 사용량 (bytes)
+  max: number;            // 최대 용량 (bytes)
+  comfortable: number;    // 쾌적 기준 (bytes)
+  percentage: number;     // 사용 퍼센트
+  status: 'good' | 'warning' | 'danger';
+  usedFormatted: string;
+  maxFormatted: string;
+  comfortableFormatted: string;
+}
+
+// 바이트를 읽기 쉬운 형식으로 변환
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+// 로컬스토리지 용량 정보 가져오기
+export function getStorageInfo(): StorageInfo {
+  const MAX_STORAGE = 5 * 1024 * 1024;        // 5MB (브라우저 일반적 한도)
+  const COMFORTABLE_STORAGE = 2 * 1024 * 1024; // 2MB (쾌적 기준)
+
+  // 현재 사용량 계산
+  let totalSize = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) {
+      const value = localStorage.getItem(key) || '';
+      // UTF-16 인코딩 고려 (문자당 2바이트)
+      totalSize += (key.length + value.length) * 2;
+    }
+  }
+
+  const percentage = (totalSize / MAX_STORAGE) * 100;
+
+  let status: 'good' | 'warning' | 'danger';
+  if (percentage < 50) {
+    status = 'good';
+  } else if (percentage < 80) {
+    status = 'warning';
+  } else {
+    status = 'danger';
+  }
+
+  return {
+    used: totalSize,
+    max: MAX_STORAGE,
+    comfortable: COMFORTABLE_STORAGE,
+    percentage,
+    status,
+    usedFormatted: formatBytes(totalSize),
+    maxFormatted: formatBytes(MAX_STORAGE),
+    comfortableFormatted: formatBytes(COMFORTABLE_STORAGE)
+  };
+}

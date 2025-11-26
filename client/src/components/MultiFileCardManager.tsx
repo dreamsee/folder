@@ -21,7 +21,8 @@ import {
   파일불러오기,
   파일내용가져오기,
   카드생성하기,
-  카드를파일에적용하기
+  카드를파일에적용하기,
+  모든카드를파일에적용하기
 } from '@/lib/multiFileCardUtils';
 
 export default function MultiFileCardManager() {
@@ -106,6 +107,16 @@ export default function MultiFileCardManager() {
 
   // 하이라이트된 항목 인덱스
   const [highlightedMatchIndex, setHighlightedMatchIndex] = useState<number | null>(null);
+
+  // 유사 항목 찾기 다이얼로그
+  interface SimilarCandidate {
+    lineNumber: number;
+    content: string;
+    similarity: number;
+  }
+  const [showSimilarDialog, setShowSimilarDialog] = useState(false);
+  const [currentMatchIndex, setCurrentMatchIndex] = useState<number | null>(null);
+  const [similarCandidates, setSimilarCandidates] = useState<SimilarCandidate[]>([]);
 
   // 편집 다이얼로그 열릴 때 파일의 실제 내용으로 originalContent 갱신
   useEffect(() => {
@@ -311,6 +322,97 @@ export default function MultiFileCardManager() {
 
     setLinePreviews(previews);
   }, [newCardLines, files]);
+
+  // 유사도 계산 함수 (레벤슈타인 거리 기반)
+  const calculateSimilarity = (str1: string, str2: string): number => {
+    const len1 = str1.length;
+    const len2 = str2.length;
+    const matrix: number[][] = [];
+
+    for (let i = 0; i <= len1; i++) {
+      matrix[i] = [i];
+    }
+    for (let j = 0; j <= len2; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= len1; i++) {
+      for (let j = 1; j <= len2; j++) {
+        const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost
+        );
+      }
+    }
+
+    const distance = matrix[len1][len2];
+    const maxLen = Math.max(len1, len2);
+    return maxLen === 0 ? 100 : ((maxLen - distance) / maxLen) * 100;
+  };
+
+  // 유사 항목 찾기
+  const handleFindSimilar = (matchIndex: number) => {
+    if (!selectedCardId) return;
+
+    const selectedCard = cards.find(c => c.id === selectedCardId);
+    if (!selectedCard) return;
+
+    const match = selectedCard.matches[matchIndex];
+    const file = files.find(f => f.index === match.fileIndex);
+    if (!file) return;
+
+    // 현재 수정본과 유사한 줄들을 찾기
+    const candidates: SimilarCandidate[] = file.lines
+      .map((line, index) => ({
+        lineNumber: index + 1,
+        content: line.replace(/[\r\n]+$/, ''),
+        similarity: calculateSimilarity(match.modifiedContent, line.replace(/[\r\n]+$/, ''))
+      }))
+      .filter(candidate => candidate.similarity > 30) // 30% 이상 유사한 것만
+      .sort((a, b) => b.similarity - a.similarity) // 유사도 높은 순
+      .slice(0, 20); // 상위 20개만
+
+    setSimilarCandidates(candidates);
+    setCurrentMatchIndex(matchIndex);
+    setShowSimilarDialog(true);
+  };
+
+  // 유사 항목 선택
+  const handleSelectSimilar = (candidate: SimilarCandidate) => {
+    if (!selectedCardId || currentMatchIndex === null) return;
+
+    const selectedCard = cards.find(c => c.id === selectedCardId);
+    if (!selectedCard) return;
+
+    const updatedCards = cards.map(card => {
+      if (card.id !== selectedCard.id) return card;
+      return {
+        ...card,
+        matches: card.matches.map((m, i) =>
+          i === currentMatchIndex
+            ? { ...m, lineNumber: candidate.lineNumber, originalContent: candidate.content }
+            : m
+        )
+      };
+    });
+
+    setCards(updatedCards);
+    const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
+    if (updatedCard) {
+      카드수정하기(updatedCard);
+    }
+
+    setShowSimilarDialog(false);
+    setCurrentMatchIndex(null);
+    setSimilarCandidates([]);
+
+    toast({
+      title: "원본 갱신 완료",
+      description: `${candidate.lineNumber}줄로 원본이 갱신되었습니다`
+    });
+  };
 
   // 커스텀 파싱 함수
   const customParse = (text: string, fileIndex: 0 | 1 | 2, lineNumber: number) => {
@@ -740,36 +842,102 @@ export default function MultiFileCardManager() {
       return;
     }
 
-    // 1. 모든 카드의 수정사항을 파일에 적용
-    let updatedFiles = [...files];
-    const updatedCards: MatchCard[] = [];
+    // 1. 모든 카드의 수정사항을 파일에 한 번에 적용
+    const updatedFiles = 모든카드를파일에적용하기(cards, files);
 
-    cards.forEach(card => {
-      updatedFiles = 카드를파일에적용하기(card, updatedFiles);
+    // 2. 카드의 originalContent를 modifiedContent로 업데이트
+    const updatedCards = cards.map(card => ({
+      ...card,
+      matches: card.matches.map(match => ({
+        ...match,
+        originalContent: match.modifiedContent
+      }))
+    }));
 
-      const updatedCard = {
-        ...card,
-        matches: card.matches.map(match => ({
-          ...match,
-          originalContent: match.modifiedContent
-        }))
-      };
-
-      updatedCards.push(updatedCard);
-      카드수정하기(updatedCard.id, updatedCard);
+    updatedCards.forEach(card => {
+      카드수정하기(card.id, card);
     });
 
-    // 2. 파일 상태 업데이트 및 저장
+    // 3. 파일 상태 업데이트 및 저장
     setFiles(updatedFiles);
     setCards(updatedCards);
     파일저장하기(updatedFiles);
-    
-    // 3. 모든 파일 다운로드
+
+    // 4. 모든 파일 다운로드 (updatedFiles를 직접 사용)
     updatedFiles.forEach((file, index) => {
-    setTimeout(() => {
-      handleDownloadFile(file.index);
-    }, index * 300);
-  });
+      setTimeout(() => {
+        // updatedFiles에서 직접 파일을 가져와서 다운로드
+        const finalContent = file.lines.join(file.lineEnding || '\n');
+        let blob: Blob;
+        const encoding = file.encoding || 'UTF-8';
+
+        if (encoding === 'UTF-16LE') {
+          const utf16Codes: number[] = [];
+          for (let i = 0; i < finalContent.length; i++) {
+            utf16Codes.push(finalContent.charCodeAt(i));
+          }
+
+          const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+          bytes[0] = 0xFF;
+          bytes[1] = 0xFE;
+
+          for (let i = 0; i < utf16Codes.length; i++) {
+            const code = utf16Codes[i];
+            bytes[(i + 1) * 2] = code & 0xFF;
+            bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
+          }
+
+          blob = new Blob([bytes], { type: 'application/octet-stream' });
+        } else if (encoding === 'UTF-16BE') {
+          const utf16Codes: number[] = [];
+          for (let i = 0; i < finalContent.length; i++) {
+            utf16Codes.push(finalContent.charCodeAt(i));
+          }
+
+          const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+          bytes[0] = 0xFE;
+          bytes[1] = 0xFF;
+
+          for (let i = 0; i < utf16Codes.length; i++) {
+            const code = utf16Codes[i];
+            bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
+            bytes[(i + 1) * 2 + 1] = code & 0xFF;
+          }
+
+          blob = new Blob([bytes], { type: 'application/octet-stream' });
+        } else {
+          const encoder = new TextEncoder();
+          const encoded = encoder.encode(finalContent);
+
+          let hasBOM = false;
+          if (file.rawData) {
+            const uint8Array = new Uint8Array(file.rawData);
+            hasBOM = uint8Array.length >= 3 &&
+                     uint8Array[0] === 0xEF &&
+                     uint8Array[1] === 0xBB &&
+                     uint8Array[2] === 0xBF;
+          }
+
+          if (hasBOM) {
+            const withBOM = new Uint8Array(encoded.length + 3);
+            withBOM[0] = 0xEF;
+            withBOM[1] = 0xBB;
+            withBOM[2] = 0xBF;
+            withBOM.set(encoded, 3);
+            blob = new Blob([withBOM], { type: 'application/octet-stream' });
+          } else {
+            blob = new Blob([encoded], { type: 'application/octet-stream' });
+          }
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, index * 300);
+    });
   };
 
   // 카테고리 접기/펼치기
@@ -1899,7 +2067,17 @@ export default function MultiFileCardManager() {
                         <div className="space-y-2">
                           {showOriginal && (
                             <div>
-                              <label className="text-xs font-medium">원본</label>
+                              <div className="flex items-center justify-between mb-1">
+                                <label className="text-xs font-medium">원본</label>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleFindSimilar(idx)}
+                                  className="h-6 text-xs px-2"
+                                >
+                                  원본 가져오기
+                                </Button>
+                              </div>
                               <div className="text-sm bg-gray-50 p-2 rounded break-all">
                                 {match.originalContent}
                               </div>
@@ -1962,6 +2140,40 @@ export default function MultiFileCardManager() {
                           </div>
                         </div>
                       </div>
+                                              {/* 삭제 버튼 */}
+                        <div className="flex items-center pt-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              if (!confirm('이 줄을 삭제하시겠습니까?')) return;    
+
+                              const updatedCards = cards.map(card => {
+                                if (card.id !== selectedCard.id) return card;       
+                                return {
+                                  ...card,
+                                  matches: card.matches.filter((_, i) => i !== idx)
+                                };
+                              });
+
+                              setCards(updatedCards);
+
+                              const updatedCard = updatedCards.find(c => c.id  === selectedCard.id);
+                              if (updatedCard) {
+                                카드수정하기(selectedCard.id, updatedCard);  // ✅ cardId와 업데이트 데이터  
+                              }
+
+                              toast({
+                                title: "줄 삭제 완료",
+                                description: "매치 항목이 삭제되었습니다"
+                              });
+                            }}
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                            title="이 줄 삭제"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                     </div>
                   );
                 })}
@@ -2171,6 +2383,65 @@ export default function MultiFileCardManager() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* 유사 항목 선택 다이얼로그 */}
+      <Dialog open={showSimilarDialog} onOpenChange={setShowSimilarDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>원본 가져오기</DialogTitle>
+            <DialogDescription>
+              수정본과 유사한 줄을 선택하여 원본으로 설정합니다
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            {similarCandidates.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                유사한 항목이 없습니다
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {similarCandidates.map((candidate, idx) => (
+                  <div
+                    key={idx}
+                    className="border rounded p-3 hover:bg-blue-50 cursor-pointer transition-colors"
+                    onClick={() => handleSelectSimilar(candidate)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="text-xs">
+                          {candidate.lineNumber}줄
+                        </Badge>
+                        <Badge
+                          variant={
+                            candidate.similarity >= 80
+                              ? "default"
+                              : candidate.similarity >= 60
+                              ? "secondary"
+                              : "outline"
+                          }
+                          className="text-xs"
+                        >
+                          유사도 {candidate.similarity.toFixed(1)}%
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="text-sm font-mono bg-gray-50 p-2 rounded break-all">
+                      {candidate.content}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSimilarDialog(false)}>
+              취소
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
