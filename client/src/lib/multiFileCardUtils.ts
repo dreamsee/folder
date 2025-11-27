@@ -13,10 +13,10 @@ import {
 // ==================== 파일 관리 ====================
 
 export async function 파일저장하기(files: LoadedFile[]): Promise<void> {
-  // rawData는 ArrayBuffer이므로 IndexedDB에 저장 불가 (제외)
-  const filesToSave = files.map(({ rawData, ...rest }) => ({
-    ...rest,
-    id: rest.index // IndexedDB는 id 필요
+  // IndexedDB는 ArrayBuffer 저장 가능 - rawData 포함하여 저장
+  const filesToSave = files.map((file) => ({
+    ...file,
+    id: file.index // IndexedDB는 id 필요
   }));
   await MultiFileLoadedFiles저장하기(filesToSave);
 }
@@ -466,13 +466,15 @@ export function 변경사항감지하기(oldFiles: LoadedFile[], newFiles: Loade
 export function 카드생성하기(
   name: string,
   categoryId: string,
-  matches: CardMatch[]
+  matches: CardMatch[],
+  order?: number
 ): MatchCard {
   const card: MatchCard = {
     id: `card_${Date.now()}`,
     name,
     categoryId,
     matches,
+    order: order ?? 0,
     createdAt: Date.now(),
     updatedAt: Date.now()
   };

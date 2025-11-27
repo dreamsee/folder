@@ -18,6 +18,7 @@ export interface MatchCard {
   name: string;  // 카드 이름 (예: "검", "창")
   categoryId: string;
   matches: CardMatch[];  // 3개 파일의 매칭 정보
+  order?: number;  // 카테고리 내 순서
   createdAt: number;
   updatedAt: number;
 }
