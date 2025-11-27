@@ -1,4 +1,16 @@
-// JSON 파일 가져오기/내보내기 유틸리티
+// JSON 파일 가져오기/내보내기 유틸리티 (IndexedDB 호환)
+import {
+  모든원본문서가져오기,
+  모든수정된문서가져오기,
+  원본문서저장하기,
+  수정된문서저장하기,
+  모든MultiFileCard가져오기,
+  모든MultiFileCardCategories가져오기,
+  모든MultiFileLoadedFiles가져오기,
+  MultiFileCard저장하기,
+  MultiFileCardCategories저장하기,
+  MultiFileLoadedFiles저장하기
+} from './localStorageUtils';
 
 export interface 노트데이터 {
   원본문서목록: {
@@ -26,7 +38,7 @@ export function JSON파일로내보내기(데이터: 노트데이터, 파일명:
   const json문자열 = JSON.stringify(데이터, null, 2);
   const blob = new Blob([json문자열], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
-  
+
   const a = document.createElement('a');
   a.href = url;
   a.download = `${파일명}_${new Date().toISOString().split('T')[0]}.json`;
@@ -42,14 +54,14 @@ export function JSON파일에서가져오기(): Promise<노트데이터> {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json';
-    
+
     input.onchange = (event) => {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) {
         reject(new Error('파일이 선택되지 않았습니다'));
         return;
       }
-      
+
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -87,27 +99,42 @@ export function JSON파일에서가져오기(): Promise<노트데이터> {
           reject(new Error('JSON 파일 파싱 오류: ' + error));
         }
       };
-      
+
       reader.onerror = () => {
         reject(new Error('파일 읽기 오류'));
       };
-      
+
       reader.readAsText(file);
     };
-    
+
     input.click();
   });
 }
 
-// 현재 로컬스토리지 데이터를 JSON 형식으로 변환
-export function 현재데이터를JSON형식으로변환(): 노트데이터 {
-  const 원본문서목록 = JSON.parse(localStorage.getItem('originalDocuments') || '[]');
-  const 수정된문서목록 = JSON.parse(localStorage.getItem('modifiedDocuments') || '[]');
+// 현재 IndexedDB 데이터를 JSON 형식으로 변환 (비동기)
+export async function 현재데이터를JSON형식으로변환(): Promise<노트데이터> {
+  const 원본문서목록Raw = await 모든원본문서가져오기();
+  const 수정된문서목록Raw = await 모든수정된문서가져오기();
+  const multiFileCards = await 모든MultiFileCard가져오기();
+  const multiFileCardCategories = await 모든MultiFileCardCategories가져오기();
+  const multiFileLoadedFiles = await 모든MultiFileLoadedFiles가져오기();
 
-  // MultiFileCard 시스템 데이터도 포함
-  const multiFileCards = JSON.parse(localStorage.getItem('multiFileCards') || '[]');
-  const multiFileCardCategories = JSON.parse(localStorage.getItem('multiFileCardCategories') || '[]');
-  const multiFileLoadedFiles = JSON.parse(localStorage.getItem('multiFileLoadedFiles') || '[]');
+  // 내보내기용 형식으로 변환
+  const 원본문서목록 = 원본문서목록Raw.map(doc => ({
+    id: doc.id,
+    제목: doc.title,
+    내용: doc.content,
+    생성일시: doc.createdAt
+  }));
+
+  const 수정된문서목록 = 수정된문서목록Raw.map(doc => ({
+    id: doc.id,
+    제목: doc.title,
+    내용: doc.content,
+    원본Id: doc.originalId,
+    영역데이터: doc.regionData,
+    생성일시: doc.createdAt
+  }));
 
   return {
     원본문서목록,
@@ -118,25 +145,40 @@ export function 현재데이터를JSON형식으로변환(): 노트데이터 {
   };
 }
 
-// JSON 데이터를 로컬스토리지에 저장
-export function JSON데이터를로컬스토리지에저장(데이터: 노트데이터) {
+// JSON 데이터를 IndexedDB에 저장 (비동기)
+export async function JSON데이터를로컬스토리지에저장(데이터: 노트데이터): Promise<void> {
   // 2개 문서 비교 시스템 데이터 저장
-  if (데이터.원본문서목록) {
-    localStorage.setItem('originalDocuments', JSON.stringify(데이터.원본문서목록));
+  if (데이터.원본문서목록 && 데이터.원본문서목록.length > 0) {
+    // JSON 형식에서 내부 형식으로 변환
+    const 원본문서들 = 데이터.원본문서목록.map(doc => ({
+      id: doc.id,
+      title: doc.제목,
+      content: doc.내용,
+      createdAt: doc.생성일시
+    }));
+    await 원본문서저장하기(원본문서들);
   }
-  if (데이터.수정된문서목록) {
-    localStorage.setItem('modifiedDocuments', JSON.stringify(데이터.수정된문서목록));
+
+  if (데이터.수정된문서목록 && 데이터.수정된문서목록.length > 0) {
+    const 수정된문서들 = 데이터.수정된문서목록.map(doc => ({
+      id: doc.id,
+      title: doc.제목,
+      content: doc.내용,
+      originalId: doc.원본Id,
+      regionData: doc.영역데이터,
+      createdAt: doc.생성일시
+    }));
+    await 수정된문서저장하기(수정된문서들);
   }
 
   // MultiFileCard 시스템 데이터 저장
-  if (데이터.multiFileCards) {
-    localStorage.setItem('multiFileCards', JSON.stringify(데이터.multiFileCards));
+  if (데이터.multiFileCards && 데이터.multiFileCards.length > 0) {
+    await MultiFileCard저장하기(데이터.multiFileCards);
   }
-  if (데이터.multiFileCardCategories) {
-    localStorage.setItem('multiFileCardCategories', JSON.stringify(데이터.multiFileCardCategories));
+  if (데이터.multiFileCardCategories && 데이터.multiFileCardCategories.length > 0) {
+    await MultiFileCardCategories저장하기(데이터.multiFileCardCategories);
   }
-  if (데이터.multiFileLoadedFiles) {
-    localStorage.setItem('multiFileLoadedFiles', JSON.stringify(데이터.multiFileLoadedFiles));
+  if (데이터.multiFileLoadedFiles && 데이터.multiFileLoadedFiles.length > 0) {
+    await MultiFileLoadedFiles저장하기(데이터.multiFileLoadedFiles);
   }
 }
-

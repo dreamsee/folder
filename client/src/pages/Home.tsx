@@ -18,7 +18,8 @@ import {
   모든원본문서가져오기,
   ID로원본문서찾기,
   원본ID로수정된문서찾기,
-  ID로수정된문서찾기
+  ID로수정된문서찾기,
+  수정된문서수정하기
 } from "@/lib/localStorageUtils";
 
 export default function Home() {
@@ -47,26 +48,26 @@ export default function Home() {
   const [isLoading] = useState(false);
 
   // 원본 문서 목록 로드
-  const loadOriginalDocuments = () => {
-    const documents = 모든원본문서가져오기();
+  const loadOriginalDocuments = async () => {
+    const documents = await 모든원본문서가져오기();
     setOriginalDocuments(documents);
     return documents;
   };
 
   // 수정된 문서 목록 로드
-  const loadModifiedDocuments = (originalId: string) => {
+  const loadModifiedDocuments = async (originalId: string) => {
     if (!originalId) return [];
-    console.log('📋 [DEBUG] 수정된 문서 목록 로드, 원본ID:', originalId);
-    const documents = 원본ID로수정된문서찾기(parseInt(originalId));
-    console.log('📋 [DEBUG] 찾은 수정된 문서들:', documents);
+    console.log('[DEBUG] 수정된 문서 목록 로드, 원본ID:', originalId);
+    const documents = await 원본ID로수정된문서찾기(parseInt(originalId));
+    console.log('[DEBUG] 찾은 수정된 문서들:', documents);
     setModifiedDocuments(documents);
     return documents;
   };
 
   // 호버된 원본에 대한 수정된 문서 로드
-  const loadHoveredModifiedDocuments = (originalId: string) => {
+  const loadHoveredModifiedDocuments = async (originalId: string) => {
     if (!originalId) return [];
-    const documents = 원본ID로수정된문서찾기(parseInt(originalId));
+    const documents = await 원본ID로수정된문서찾기(parseInt(originalId));
     setHoveredModifiedDocuments(documents);
     return documents;
   };
@@ -75,7 +76,7 @@ export default function Home() {
   const getOriginalDocument = async (id: string, resetModified: boolean = true) => {
     if (!id) return;
     try {
-      const document = ID로원본문서찾기(parseInt(id));
+      const document = await ID로원본문서찾기(parseInt(id));
       if (document) {
         setOriginalText(document.content);
 
@@ -86,7 +87,7 @@ export default function Home() {
         }
 
         // 해당 원본의 수정된 문서들 로드
-        loadModifiedDocuments(id);
+        await loadModifiedDocuments(id);
       }
     } catch (error) {
       toast({
@@ -96,24 +97,24 @@ export default function Home() {
       });
     }
   };
-  
+
   // 특정 ID의 수정된 문서 가져오기
   const getModifiedDocument = async (id: string) => {
     if (!id) return;
     try {
-      console.log('🔍 [DEBUG] 수정된 문서 가져오기 시작, ID:', id);
-      const document = ID로수정된문서찾기(parseInt(id));
-      console.log('🔍 [DEBUG] 찾은 수정된 문서:', document);
-      
+      console.log('[DEBUG] 수정된 문서 가져오기 시작, ID:', id);
+      const document = await ID로수정된문서찾기(parseInt(id));
+      console.log('[DEBUG] 찾은 수정된 문서:', document);
+
       if (document) {
         // 수정된 문서의 내용만 업데이트 (원본은 그대로 유지)
         setModifiedText(document.content);
-        console.log('🔍 [DEBUG] 수정된 텍스트 설정됨, 길이:', document.content.length);
+        console.log('[DEBUG] 수정된 텍스트 설정됨, 길이:', document.content.length);
       } else {
-        console.log('🔍 [DEBUG] 수정된 문서를 찾지 못함');
+        console.log('[DEBUG] 수정된 문서를 찾지 못함');
       }
     } catch (error) {
-      console.error('🔍 [DEBUG] 수정된 문서 가져오기 오류:', error);
+      console.error('[DEBUG] 수정된 문서 가져오기 오류:', error);
       toast({
         title: "오류",
         description: "수정된 문서를 가져오는 중 오류가 발생했습니다",
@@ -246,21 +247,16 @@ export default function Home() {
 
   // regionData 변경 시 자동으로 수정된 문서 업데이트
   useEffect(() => {
-    if (selectedModifiedDocumentId && selectedModifiedDocumentId !== "none" && regionData) {
-      const modifiedDocs = JSON.parse(localStorage.getItem('modifiedDocuments') || '[]');
-      const docIndex = modifiedDocs.findIndex((doc: any) => doc.id === parseInt(selectedModifiedDocumentId));
-      
-      if (docIndex !== -1) {
-        // 기존 문서의 regionData 업데이트
-        modifiedDocs[docIndex].regionData = regionData;
-        localStorage.setItem('modifiedDocuments', JSON.stringify(modifiedDocs));
-        
-        console.log('🔄 [AUTO UPDATE] 수정된 문서의 regionData 자동 업데이트:', {
+    const updateRegionData = async () => {
+      if (selectedModifiedDocumentId && selectedModifiedDocumentId !== "none" && regionData) {
+        await 수정된문서수정하기(parseInt(selectedModifiedDocumentId), { regionData });
+        console.log('[AUTO UPDATE] 수정된 문서의 regionData 자동 업데이트:', {
           documentId: selectedModifiedDocumentId,
           regionData: regionData
         });
       }
-    }
+    };
+    updateRegionData();
   }, [regionData, selectedModifiedDocumentId]);
 
   // 모드 전환 함수
@@ -402,10 +398,10 @@ export default function Home() {
                                         // 원본 문서가 이미 선택되어 있지 않은 경우에만 원본 로드
                                         if (selectedDocumentId !== doc.id.toString()) {
                                           setSelectedDocumentId(doc.id.toString());
-                                          const originalDoc = ID로원본문서찾기(doc.id);
+                                          const originalDoc = await ID로원본문서찾기(doc.id);
                                           if (originalDoc) {
                                             setOriginalText(originalDoc.content);
-                                            loadModifiedDocuments(doc.id.toString());
+                                            await loadModifiedDocuments(doc.id.toString());
                                           }
                                         }
 

@@ -14,9 +14,11 @@ import {
   카드추가하기,
   카드수정하기,
   카드삭제하기,
+  카드저장하기,
   모든카테고리가져오기,
   카테고리추가하기,
   카테고리수정하기,
+  카테고리저장하기,
   파일저장하기,
   파일불러오기,
   파일내용가져오기,
@@ -98,6 +100,14 @@ export default function MultiFileCardManager() {
   // 카드 편집 다이얼로그 원본 보기/안보기
   const [showOriginal, setShowOriginal] = useState(true);
   const [viewMode, setViewMode] = useState<'move' | 'expand'>('move');
+
+  // 카드 순서 편집 상태
+  const [editingOrderCardId, setEditingOrderCardId] = useState<string | null>(null);
+  const [editingOrderValue, setEditingOrderValue] = useState<string>('');
+
+  // 카테고리 순서 편집 상태
+  const [editingCategoryOrderId, setEditingCategoryOrderId] = useState<string | null>(null);
+  const [editingCategoryOrderValue, setEditingCategoryOrderValue] = useState<string>('');
 
   // 각 매칭 항목의 확장 상태 (fileIndex-lineNumber로 식별)
   const [expandedMatches, setExpandedMatches] = useState<Set<string>>(new Set());
@@ -181,7 +191,7 @@ export default function MultiFileCardManager() {
         setCards(updatedCards);
         const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
         if (updatedCard) {
-          카드수정하기(updatedCard);
+          카드수정하기(updatedCard.id, updatedCard);
         }
         setHighlightedMatchIndex(newIdx);
       } else if (e.key === 'ArrowDown' && highlightedMatchIndex < selectedCard.matches.length - 1) {
@@ -199,7 +209,7 @@ export default function MultiFileCardManager() {
         setCards(updatedCards);
         const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
         if (updatedCard) {
-          카드수정하기(updatedCard);
+          카드수정하기(updatedCard.id, updatedCard);
         }
         setHighlightedMatchIndex(newIdx);
       }
@@ -224,10 +234,13 @@ export default function MultiFileCardManager() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setFiles(파일불러오기());
-    setCards(모든카드가져오기());
-    setCategories(모든카테고리가져오기());
+  const loadData = async () => {
+    const loadedFiles = await 파일불러오기();
+    const loadedCards = await 모든카드가져오기();
+    const loadedCategories = await 모든카테고리가져오기();
+    setFiles(loadedFiles);
+    setCards(loadedCards);
+    setCategories(loadedCategories);
   };
 
   // 파일 업로드
@@ -283,7 +296,7 @@ export default function MultiFileCardManager() {
     updatedFiles.sort((a, b) => a.index - b.index);
 
     setFiles(updatedFiles);
-    파일저장하기(updatedFiles);
+    await 파일저장하기(updatedFiles);
 
     toast({
       title: "파일 업로드 완료",
@@ -292,13 +305,13 @@ export default function MultiFileCardManager() {
   };
 
   // 파일 삭제
-  const handleFileRemove = (fileIndex: 0 | 1 | 2) => {
+  const handleFileRemove = async (fileIndex: 0 | 1 | 2) => {
     const file = files.find(f => f.index === fileIndex);
     if (!file) return;
 
     const updatedFiles = files.filter(f => f.index !== fileIndex);
     setFiles(updatedFiles);
-    파일저장하기(updatedFiles);
+    await 파일저장하기(updatedFiles);
 
     toast({
       title: "파일 삭제 완료",
@@ -308,19 +321,32 @@ export default function MultiFileCardManager() {
 
   // 줄 번호 입력시 미리보기
   useEffect(() => {
-    const previews: { [key: string]: string[] } = {};
+    const loadPreviews = async () => {
+      const previews: { [key: string]: string[] } = {};
 
-    if (newCardLines.file1.length > 0) {
-      previews.file1 = newCardLines.file1.map(lineNum => (파일내용가져오기(0, lineNum) || '').replace(/[\r\n]+$/, '')).filter(c => c);
-    }
-    if (newCardLines.file2.length > 0) {
-      previews.file2 = newCardLines.file2.map(lineNum => (파일내용가져오기(1, lineNum) || '').replace(/[\r\n]+$/, '')).filter(c => c);
-    }
-    if (newCardLines.file3.length > 0) {
-      previews.file3 = newCardLines.file3.map(lineNum => (파일내용가져오기(2, lineNum) || '').replace(/[\r\n]+$/, '')).filter(c => c);
-    }
+      if (newCardLines.file1.length > 0) {
+        const contents = await Promise.all(
+          newCardLines.file1.map(lineNum => 파일내용가져오기(0, lineNum))
+        );
+        previews.file1 = contents.map(c => (c || '').replace(/[\r\n]+$/, '')).filter(c => c);
+      }
+      if (newCardLines.file2.length > 0) {
+        const contents = await Promise.all(
+          newCardLines.file2.map(lineNum => 파일내용가져오기(1, lineNum))
+        );
+        previews.file2 = contents.map(c => (c || '').replace(/[\r\n]+$/, '')).filter(c => c);
+      }
+      if (newCardLines.file3.length > 0) {
+        const contents = await Promise.all(
+          newCardLines.file3.map(lineNum => 파일내용가져오기(2, lineNum))
+        );
+        previews.file3 = contents.map(c => (c || '').replace(/[\r\n]+$/, '')).filter(c => c);
+      }
 
-    setLinePreviews(previews);
+      setLinePreviews(previews);
+    };
+
+    loadPreviews();
   }, [newCardLines, files]);
 
   // 유사도 계산 함수 (레벤슈타인 거리 기반)
@@ -401,7 +427,7 @@ export default function MultiFileCardManager() {
     setCards(updatedCards);
     const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
     if (updatedCard) {
-      카드수정하기(updatedCard);
+      카드수정하기(updatedCard.id, updatedCard);
     }
 
     setShowSimilarDialog(false);
@@ -476,7 +502,7 @@ export default function MultiFileCardManager() {
 
 
   // 카드 생성
-  const handleCreateCard = () => {
+  const handleCreateCard = async () => {
     if (!newCardName.trim()) {
       toast({
         title: "오류",
@@ -554,7 +580,7 @@ export default function MultiFileCardManager() {
       matches
     );
 
-    카드추가하기(newCard);
+    await 카드추가하기(newCard);
     setCards([...cards, newCard]);
 
     // 폼 초기화
@@ -571,10 +597,10 @@ export default function MultiFileCardManager() {
   };
 
   // 카테고리 생성
-  const handleCreateCategory = () => {
+  const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) return;
 
-    const newCategory = 카테고리추가하기(newCategoryName.trim(), newCategoryColor);
+    const newCategory = await 카테고리추가하기(newCategoryName.trim(), newCategoryColor);
     setCategories([...categories, newCategory]);
     setNewCategoryName('');
     setNewCategoryColor('#3b82f6');
@@ -587,16 +613,88 @@ export default function MultiFileCardManager() {
   };
 
   // 카드 삭제
-  const handleDeleteCard = (cardId: string) => {
+  const handleDeleteCard = async (cardId: string) => {
     if (!confirm('정말 이 카드를 삭제하시겠습니까?')) return;
 
-    카드삭제하기(cardId);
+    await 카드삭제하기(cardId);
     setCards(cards.filter(c => c.id !== cardId));
 
     toast({
       title: "카드 삭제 완료",
       description: "카드가 삭제되었습니다"
     });
+  };
+
+  // 카드 순서 변경 (카테고리 내에서)
+  const handleCardOrderChange = async (cardId: string, categoryId: string, newOrder: number) => {
+    // 같은 카테고리의 카드들만 필터링
+    const categoryCards = cards.filter(c => c.categoryId === categoryId);
+    const otherCards = cards.filter(c => c.categoryId !== categoryId);
+
+    // 현재 카드 찾기
+    const currentIndex = categoryCards.findIndex(c => c.id === cardId);
+    if (currentIndex === -1) return;
+
+    // 새 순서가 유효한 범위인지 확인
+    const targetIndex = Math.max(0, Math.min(newOrder - 1, categoryCards.length - 1));
+    if (currentIndex === targetIndex) return;
+
+    // 카드 재배열
+    const reorderedCards = [...categoryCards];
+    const [movedCard] = reorderedCards.splice(currentIndex, 1);
+    reorderedCards.splice(targetIndex, 0, movedCard);
+
+    // 전체 카드 목록 업데이트
+    const updatedCards = [...otherCards, ...reorderedCards];
+    setCards(updatedCards);
+
+    // IndexedDB 저장
+    await 카드저장하기(updatedCards);
+
+    toast({
+      title: "순서 변경 완료",
+      description: `${currentIndex + 1}번 → ${targetIndex + 1}번으로 이동했습니다`
+    });
+
+    // 편집 모드 종료
+    setEditingOrderCardId(null);
+    setEditingOrderValue('');
+  };
+
+  // 카테고리 순서 변경
+  const handleCategoryOrderChange = async (categoryId: string, newOrder: number) => {
+    // 현재 카테고리 찾기
+    const currentIndex = categories.findIndex(c => c.id === categoryId);
+    if (currentIndex === -1) return;
+
+    // 새 순서가 유효한 범위인지 확인
+    const targetIndex = Math.max(0, Math.min(newOrder - 1, categories.length - 1));
+    if (currentIndex === targetIndex) return;
+
+    // 카테고리 재배열
+    const reorderedCategories = [...categories];
+    const [movedCategory] = reorderedCategories.splice(currentIndex, 1);
+    reorderedCategories.splice(targetIndex, 0, movedCategory);
+
+    // order 필드 업데이트
+    const updatedCategories = reorderedCategories.map((cat, idx) => ({
+      ...cat,
+      order: idx
+    }));
+
+    setCategories(updatedCategories);
+
+    // IndexedDB 저장
+    await 카테고리저장하기(updatedCategories);
+
+    toast({
+      title: "카테고리 순서 변경 완료",
+      description: `${currentIndex + 1}번 → ${targetIndex + 1}번으로 이동했습니다`
+    });
+
+    // 편집 모드 종료
+    setEditingCategoryOrderId(null);
+    setEditingCategoryOrderValue('');
   };
 
   // 매치 추가
@@ -662,7 +760,7 @@ export default function MultiFileCardManager() {
   };
 
   // 패턴 복제
-  const handlePatternClone = () => {
+  const handlePatternClone = async () => {
     if (!cloneSourceCardId) return;
 
     const sourceCard = cards.find(c => c.id === cloneSourceCardId);
@@ -702,8 +800,10 @@ export default function MultiFileCardManager() {
       newCards.push(newCard);
     }
 
-    // 카드 추가 및 저장
-    newCards.forEach(card => 카드추가하기(card));
+    // 카드 추가 및 저장 (순차 실행 - race condition 방지)
+    for (const card of newCards) {
+      await 카드추가하기(card);
+    }
     setCards([...cards, ...newCards]);
 
     toast({
@@ -716,14 +816,14 @@ export default function MultiFileCardManager() {
 
 
   // 카드를 파일에 적용
-  const handleApplyCardToFiles = (cardId: string) => {
+  const handleApplyCardToFiles = async (cardId: string) => {
     const card = cards.find(c => c.id === cardId);
     if (!card) return;
 
     // 1. 파일에 적용
     const updatedFiles = 카드를파일에적용하기(card, files);
     setFiles(updatedFiles);
-    파일저장하기(updatedFiles);
+    await 파일저장하기(updatedFiles);
 
     // 2. 카드 업데이트 (originalContent를 modifiedContent로) - 불변성 유지
     const updatedCard = {
@@ -737,8 +837,8 @@ export default function MultiFileCardManager() {
     // 3. State 업데이트
     setCards(prev => prev.map(c => c.id === cardId ? updatedCard : c));
 
-    // 4. 로컬스토리지 저장
-    카드수정하기(cardId, updatedCard);
+    // 4. IndexedDB 저장
+    await 카드수정하기(cardId, updatedCard);
 
     toast({
       title: "적용 완료",
@@ -832,7 +932,7 @@ export default function MultiFileCardManager() {
 };
 
   // 전체 적용 및 다운로드
-  const handleApplyAllAndDownload = () => {
+  const handleApplyAllAndDownload = async () => {
     if (cards.length === 0) {
       toast({
         title: "카드가 없습니다",
@@ -842,102 +942,116 @@ export default function MultiFileCardManager() {
       return;
     }
 
-    // 1. 모든 카드의 수정사항을 파일에 한 번에 적용
-    const updatedFiles = 모든카드를파일에적용하기(cards, files);
+    try {
+      // 1. 모든 카드의 수정사항을 파일에 한 번에 적용
+      const updatedFiles = 모든카드를파일에적용하기(cards, files);
 
-    // 2. 카드의 originalContent를 modifiedContent로 업데이트
-    const updatedCards = cards.map(card => ({
-      ...card,
-      matches: card.matches.map(match => ({
-        ...match,
-        originalContent: match.modifiedContent
-      }))
-    }));
+      // 2. 카드의 originalContent를 modifiedContent로 업데이트
+      const updatedCards = cards.map(card => ({
+        ...card,
+        matches: card.matches.map(match => ({
+          ...match,
+          originalContent: match.modifiedContent
+        })),
+        updatedAt: Date.now()
+      }));
 
-    updatedCards.forEach(card => {
-      카드수정하기(card.id, card);
-    });
+      // 모든 카드를 한번에 저장 (효율적)
+      await 카드저장하기(updatedCards);
 
-    // 3. 파일 상태 업데이트 및 저장
-    setFiles(updatedFiles);
-    setCards(updatedCards);
-    파일저장하기(updatedFiles);
+      // 3. 파일 상태 업데이트 및 저장
+      setFiles(updatedFiles);
+      setCards(updatedCards);
+      await 파일저장하기(updatedFiles);
 
-    // 4. 모든 파일 다운로드 (updatedFiles를 직접 사용)
-    updatedFiles.forEach((file, index) => {
-      setTimeout(() => {
-        // updatedFiles에서 직접 파일을 가져와서 다운로드
-        const finalContent = file.lines.join(file.lineEnding || '\n');
-        let blob: Blob;
-        const encoding = file.encoding || 'UTF-8';
+      // 4. 모든 파일 다운로드 (updatedFiles를 직접 사용)
+      updatedFiles.forEach((file, index) => {
+        setTimeout(() => {
+          // updatedFiles에서 직접 파일을 가져와서 다운로드
+          const finalContent = file.lines.join(file.lineEnding || '\n');
+          let blob: Blob;
+          const encoding = file.encoding || 'UTF-8';
 
-        if (encoding === 'UTF-16LE') {
-          const utf16Codes: number[] = [];
-          for (let i = 0; i < finalContent.length; i++) {
-            utf16Codes.push(finalContent.charCodeAt(i));
-          }
+          if (encoding === 'UTF-16LE') {
+            const utf16Codes: number[] = [];
+            for (let i = 0; i < finalContent.length; i++) {
+              utf16Codes.push(finalContent.charCodeAt(i));
+            }
 
-          const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
-          bytes[0] = 0xFF;
-          bytes[1] = 0xFE;
+            const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+            bytes[0] = 0xFF;
+            bytes[1] = 0xFE;
 
-          for (let i = 0; i < utf16Codes.length; i++) {
-            const code = utf16Codes[i];
-            bytes[(i + 1) * 2] = code & 0xFF;
-            bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
-          }
+            for (let i = 0; i < utf16Codes.length; i++) {
+              const code = utf16Codes[i];
+              bytes[(i + 1) * 2] = code & 0xFF;
+              bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
+            }
 
-          blob = new Blob([bytes], { type: 'application/octet-stream' });
-        } else if (encoding === 'UTF-16BE') {
-          const utf16Codes: number[] = [];
-          for (let i = 0; i < finalContent.length; i++) {
-            utf16Codes.push(finalContent.charCodeAt(i));
-          }
+            blob = new Blob([bytes], { type: 'application/octet-stream' });
+          } else if (encoding === 'UTF-16BE') {
+            const utf16Codes: number[] = [];
+            for (let i = 0; i < finalContent.length; i++) {
+              utf16Codes.push(finalContent.charCodeAt(i));
+            }
 
-          const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
-          bytes[0] = 0xFE;
-          bytes[1] = 0xFF;
+            const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+            bytes[0] = 0xFE;
+            bytes[1] = 0xFF;
 
-          for (let i = 0; i < utf16Codes.length; i++) {
-            const code = utf16Codes[i];
-            bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
-            bytes[(i + 1) * 2 + 1] = code & 0xFF;
-          }
+            for (let i = 0; i < utf16Codes.length; i++) {
+              const code = utf16Codes[i];
+              bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
+              bytes[(i + 1) * 2 + 1] = code & 0xFF;
+            }
 
-          blob = new Blob([bytes], { type: 'application/octet-stream' });
-        } else {
-          const encoder = new TextEncoder();
-          const encoded = encoder.encode(finalContent);
-
-          let hasBOM = false;
-          if (file.rawData) {
-            const uint8Array = new Uint8Array(file.rawData);
-            hasBOM = uint8Array.length >= 3 &&
-                     uint8Array[0] === 0xEF &&
-                     uint8Array[1] === 0xBB &&
-                     uint8Array[2] === 0xBF;
-          }
-
-          if (hasBOM) {
-            const withBOM = new Uint8Array(encoded.length + 3);
-            withBOM[0] = 0xEF;
-            withBOM[1] = 0xBB;
-            withBOM[2] = 0xBF;
-            withBOM.set(encoded, 3);
-            blob = new Blob([withBOM], { type: 'application/octet-stream' });
+            blob = new Blob([bytes], { type: 'application/octet-stream' });
           } else {
-            blob = new Blob([encoded], { type: 'application/octet-stream' });
-          }
-        }
+            const encoder = new TextEncoder();
+            const encoded = encoder.encode(finalContent);
 
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        a.click();
-        URL.revokeObjectURL(url);
-      }, index * 300);
-    });
+            let hasBOM = false;
+            if (file.rawData) {
+              const uint8Array = new Uint8Array(file.rawData);
+              hasBOM = uint8Array.length >= 3 &&
+                       uint8Array[0] === 0xEF &&
+                       uint8Array[1] === 0xBB &&
+                       uint8Array[2] === 0xBF;
+            }
+
+            if (hasBOM) {
+              const withBOM = new Uint8Array(encoded.length + 3);
+              withBOM[0] = 0xEF;
+              withBOM[1] = 0xBB;
+              withBOM[2] = 0xBF;
+              withBOM.set(encoded, 3);
+              blob = new Blob([withBOM], { type: 'application/octet-stream' });
+            } else {
+              blob = new Blob([encoded], { type: 'application/octet-stream' });
+            }
+          }
+
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = file.name;
+          a.click();
+          URL.revokeObjectURL(url);
+        }, index * 300);
+      });
+
+      toast({
+        title: "전체 적용 완료",
+        description: `${updatedFiles.length}개 파일에 변경사항이 적용되었습니다`
+      });
+    } catch (error) {
+      console.error('전체 적용 실패:', error);
+      toast({
+        title: "오류",
+        description: "전체 적용 중 오류가 발생했습니다",
+        variant: "destructive"
+      });
+    }
   };
 
   // 카테고리 접기/펼치기
@@ -1123,52 +1237,56 @@ export default function MultiFileCardManager() {
   };
 
   // 빠른 태그: 모든 태그된 선택을 카드로 일괄 생성
-  const handleBulkCreateCards = () => {
+  const handleBulkCreateCards = async () => {
     if (!quickTagCategoryId || quickTagSelections.size === 0) return;
 
     let createdCount = 0;
+    const cardsToAdd: MatchCard[] = [];
 
-    quickTagSelections.forEach((selection, subCategoryName) => {
+    for (const [subCategoryName, selection] of quickTagSelections) {
       const matches: any[] = [];
 
       // file1 매칭
-      selection.lines.file1.forEach(lineNum => {
-        const content = 파일내용가져오기(0, lineNum)?.replace(/[\r\n]+$/, '');
-        if (content) {
+      for (const lineNum of selection.lines.file1) {
+        const content = await 파일내용가져오기(0, lineNum);
+        const cleanContent = content?.replace(/[\r\n]+$/, '');
+        if (cleanContent) {
           matches.push({
             fileIndex: 0,
             lineNumber: lineNum,
-            originalContent: content,
-            modifiedContent: content
+            originalContent: cleanContent,
+            modifiedContent: cleanContent
           });
         }
-      });
+      }
 
       // file2 매칭
-      selection.lines.file2.forEach(lineNum => {
-        const content = 파일내용가져오기(1, lineNum)?.replace(/[\r\n]+$/, '');
-        if (content) {
+      for (const lineNum of selection.lines.file2) {
+        const content = await 파일내용가져오기(1, lineNum);
+        const cleanContent = content?.replace(/[\r\n]+$/, '');
+        if (cleanContent) {
           matches.push({
             fileIndex: 1,
             lineNumber: lineNum,
-            originalContent: content,
-            modifiedContent: content
+            originalContent: cleanContent,
+            modifiedContent: cleanContent
           });
         }
-      });
+      }
 
       // file3 매칭
-      selection.lines.file3.forEach(lineNum => {
-        const content = 파일내용가져오기(2, lineNum)?.replace(/[\r\n]+$/, '');
-        if (content) {
+      for (const lineNum of selection.lines.file3) {
+        const content = await 파일내용가져오기(2, lineNum);
+        const cleanContent = content?.replace(/[\r\n]+$/, '');
+        if (cleanContent) {
           matches.push({
             fileIndex: 2,
             lineNumber: lineNum,
-            originalContent: content,
-            modifiedContent: content
+            originalContent: cleanContent,
+            modifiedContent: cleanContent
           });
         }
-      });
+      }
 
       if (matches.length > 0) {
         const card = 카드생성하기(
@@ -1176,10 +1294,15 @@ export default function MultiFileCardManager() {
           quickTagCategoryId,
           matches
         );
-        카드추가하기(card);
+        cardsToAdd.push(card);
         createdCount++;
       }
-    });
+    }
+
+    // 모든 카드 일괄 추가 (순차 실행 - race condition 방지)
+    for (const card of cardsToAdd) {
+      await 카드추가하기(card);
+    }
 
     // 초기화
     setQuickTagMode(false);
@@ -1194,12 +1317,15 @@ export default function MultiFileCardManager() {
     });
 
     // 카드 목록 새로고침
-    setCards(모든카드가져오기());
+    const loadedCards = await 모든카드가져오기();
+    setCards(loadedCards);
   };
 
-  // 카테고리별 카드 그룹화
-  const cardsByCategory = categories.map(category => ({
+  // 카테고리별 카드 그룹화 (order 순으로 정렬)
+  const sortedCategories = [...categories].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const cardsByCategory = sortedCategories.map((category, categoryIndex) => ({
     category,
+    categoryIndex,
     cards: cards.filter(card => card.categoryId === category.id)
   }));
 
@@ -1327,8 +1453,9 @@ export default function MultiFileCardManager() {
 
       {/* 카드 목록 */}
       <div className="space-y-1">
-        {cardsByCategory.map(({ category, cards: categoryCards }) => {
+        {cardsByCategory.map(({ category, categoryIndex, cards: categoryCards }) => {
           const isCollapsed = collapsedCategories.has(category.id);
+          const isEditingCategoryOrder = editingCategoryOrderId === category.id;
           return (
           <Card key={category.id}>
             <CardHeader className="pb-3">
@@ -1337,6 +1464,52 @@ export default function MultiFileCardManager() {
                   className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 transition-colors flex-1"
                   onClick={() => toggleCategory(category.id)}
                 >
+                  {/* 카테고리 순서 번호 */}
+                  {isEditingCategoryOrder ? (
+                    <Input
+                      type="number"
+                      value={editingCategoryOrderValue}
+                      onChange={(e) => setEditingCategoryOrderValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const newOrder = parseInt(editingCategoryOrderValue);
+                          if (!isNaN(newOrder)) {
+                            handleCategoryOrderChange(category.id, newOrder);
+                          }
+                        } else if (e.key === 'Escape') {
+                          setEditingCategoryOrderId(null);
+                          setEditingCategoryOrderValue('');
+                        }
+                      }}
+                      onBlur={() => {
+                        const newOrder = parseInt(editingCategoryOrderValue);
+                        if (!isNaN(newOrder)) {
+                          handleCategoryOrderChange(category.id, newOrder);
+                        } else {
+                          setEditingCategoryOrderId(null);
+                          setEditingCategoryOrderValue('');
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      className="w-12 h-6 text-center text-xs p-1"
+                      min={1}
+                      max={categories.length}
+                    />
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="cursor-pointer hover:bg-blue-100 text-xs px-1.5 py-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingCategoryOrderId(category.id);
+                        setEditingCategoryOrderValue(String(categoryIndex + 1));
+                      }}
+                      title="클릭하여 순서 변경"
+                    >
+                      {categoryIndex + 1}
+                    </Badge>
+                  )}
                   {isCollapsed ? (
                     <ChevronRight className="h-4 w-4 text-gray-500" />
                   ) : (
@@ -1410,13 +1583,61 @@ export default function MultiFileCardManager() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {categoryCards.map(card => {
+                  {categoryCards.map((card, cardIndex) => {
                     const isExpanded = expandedCardId === card.id;
+                    const isEditingOrder = editingOrderCardId === card.id;
                     return (
                     <Card key={card.id} className="hover:shadow-md transition-shadow">
                       <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm">{card.name}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            {/* 순서 번호 */}
+                            {isEditingOrder ? (
+                              <Input
+                                type="number"
+                                value={editingOrderValue}
+                                onChange={(e) => setEditingOrderValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    const newOrder = parseInt(editingOrderValue);
+                                    if (!isNaN(newOrder)) {
+                                      handleCardOrderChange(card.id, category.id, newOrder);
+                                    }
+                                  } else if (e.key === 'Escape') {
+                                    setEditingOrderCardId(null);
+                                    setEditingOrderValue('');
+                                  }
+                                }}
+                                onBlur={() => {
+                                  const newOrder = parseInt(editingOrderValue);
+                                  if (!isNaN(newOrder)) {
+                                    handleCardOrderChange(card.id, category.id, newOrder);
+                                  } else {
+                                    setEditingOrderCardId(null);
+                                    setEditingOrderValue('');
+                                  }
+                                }}
+                                autoFocus
+                                className="w-12 h-6 text-xs text-center p-1"
+                                min={1}
+                                max={categoryCards.length}
+                              />
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="cursor-pointer hover:bg-gray-100 min-w-[24px] justify-center"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingOrderCardId(card.id);
+                                  setEditingOrderValue(String(cardIndex + 1));
+                                }}
+                                title="클릭하여 순서 변경"
+                              >
+                                {cardIndex + 1}
+                              </Badge>
+                            )}
+                            <CardTitle className="text-sm">{card.name}</CardTitle>
+                          </div>
                           <div className="flex items-center gap-1">
                             <Button
                               size="sm"
@@ -1992,10 +2213,10 @@ export default function MultiFileCardManager() {
 
                               setCards(updatedCards);
 
-                              // localStorage에 저장
+                              // IndexedDB에 저장
                               const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
                               if (updatedCard) {
-                                카드수정하기(updatedCard);
+                                카드수정하기(updatedCard.id, updatedCard);
                               }
 
                               // 하이라이트 설정
@@ -2020,10 +2241,10 @@ export default function MultiFileCardManager() {
 
                               setCards(updatedCards);
 
-                              // localStorage에 저장
+                              // IndexedDB에 저장
                               const updatedCard = updatedCards.find(c => c.id === selectedCard.id);
                               if (updatedCard) {
-                                카드수정하기(updatedCard);
+                                카드수정하기(updatedCard.id, updatedCard);
                               }
 
                               // 하이라이트 설정

@@ -55,13 +55,13 @@ export default function NewOriginalModal({
 
     try {
       setIsLoading(true);
-      원본문서추가하기({ title, content });
-      
+      await 원본문서추가하기({ title, content });
+
       toast({
         title: "성공",
         description: "원본 문서가 추가되었습니다",
       });
-      
+
       resetForm();
       onClose();
       onDocumentAdded();

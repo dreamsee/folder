@@ -36,14 +36,17 @@ export default function SaveModifiedModal({
   
   // 기존 수정된 문서 목록 가져오기
   useEffect(() => {
-    if (isOpen && originalId > 0) {
-      const documents = 원본ID로수정된문서찾기(originalId);
-      setModifiedDocuments(documents);
-      // 모달이 열릴 때 상태 초기화
-      setSelectedDocumentId(null);
-      setIsOverwriteMode(false);
-      setTitle("");
-    }
+    const loadDocuments = async () => {
+      if (isOpen && originalId > 0) {
+        const documents = await 원본ID로수정된문서찾기(originalId);
+        setModifiedDocuments(documents);
+        // 모달이 열릴 때 상태 초기화
+        setSelectedDocumentId(null);
+        setIsOverwriteMode(false);
+        setTitle("");
+      }
+    };
+    loadDocuments();
   }, [isOpen, originalId]);
 
   // 기존 문서 선택 함수
@@ -66,18 +69,18 @@ export default function SaveModifiedModal({
 
     try {
       setIsLoading(true);
-      
-      console.log('💾 [DEBUG] 덮어쓰기 시작');
-      console.log('💾 [DEBUG] 문서 ID:', selectedDocumentId);
-      console.log('💾 [DEBUG] 새 내용 길이:', content.length);
-      console.log('💾 [DEBUG] 영역 데이터:', regionData);
-      
-      const 업데이트된문서 = 수정된문서수정하기(selectedDocumentId, {
+
+      console.log('[DEBUG] 덮어쓰기 시작');
+      console.log('[DEBUG] 문서 ID:', selectedDocumentId);
+      console.log('[DEBUG] 새 내용 길이:', content.length);
+      console.log('[DEBUG] 영역 데이터:', regionData);
+
+      const 업데이트된문서 = await 수정된문서수정하기(selectedDocumentId, {
         content,
         regionData
       });
-      
-      console.log('💾 [DEBUG] 덮어쓰기 완료:', 업데이트된문서);
+
+      console.log('[DEBUG] 덮어쓰기 완료:', 업데이트된문서);
 
       toast({
         title: "성공",
@@ -110,23 +113,22 @@ export default function SaveModifiedModal({
 
     try {
       setIsLoading(true);
-      
-      console.log('💾 [DEBUG] 수정된 문서 저장 시작');
-      console.log('💾 [DEBUG] 제목:', title.trim());
-      console.log('💾 [DEBUG] 원본ID:', originalId);
-      console.log('💾 [DEBUG] 내용 길이:', content.length);
-      console.log('💾 [DEBUG] 영역 데이터:', regionData);
-      console.log('💾 [DEBUG] 줄 그룹 개수:', regionData?.lineGroups?.length || 0);
-      
-      const 저장된문서 = 수정된문서추가하기({
+
+      console.log('[DEBUG] 수정된 문서 저장 시작');
+      console.log('[DEBUG] 제목:', title.trim());
+      console.log('[DEBUG] 원본ID:', originalId);
+      console.log('[DEBUG] 내용 길이:', content.length);
+      console.log('[DEBUG] 영역 데이터:', regionData);
+      console.log('[DEBUG] 줄 그룹 개수:', regionData?.lineGroups?.length || 0);
+
+      const 저장된문서 = await 수정된문서추가하기({
         title: title.trim(),
         content,
         originalId,
         regionData
       });
-      
-      console.log('💾 [DEBUG] 저장된 문서:', 저장된문서);
-      console.log('💾 [DEBUG] 현재 localStorage 수정된문서들:', JSON.parse(localStorage.getItem('modifiedDocuments') || '[]'));
+
+      console.log('[DEBUG] 저장된 문서:', 저장된문서);
 
       toast({
         title: "성공",

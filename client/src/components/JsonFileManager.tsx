@@ -14,13 +14,14 @@ export function JsonFileManager() {
   const [오류메시지, 오류메시지설정] = useState<string>('');
   const [로딩중, 로딩중설정] = useState<boolean>(false);
 
-  const 내보내기처리 = () => {
+  const 내보내기처리 = async () => {
     try {
-      const 현재데이터 = 현재데이터를JSON형식으로변환();
-      console.log('📦 [DEBUG] 내보내기 데이터:', 현재데이터);
-      console.log('📦 [DEBUG] 원본문서 개수:', 현재데이터.원본문서목록.length);
-      console.log('📦 [DEBUG] 수정된문서 개수:', 현재데이터.수정된문서목록.length);
-      console.log('📦 [DEBUG] MultiFileCard 개수:', 현재데이터.multiFileCards?.length || 0);
+      로딩중설정(true);
+      const 현재데이터 = await 현재데이터를JSON형식으로변환();
+      console.log('[DEBUG] 내보내기 데이터:', 현재데이터);
+      console.log('[DEBUG] 원본문서 개수:', 현재데이터.원본문서목록.length);
+      console.log('[DEBUG] 수정된문서 개수:', 현재데이터.수정된문서목록.length);
+      console.log('[DEBUG] MultiFileCard 개수:', 현재데이터.multiFileCards?.length || 0);
 
       JSON파일로내보내기(현재데이터, '노트비교_데이터');
 
@@ -41,6 +42,8 @@ export function JsonFileManager() {
     } catch (error) {
       오류메시지설정('내보내기 중 오류가 발생했습니다: ' + error);
       메시지설정('');
+    } finally {
+      로딩중설정(false);
     }
   };
 

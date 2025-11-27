@@ -1,27 +1,33 @@
-// 3개 파일 매칭 시스템 유틸 함수
+// 3개 파일 매칭 시스템 유틸 함수 (IndexedDB 호환)
 
 import { MatchCard, CardMatch, LoadedFile, CardCategory, ChangeDetection } from './multiFileCardTypes';
-
-// localStorage 키
-const STORAGE_KEY_CARDS = 'multiFileCards';
-const STORAGE_KEY_CATEGORIES = 'multiFileCardCategories';
-const STORAGE_KEY_FILES = 'multiFileLoadedFiles';
+import {
+  모든MultiFileCard가져오기,
+  MultiFileCard저장하기,
+  모든MultiFileCardCategories가져오기,
+  MultiFileCardCategories저장하기,
+  모든MultiFileLoadedFiles가져오기,
+  MultiFileLoadedFiles저장하기
+} from './localStorageUtils';
 
 // ==================== 파일 관리 ====================
 
-export function 파일저장하기(files: LoadedFile[]): void {
-  // rawData는 ArrayBuffer이므로 localStorage에 저장 불가 (제외)
-  const filesToSave = files.map(({ rawData, ...rest }) => rest);
-  localStorage.setItem(STORAGE_KEY_FILES, JSON.stringify(filesToSave));
+export async function 파일저장하기(files: LoadedFile[]): Promise<void> {
+  // rawData는 ArrayBuffer이므로 IndexedDB에 저장 불가 (제외)
+  const filesToSave = files.map(({ rawData, ...rest }) => ({
+    ...rest,
+    id: rest.index // IndexedDB는 id 필요
+  }));
+  await MultiFileLoadedFiles저장하기(filesToSave);
 }
 
-export function 파일불러오기(): LoadedFile[] {
-  const data = localStorage.getItem(STORAGE_KEY_FILES);
-  return data ? JSON.parse(data) : [];
+export async function 파일불러오기(): Promise<LoadedFile[]> {
+  const files = await 모든MultiFileLoadedFiles가져오기();
+  return files || [];
 }
 
-export function 파일내용가져오기(fileIndex: 0 | 1 | 2, lineNumber: number): string | null {
-  const files = 파일불러오기();
+export async function 파일내용가져오기(fileIndex: 0 | 1 | 2, lineNumber: number): Promise<string | null> {
+  const files = await 파일불러오기();
   const file = files.find(f => f.index === fileIndex);
 
   if (!file || lineNumber < 1 || lineNumber > file.lines.length) {
@@ -33,9 +39,9 @@ export function 파일내용가져오기(fileIndex: 0 | 1 | 2, lineNumber: numbe
 
 // ==================== 카테고리 관리 ====================
 
-export function 모든카테고리가져오기(): CardCategory[] {
-  const data = localStorage.getItem(STORAGE_KEY_CATEGORIES);
-  if (!data) {
+export async function 모든카테고리가져오기(): Promise<CardCategory[]> {
+  const categories = await 모든MultiFileCardCategories가져오기();
+  if (!categories || categories.length === 0) {
     // 기본 카테고리 생성
     const defaultCategory: CardCategory = {
       id: 'default',
@@ -43,14 +49,14 @@ export function 모든카테고리가져오기(): CardCategory[] {
       color: '#6b7280',
       order: 0
     };
-    localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify([defaultCategory]));
+    await MultiFileCardCategories저장하기([defaultCategory]);
     return [defaultCategory];
   }
-  return JSON.parse(data);
+  return categories;
 }
 
-export function 카테고리추가하기(name: string, color: string): CardCategory {
-  const categories = 모든카테고리가져오기();
+export async function 카테고리추가하기(name: string, color: string): Promise<CardCategory> {
+  const categories = await 모든카테고리가져오기();
   const newCategory: CardCategory = {
     id: `category_${Date.now()}`,
     name,
@@ -58,49 +64,53 @@ export function 카테고리추가하기(name: string, color: string): CardCateg
     order: categories.length
   };
   categories.push(newCategory);
-  localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(categories));
+  await MultiFileCardCategories저장하기(categories);
   return newCategory;
 }
 
-export function 카테고리수정하기(categoryId: string, updatedCategory: Partial<CardCategory>): void {
-  const categories = 모든카테고리가져오기();
+export async function 카테고리수정하기(categoryId: string, updatedCategory: Partial<CardCategory>): Promise<void> {
+  const categories = await 모든카테고리가져오기();
   const index = categories.findIndex(c => c.id === categoryId);
   if (index !== -1) {
     categories[index] = { ...categories[index], ...updatedCategory };
-    localStorage.setItem(STORAGE_KEY_CATEGORIES, JSON.stringify(categories));
+    await MultiFileCardCategories저장하기(categories);
   }
+}
+
+export async function 카테고리저장하기(categories: CardCategory[]): Promise<void> {
+  await MultiFileCardCategories저장하기(categories);
 }
 
 // ==================== 카드 관리 ====================
 
-export function 모든카드가져오기(): MatchCard[] {
-  const data = localStorage.getItem(STORAGE_KEY_CARDS);
-  return data ? JSON.parse(data) : [];
+export async function 모든카드가져오기(): Promise<MatchCard[]> {
+  const cards = await 모든MultiFileCard가져오기();
+  return cards || [];
 }
 
-export function 카드저장하기(cards: MatchCard[]): void {
-  localStorage.setItem(STORAGE_KEY_CARDS, JSON.stringify(cards));
+export async function 카드저장하기(cards: MatchCard[]): Promise<void> {
+  await MultiFileCard저장하기(cards);
 }
 
-export function 카드추가하기(card: MatchCard): void {
-  const cards = 모든카드가져오기();
+export async function 카드추가하기(card: MatchCard): Promise<void> {
+  const cards = await 모든카드가져오기();
   cards.push(card);
-  카드저장하기(cards);
+  await 카드저장하기(cards);
 }
 
-export function 카드수정하기(cardId: string, updatedCard: Partial<MatchCard>): void {
-  const cards = 모든카드가져오기();
+export async function 카드수정하기(cardId: string, updatedCard: Partial<MatchCard>): Promise<void> {
+  const cards = await 모든카드가져오기();
   const index = cards.findIndex(c => c.id === cardId);
   if (index !== -1) {
     cards[index] = { ...cards[index], ...updatedCard, updatedAt: Date.now() };
-    카드저장하기(cards);
+    await 카드저장하기(cards);
   }
 }
 
-export function 카드삭제하기(cardId: string): void {
-  const cards = 모든카드가져오기();
+export async function 카드삭제하기(cardId: string): Promise<void> {
+  const cards = await 모든카드가져오기();
   const filtered = cards.filter(c => c.id !== cardId);
-  카드저장하기(filtered);
+  await 카드저장하기(filtered);
 }
 
 
@@ -213,7 +223,7 @@ export function 원본에서내용찾기(fileContent: string, originalContent: s
     }
   }
 
-  // 2. 주변 줄에서 유사도 검색 (±5줄)
+  // 2. 주변 줄에서 유사도 검색 (+-5줄)
   const searchRange = 5;
   const startIdx = Math.max(0, oldLineNumber - 1 - searchRange);
   const endIdx = Math.min(lines.length - 1, oldLineNumber - 1 + searchRange);
