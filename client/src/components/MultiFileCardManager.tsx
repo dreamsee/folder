@@ -1013,16 +1013,13 @@ export default function MultiFileCardManager() {
         setTimeout(() => {
           let blob: Blob;
 
-          // 이 파일에 수정사항이 있는지 확인
-          const fileHasModifications = cards.some(card =>
-            card.matches.some(match =>
-              match.fileIndex === file.index && match.originalContent !== match.modifiedContent
-            )
-          );
+          // 이 파일이 실제로 수정되었는지 확인 (원본 파일과 lines 비교)
+          const originalFile = files.find(f => f.index === file.index);
+          const fileActuallyModified = originalFile ?
+            file.lines.some((line, i) => originalFile.lines[i] !== line) : false;
 
           // 수정사항이 없고 rawData가 있으면 원본 그대로 다운로드
-          const originalFile = files.find(f => f.index === file.index);
-          if (!fileHasModifications && originalFile?.rawData) {
+          if (!fileActuallyModified && originalFile?.rawData) {
             blob = new Blob([originalFile.rawData], { type: 'application/octet-stream' });
           } else {
             // 수정사항이 있으면 텍스트 기반으로 인코딩

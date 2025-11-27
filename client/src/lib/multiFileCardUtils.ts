@@ -384,11 +384,12 @@ export function 모든카드를파일에적용하기(cards: MatchCard[], files: 
     const newLines = [...file.lines];
     let hasChanges = false;
 
-    // 각 매치에 대해 직접 lines 배열 수정
+    // 각 매치에 대해 직접 lines 배열 수정 (항상 modifiedContent로 업데이트)
     matchesForThisFile.forEach(match => {
-      if (match.originalContent !== match.modifiedContent) {
-        const lineIndex = match.lineNumber - 1;
-        if (lineIndex >= 0 && lineIndex < newLines.length) {
+      const lineIndex = match.lineNumber - 1;
+      if (lineIndex >= 0 && lineIndex < newLines.length) {
+        // 현재 줄 내용과 modifiedContent가 다르면 업데이트
+        if (newLines[lineIndex] !== match.modifiedContent) {
           newLines[lineIndex] = match.modifiedContent;
           hasChanges = true;
         }
