@@ -640,30 +640,87 @@ export default function MultiFileCardManager() {
 
   // 카드 순서 변경 (카테고리 내에서)
   const handleCardOrderChange = async (cardId: string, categoryId: string, newOrder: number) => {
-    // 같은 카테고리의 카드들만 필터링 (order 순으로 정렬)
-    const categoryCards = cards
-      .filter(c => c.categoryId === categoryId)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    // 같은 카테고리의 카드들
+    const allCategoryCards = cards.filter(c => c.categoryId === categoryId);
     const otherCards = cards.filter(c => c.categoryId !== categoryId);
 
-    // 현재 카드 찾기
-    const currentIndex = categoryCards.findIndex(c => c.id === cardId);
+    // 해당 카드가 그룹에 속해있는지 확인
+    const targetCard = allCategoryCards.find(c => c.id === cardId);
+    if (!targetCard) return;
+
+    // 그룹과 개별 카드를 분리하여 순서 단위로 만듦
+    const groupedMap = new Map<string, typeof allCategoryCards>();
+    const individualCards: typeof allCategoryCards = [];
+
+    allCategoryCards.forEach(card => {
+      if (card.groupId) {
+        if (!groupedMap.has(card.groupId)) {
+          groupedMap.set(card.groupId, []);
+        }
+        groupedMap.get(card.groupId)!.push(card);
+      } else {
+        individualCards.push(card);
+      }
+    });
+
+    // 순서 단위 배열 생성 (그룹은 첫 번째 카드의 order 기준)
+    type OrderUnit = { type: 'group'; groupId: string; cards: typeof allCategoryCards } | { type: 'individual'; card: typeof allCategoryCards[0] };
+    const orderUnits: OrderUnit[] = [];
+
+    groupedMap.forEach((groupCards, groupId) => {
+      groupCards.sort((a, b) => (a.groupOrder || 0) - (b.groupOrder || 0));
+      orderUnits.push({ type: 'group', groupId, cards: groupCards });
+    });
+
+    individualCards.forEach(card => {
+      orderUnits.push({ type: 'individual', card });
+    });
+
+    // order 기준으로 정렬
+    orderUnits.sort((a, b) => {
+      const orderA = a.type === 'group' ? (a.cards[0]?.order ?? 0) : (a.card.order ?? 0);
+      const orderB = b.type === 'group' ? (b.cards[0]?.order ?? 0) : (b.card.order ?? 0);
+      return orderA - orderB;
+    });
+
+    // 현재 단위 인덱스 찾기
+    const currentIndex = orderUnits.findIndex(unit => {
+      if (unit.type === 'group') {
+        return unit.cards.some(c => c.id === cardId);
+      } else {
+        return unit.card.id === cardId;
+      }
+    });
     if (currentIndex === -1) return;
 
     // 새 순서가 유효한 범위인지 확인
-    const targetIndex = Math.max(0, Math.min(newOrder - 1, categoryCards.length - 1));
-    if (currentIndex === targetIndex) return;
+    const targetIndex = Math.max(0, Math.min(newOrder - 1, orderUnits.length - 1));
+    if (currentIndex === targetIndex) {
+      setEditingOrderCardId(null);
+      setEditingOrderValue('');
+      return;
+    }
 
-    // 카드 재배열
-    const reorderedCards = [...categoryCards];
-    const [movedCard] = reorderedCards.splice(currentIndex, 1);
-    reorderedCards.splice(targetIndex, 0, movedCard);
+    // 단위 재배열
+    const reorderedUnits = [...orderUnits];
+    const [movedUnit] = reorderedUnits.splice(currentIndex, 1);
+    reorderedUnits.splice(targetIndex, 0, movedUnit);
 
-    // order 필드 업데이트
-    const updatedCategoryCards = reorderedCards.map((card, idx) => ({
-      ...card,
-      order: idx
-    }));
+    // order 필드 업데이트하여 카드 배열로 변환
+    const updatedCategoryCards: typeof allCategoryCards = [];
+    let orderCounter = 0;
+
+    reorderedUnits.forEach(unit => {
+      if (unit.type === 'group') {
+        unit.cards.forEach(card => {
+          updatedCategoryCards.push({ ...card, order: orderCounter });
+        });
+        orderCounter++;
+      } else {
+        updatedCategoryCards.push({ ...unit.card, order: orderCounter });
+        orderCounter++;
+      }
+    });
 
     // 전체 카드 목록 업데이트
     const updatedCards = [...otherCards, ...updatedCategoryCards];
@@ -1721,13 +1778,35 @@ export default function MultiFileCardManager() {
                       cards.sort((a, b) => (a.groupOrder || 0) - (b.groupOrder || 0));
                     });
 
-                    const renderItems: React.ReactNode[] = [];
-                    let itemIndex = 0;
+                    // 순서 단위 배열 생성 (order 값 기준으로 정렬)
+                    type RenderUnit = { type: 'group'; groupId: string; cards: typeof categoryCards } | { type: 'individual'; card: typeof categoryCards[0] };
+                    const orderUnits: RenderUnit[] = [];
 
-                    // 그룹화된 카드들 렌더링
                     groupedCards.forEach((groupCards, groupId) => {
-                      const groupName = groupCards[0]?.groupName || '그룹';
-                      const firstCard = groupCards[0];
+                      orderUnits.push({ type: 'group', groupId, cards: groupCards });
+                    });
+
+                    individualCards.forEach(card => {
+                      orderUnits.push({ type: 'individual', card });
+                    });
+
+                    // order 기준으로 정렬 (그룹은 첫 번째 카드의 order 사용)
+                    orderUnits.sort((a, b) => {
+                      const orderA = a.type === 'group' ? (a.cards[0]?.order ?? 0) : (a.card.order ?? 0);
+                      const orderB = b.type === 'group' ? (b.cards[0]?.order ?? 0) : (b.card.order ?? 0);
+                      return orderA - orderB;
+                    });
+
+                    const renderItems: React.ReactNode[] = [];
+
+                    // 정렬된 순서대로 렌더링
+                    orderUnits.forEach((unit, unitIndex) => {
+                      if (unit.type === 'group') {
+                        const groupCards = unit.cards;
+                        const groupId = unit.groupId;
+                        const groupName = groupCards[0]?.groupName || '그룹';
+                        const firstCard = groupCards[0];
+                        const isEditingGroupOrder = firstCard && editingOrderCardId === firstCard.id;
 
                       renderItems.push(
                         <Card key={groupId} className="hover:shadow-md transition-shadow border-2 border-blue-200">
@@ -1751,9 +1830,52 @@ export default function MultiFileCardManager() {
                                     className="w-4 h-4"
                                   />
                                 )}
-                                <Badge variant="outline" className="text-xs px-1.5 py-0">
-                                  {++itemIndex}
-                                </Badge>
+                                {isEditingGroupOrder ? (
+                                  <Input
+                                    type="number"
+                                    value={editingOrderValue}
+                                    onChange={(e) => setEditingOrderValue(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        const newOrder = parseInt(editingOrderValue);
+                                        if (!isNaN(newOrder) && firstCard) {
+                                          handleCardOrderChange(firstCard.id, category.id, newOrder);
+                                        }
+                                      } else if (e.key === 'Escape') {
+                                        setEditingOrderCardId(null);
+                                        setEditingOrderValue('');
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      const newOrder = parseInt(editingOrderValue);
+                                      if (!isNaN(newOrder) && firstCard) {
+                                        handleCardOrderChange(firstCard.id, category.id, newOrder);
+                                      } else {
+                                        setEditingOrderCardId(null);
+                                        setEditingOrderValue('');
+                                      }
+                                    }}
+                                    autoFocus
+                                    className="w-12 h-6 text-xs text-center p-1"
+                                    min={1}
+                                    max={categoryCards.length}
+                                  />
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className="cursor-pointer hover:bg-gray-100 min-w-[24px] justify-center"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (firstCard) {
+                                        setEditingOrderCardId(firstCard.id);
+                                        setEditingOrderValue(String(unitIndex + 1));
+                                      }
+                                    }}
+                                    title="클릭하여 순서 변경"
+                                  >
+                                    {unitIndex + 1}
+                                  </Badge>
+                                )}
                                 <CardTitle className="text-sm">{groupName}</CardTitle>
                                 {/* 그룹 메모 아이콘 */}
                                 {firstCard && (
@@ -1854,13 +1976,11 @@ export default function MultiFileCardManager() {
                           </CardContent>
                         </Card>
                       );
-                    });
-
-                    // 개별 카드들 렌더링
-                    individualCards.forEach((card) => {
-                      const cardIndex = itemIndex++;
-                      const isExpanded = expandedCardId === card.id;
-                      const isEditingOrder = editingOrderCardId === card.id;
+                      } else {
+                        // 개별 카드 렌더링
+                        const card = unit.card;
+                        const isExpanded = expandedCardId === card.id;
+                        const isEditingOrder = editingOrderCardId === card.id;
 
                       renderItems.push(
                         <Card key={card.id} className="hover:shadow-md transition-shadow">
@@ -1922,11 +2042,11 @@ export default function MultiFileCardManager() {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setEditingOrderCardId(card.id);
-                                  setEditingOrderValue(String(cardIndex + 1));
+                                  setEditingOrderValue(String(unitIndex + 1));
                                 }}
                                 title="클릭하여 순서 변경"
                               >
-                                {cardIndex + 1}
+                                {unitIndex + 1}
                               </Badge>
                             )}
                             <CardTitle className="text-sm">{card.name}</CardTitle>
@@ -2041,6 +2161,7 @@ export default function MultiFileCardManager() {
                       </CardContent>
                     </Card>
                       );
+                      }
                     });
 
                     return renderItems;
