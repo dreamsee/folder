@@ -18,6 +18,7 @@ export interface MatchCard {
   name: string;  // 카드 이름 (예: "검", "창")
   categoryId: string;
   matches: CardMatch[];  // 3개 파일의 매칭 정보
+  memo?: string;  // 카드 메모
   order?: number;  // 카테고리 내 순서
   createdAt: number;
   updatedAt: number;
@@ -32,6 +33,7 @@ export interface LoadedFile {
   rawData?: ArrayBuffer;  // 원본 바이너리 데이터 (인코딩 보존용)
   encoding?: string;  // 감지된 인코딩 정보
   lineEnding?: '\r\n' | '\n';  // 줄바꿈 문자 (Windows CRLF vs Unix LF)
+  originalContent?: string;  // 업로드 시점의 원본 텍스트 (수정 여부 판단용)
 }
 
 // 카드 카테고리

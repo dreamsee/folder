@@ -6,7 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, Copy, ChevronUp, ArrowUp, ArrowDown, Menu } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, ChevronUp, ArrowUp, ArrowDown, Menu, StickyNote } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MatchCard, LoadedFile, CardMatch, CardCategory } from '@/lib/multiFileCardTypes';
 import { detectEncoding, encodeToEucKr, buildFullEucKrTable } from '@/lib/encodingUtils';
@@ -44,8 +46,6 @@ export default function MultiFileCardManager() {
   const [showNewCardDialog, setShowNewCardDialog] = useState(false);
   const [showNewCategoryDialog, setShowNewCategoryDialog] = useState(false);
   const [showEditCardDialog, setShowEditCardDialog] = useState(false);
-  const [showPatternCloneDialog, setShowPatternCloneDialog] = useState(false);
-  const [cloneSourceCardId, setCloneSourceCardId] = useState<string | null>(null);
 
   // 새 카드 생성 폼
   const [newCardName, setNewCardName] = useState('');
@@ -219,11 +219,6 @@ export default function MultiFileCardManager() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedCardId, highlightedMatchIndex, cards]);
-
-  // 패턴 복제 폼
-  const [cloneCount, setCloneCount] = useState(1);
-  const [cloneOffset, setCloneOffset] = useState(1);
-  const [cloneCardNames, setCloneCardNames] = useState<string[]>([]);
 
   // 매치 추가 폼
   const [showAddMatchForm, setShowAddMatchForm] = useState(false);
@@ -769,67 +764,6 @@ export default function MultiFileCardManager() {
     });
   };
 
-  // 패턴 복제
-  const handlePatternClone = async () => {
-    if (!cloneSourceCardId) return;
-
-    const sourceCard = cards.find(c => c.id === cloneSourceCardId);
-    if (!sourceCard) return;
-
-    const newCards: MatchCard[] = [];
-
-    // 현재 카테고리의 카드 개수 (새 카드의 order 시작점)
-    let currentOrder = cards.filter(c => c.categoryId === sourceCard.categoryId).length;
-
-    for (let i = 0; i < cloneCount; i++) {
-      const offsetAmount = (i + 1) * cloneOffset;
-
-      // matches 복제 및 줄 번호 오프셋 적용 + 실제 파일 내용 가져오기
-      const newMatches: CardMatch[] = sourceCard.matches.map(match => {
-        const newLineNumber = match.lineNumber + offsetAmount;
-        const file = files.find(f => f.index === match.fileIndex);
-        const newContent = (file?.lines[newLineNumber - 1]?.replace(/[\r\n]+$/, '')) || match.originalContent;
-
-        return {
-          ...match,
-          lineNumber: newLineNumber,
-          originalContent: newContent,
-          modifiedContent: newContent
-        };
-      });
-
-      // 이름이 비어있으면 자동 생성
-      const cardName = cloneCardNames[i]?.trim() || `${sourceCard.name}_복제${i + 1}`;
-
-      const newCard: MatchCard = {
-        id: `card-${Date.now()}-${i}`,
-        name: cardName,
-        categoryId: sourceCard.categoryId,
-        matches: newMatches,
-        order: currentOrder,
-        createdAt: Date.now(),
-        updatedAt: Date.now()
-      };
-
-      newCards.push(newCard);
-      currentOrder++;
-    }
-
-    // 카드 추가 및 저장 (순차 실행 - race condition 방지)
-    for (const card of newCards) {
-      await 카드추가하기(card);
-    }
-    setCards([...cards, ...newCards]);
-
-    toast({
-      title: "패턴 복제 완료",
-      description: `${cloneCount}개의 카드가 생성되었습니다`
-    });
-
-    setShowPatternCloneDialog(false);
-  };
-
-
   // 카드를 파일에 적용
   const handleApplyCardToFiles = async (cardId: string) => {
     const card = cards.find(c => c.id === cardId);
@@ -861,15 +795,6 @@ export default function MultiFileCardManager() {
     });
   };
 
-  // 파일에 수정사항이 있는지 확인
-  const hasFileModifications = (fileIndex: 0 | 1 | 2): boolean => {
-    return cards.some(card =>
-      card.matches.some(match =>
-        match.fileIndex === fileIndex && match.originalContent !== match.modifiedContent
-      )
-    );
-  };
-
   // 파일 다운로드
   const handleDownloadFile = async (fileIndex: 0 | 1 | 2) => {
     const file = files.find(f => f.index === fileIndex);
@@ -880,84 +805,74 @@ export default function MultiFileCardManager() {
       await buildFullEucKrTable();
     }
 
+    // 현재 카드의 modifiedContent를 파일에 먼저 적용
+    const updatedFiles = 모든카드를파일에적용하기(cards, files);
+    const updatedFile = updatedFiles.find(f => f.index === fileIndex) || file;
+
     let blob: Blob;
+    // 항상 updatedFile의 lines를 텍스트로 인코딩하여 다운로드 (rawData 사용 안함)
+    const finalContent = updatedFile.lines.join(file.lineEnding || '\n');
+    const encoding = file.encoding || 'UTF-8';
 
-    // 수정사항이 없고 rawData가 있으면 원본 그대로 다운로드
-    if (!hasFileModifications(fileIndex) && file.rawData) {
-      blob = new Blob([file.rawData], { type: 'application/octet-stream' });
+    if (encoding === 'UTF-16LE') {
+      const utf16Codes: number[] = [];
+      for (let i = 0; i < finalContent.length; i++) {
+        utf16Codes.push(finalContent.charCodeAt(i));
+      }
+
+      const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+      bytes[0] = 0xFF;
+      bytes[1] = 0xFE;
+
+      for (let i = 0; i < utf16Codes.length; i++) {
+        const code = utf16Codes[i];
+        bytes[(i + 1) * 2] = code & 0xFF;
+        bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
+      }
+
+      blob = new Blob([bytes], { type: 'application/octet-stream' });
+    } else if (encoding === 'UTF-16BE') {
+      const utf16Codes: number[] = [];
+      for (let i = 0; i < finalContent.length; i++) {
+        utf16Codes.push(finalContent.charCodeAt(i));
+      }
+
+      const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+      bytes[0] = 0xFE;
+      bytes[1] = 0xFF;
+
+      for (let i = 0; i < utf16Codes.length; i++) {
+        const code = utf16Codes[i];
+        bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
+        bytes[(i + 1) * 2 + 1] = code & 0xFF;
+      }
+
+      blob = new Blob([bytes], { type: 'application/octet-stream' });
+    } else if (encoding === 'EUC-KR') {
+      const eucKrBytes = encodeToEucKr(finalContent);
+      blob = new Blob([eucKrBytes], { type: 'application/octet-stream' });
     } else {
-      // 수정사항이 있으면 텍스트 기반으로 인코딩
-      const finalContent = file.lines.join(file.lineEnding || '\n');
-      const encoding = file.encoding || 'UTF-8';
+      const encoder = new TextEncoder();
+      const encoded = encoder.encode(finalContent);
 
-      if (encoding === 'UTF-16LE') {
-        // UTF-16LE로 인코딩 (서로게이트 페어 처리)
-        const utf16Codes: number[] = [];
-        for (let i = 0; i < finalContent.length; i++) {
-          utf16Codes.push(finalContent.charCodeAt(i));
-        }
+      let hasBOM = false;
+      if (file.rawData) {
+        const uint8Array = new Uint8Array(file.rawData);
+        hasBOM = uint8Array.length >= 3 &&
+                 uint8Array[0] === 0xEF &&
+                 uint8Array[1] === 0xBB &&
+                 uint8Array[2] === 0xBF;
+      }
 
-        // 바이트 배열 생성 (BOM + 데이터)
-        const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
-        bytes[0] = 0xFF; // BOM LE
-        bytes[1] = 0xFE;
-
-        for (let i = 0; i < utf16Codes.length; i++) {
-          const code = utf16Codes[i];
-          bytes[(i + 1) * 2] = code & 0xFF;
-          bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
-        }
-
-        blob = new Blob([bytes], { type: 'application/octet-stream' });
-      } else if (encoding === 'UTF-16BE') {
-        // UTF-16BE로 인코딩 (서로게이트 페어 처리)
-        const utf16Codes: number[] = [];
-        for (let i = 0; i < finalContent.length; i++) {
-          utf16Codes.push(finalContent.charCodeAt(i));
-        }
-
-        // 바이트 배열 생성 (BOM + 데이터)
-        const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
-        bytes[0] = 0xFE; // BOM BE
-        bytes[1] = 0xFF;
-
-        for (let i = 0; i < utf16Codes.length; i++) {
-          const code = utf16Codes[i];
-          bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
-          bytes[(i + 1) * 2 + 1] = code & 0xFF;
-        }
-
-        blob = new Blob([bytes], { type: 'application/octet-stream' });
-      } else if (encoding === 'EUC-KR') {
-        // EUC-KR 인코딩 (한국어 게임 파일용)
-        const eucKrBytes = encodeToEucKr(finalContent);
-        blob = new Blob([eucKrBytes], { type: 'application/octet-stream' });
+      if (hasBOM) {
+        const withBOM = new Uint8Array(encoded.length + 3);
+        withBOM[0] = 0xEF;
+        withBOM[1] = 0xBB;
+        withBOM[2] = 0xBF;
+        withBOM.set(encoded, 3);
+        blob = new Blob([withBOM], { type: 'application/octet-stream' });
       } else {
-        // UTF-8 인코딩
-        const encoder = new TextEncoder();
-        const encoded = encoder.encode(finalContent);
-
-        // 원본에 BOM이 있었는지 확인
-        let hasBOM = false;
-        if (file.rawData) {
-          const uint8Array = new Uint8Array(file.rawData);
-          hasBOM = uint8Array.length >= 3 &&
-                   uint8Array[0] === 0xEF &&
-                   uint8Array[1] === 0xBB &&
-                   uint8Array[2] === 0xBF;
-        }
-
-        if (hasBOM) {
-          // BOM 추가
-          const withBOM = new Uint8Array(encoded.length + 3);
-          withBOM[0] = 0xEF;
-          withBOM[1] = 0xBB;
-          withBOM[2] = 0xBF;
-          withBOM.set(encoded, 3);
-          blob = new Blob([withBOM], { type: 'application/octet-stream' });
-        } else {
-          blob = new Blob([encoded], { type: 'application/octet-stream' });
-        }
+        blob = new Blob([encoded], { type: 'application/octet-stream' });
       }
     }
 
@@ -1008,85 +923,74 @@ export default function MultiFileCardManager() {
       setCards(updatedCards);
       await 파일저장하기(updatedFiles);
 
-      // 4. 모든 파일 다운로드 (updatedFiles를 직접 사용)
+      // 4. 모든 파일 다운로드 (updatedFiles의 lines를 항상 사용)
       updatedFiles.forEach((file, index) => {
         setTimeout(() => {
           let blob: Blob;
+          // 항상 현재 file.lines를 텍스트로 인코딩하여 다운로드 (rawData 사용 안함)
+          const finalContent = file.lines.join(file.lineEnding || '\n');
+          const encoding = file.encoding || 'UTF-8';
 
-          // 이 파일이 실제로 수정되었는지 확인 (원본 파일과 lines 비교)
-          const originalFile = files.find(f => f.index === file.index);
-          const fileActuallyModified = originalFile ?
-            file.lines.some((line, i) => originalFile.lines[i] !== line) : false;
+          if (encoding === 'UTF-16LE') {
+            const utf16Codes: number[] = [];
+            for (let i = 0; i < finalContent.length; i++) {
+              utf16Codes.push(finalContent.charCodeAt(i));
+            }
 
-          // 수정사항이 없고 rawData가 있으면 원본 그대로 다운로드
-          if (!fileActuallyModified && originalFile?.rawData) {
-            blob = new Blob([originalFile.rawData], { type: 'application/octet-stream' });
+            const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+            bytes[0] = 0xFF;
+            bytes[1] = 0xFE;
+
+            for (let i = 0; i < utf16Codes.length; i++) {
+              const code = utf16Codes[i];
+              bytes[(i + 1) * 2] = code & 0xFF;
+              bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
+            }
+
+            blob = new Blob([bytes], { type: 'application/octet-stream' });
+          } else if (encoding === 'UTF-16BE') {
+            const utf16Codes: number[] = [];
+            for (let i = 0; i < finalContent.length; i++) {
+              utf16Codes.push(finalContent.charCodeAt(i));
+            }
+
+            const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
+            bytes[0] = 0xFE;
+            bytes[1] = 0xFF;
+
+            for (let i = 0; i < utf16Codes.length; i++) {
+              const code = utf16Codes[i];
+              bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
+              bytes[(i + 1) * 2 + 1] = code & 0xFF;
+            }
+
+            blob = new Blob([bytes], { type: 'application/octet-stream' });
+          } else if (encoding === 'EUC-KR') {
+            // EUC-KR 인코딩 (한국어 게임 파일용)
+            const eucKrBytes = encodeToEucKr(finalContent);
+            blob = new Blob([eucKrBytes], { type: 'application/octet-stream' });
           } else {
-            // 수정사항이 있으면 텍스트 기반으로 인코딩
-            const finalContent = file.lines.join(file.lineEnding || '\n');
-            const encoding = file.encoding || 'UTF-8';
+            const encoder = new TextEncoder();
+            const encoded = encoder.encode(finalContent);
 
-            if (encoding === 'UTF-16LE') {
-              const utf16Codes: number[] = [];
-              for (let i = 0; i < finalContent.length; i++) {
-                utf16Codes.push(finalContent.charCodeAt(i));
-              }
+            let hasBOM = false;
+            if (file.rawData) {
+              const uint8Array = new Uint8Array(file.rawData);
+              hasBOM = uint8Array.length >= 3 &&
+                       uint8Array[0] === 0xEF &&
+                       uint8Array[1] === 0xBB &&
+                       uint8Array[2] === 0xBF;
+            }
 
-              const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
-              bytes[0] = 0xFF;
-              bytes[1] = 0xFE;
-
-              for (let i = 0; i < utf16Codes.length; i++) {
-                const code = utf16Codes[i];
-                bytes[(i + 1) * 2] = code & 0xFF;
-                bytes[(i + 1) * 2 + 1] = (code >> 8) & 0xFF;
-              }
-
-              blob = new Blob([bytes], { type: 'application/octet-stream' });
-            } else if (encoding === 'UTF-16BE') {
-              const utf16Codes: number[] = [];
-              for (let i = 0; i < finalContent.length; i++) {
-                utf16Codes.push(finalContent.charCodeAt(i));
-              }
-
-              const bytes = new Uint8Array((utf16Codes.length + 1) * 2);
-              bytes[0] = 0xFE;
-              bytes[1] = 0xFF;
-
-              for (let i = 0; i < utf16Codes.length; i++) {
-                const code = utf16Codes[i];
-                bytes[(i + 1) * 2] = (code >> 8) & 0xFF;
-                bytes[(i + 1) * 2 + 1] = code & 0xFF;
-              }
-
-              blob = new Blob([bytes], { type: 'application/octet-stream' });
-            } else if (encoding === 'EUC-KR') {
-              // EUC-KR 인코딩 (한국어 게임 파일용)
-              const eucKrBytes = encodeToEucKr(finalContent);
-              blob = new Blob([eucKrBytes], { type: 'application/octet-stream' });
+            if (hasBOM) {
+              const withBOM = new Uint8Array(encoded.length + 3);
+              withBOM[0] = 0xEF;
+              withBOM[1] = 0xBB;
+              withBOM[2] = 0xBF;
+              withBOM.set(encoded, 3);
+              blob = new Blob([withBOM], { type: 'application/octet-stream' });
             } else {
-              const encoder = new TextEncoder();
-              const encoded = encoder.encode(finalContent);
-
-              let hasBOM = false;
-              if (file.rawData) {
-                const uint8Array = new Uint8Array(file.rawData);
-                hasBOM = uint8Array.length >= 3 &&
-                         uint8Array[0] === 0xEF &&
-                         uint8Array[1] === 0xBB &&
-                         uint8Array[2] === 0xBF;
-              }
-
-              if (hasBOM) {
-                const withBOM = new Uint8Array(encoded.length + 3);
-                withBOM[0] = 0xEF;
-                withBOM[1] = 0xBB;
-                withBOM[2] = 0xBF;
-                withBOM.set(encoded, 3);
-                blob = new Blob([withBOM], { type: 'application/octet-stream' });
-              } else {
-                blob = new Blob([encoded], { type: 'application/octet-stream' });
-              }
+              blob = new Blob([encoded], { type: 'application/octet-stream' });
             }
           }
 
@@ -1705,24 +1609,48 @@ export default function MultiFileCardManager() {
                               </Badge>
                             )}
                             <CardTitle className="text-sm">{card.name}</CardTitle>
+                            <Popover>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`p-0.5 rounded hover:bg-gray-200 ${card.memo ? 'text-yellow-600' : 'text-gray-400'}`}
+                                      >
+                                        <StickyNote className="h-3.5 w-3.5" />
+                                      </button>
+                                    </PopoverTrigger>
+                                  </TooltipTrigger>
+                                  {card.memo && (
+                                    <TooltipContent side="top" className="max-w-xs">
+                                      <p className="whitespace-pre-wrap text-xs">{card.memo}</p>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TooltipProvider>
+                              <PopoverContent className="w-64 p-2" onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium">메모</label>
+                                  <textarea
+                                    defaultValue={card.memo || ''}
+                                    placeholder="메모를 입력하세요..."
+                                    className="w-full h-20 text-xs p-2 border rounded resize-none"
+                                    onBlur={(e) => {
+                                      const newMemo = e.target.value.trim();
+                                      if (newMemo !== (card.memo || '')) {
+                                        카드수정하기(card.id, { ...card, memo: newMemo || undefined });
+                                        setCards(prev => prev.map(c =>
+                                          c.id === card.id ? { ...c, memo: newMemo || undefined } : c
+                                        ));
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setCloneSourceCardId(card.id);
-                                setShowPatternCloneDialog(true);
-                                setCloneCount(1);
-                                setCloneOffset(1);
-                                setCloneCardNames(['']);
-                              }}
-                              className="h-6 w-6 p-0"
-                              title="패턴 복제"
-                            >
-                              <Copy className="h-3 w-3" />
-                            </Button>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -2592,81 +2520,6 @@ export default function MultiFileCardManager() {
                 setSelectedMatchesByFile(new Map());
               }}>
                 파일에 적용
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* 패턴 복제 다이얼로그 */}
-      {cloneSourceCardId && (
-        <Dialog open={showPatternCloneDialog} onOpenChange={setShowPatternCloneDialog}>
-          <DialogContent className="max-w-xl">
-            <DialogHeader>
-              <DialogTitle>패턴 복제</DialogTitle>
-              <DialogDescription>
-                선택한 카드의 패턴을 복제하여 여러 개의 카드를 생성합니다
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium">복제할 개수</label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={cloneCount}
-                  onChange={(e) => {
-                    const count = parseInt(e.target.value) || 1;
-                    setCloneCount(count);
-                    setCloneCardNames(Array(count).fill(''));
-                  }}
-                  className="mt-1"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">줄 번호 오프셋</label>
-                <Input
-                  type="number"
-                  value={cloneOffset}
-                  onChange={(e) => setCloneOffset(parseInt(e.target.value) || 1)}
-                  className="mt-1"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  각 복제본의 줄 번호가 이 값만큼 증가합니다
-                </p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium">카드 이름 (선택사항)</label>
-                <p className="text-xs text-gray-500 mt-1">
-                  비워두면 자동으로 "원본이름_복제1" 형식으로 생성됩니다
-                </p>
-                <div className="space-y-2 mt-2 max-h-[300px] overflow-y-auto">
-                  {Array.from({ length: cloneCount }).map((_, idx) => (
-                    <Input
-                      key={idx}
-                      placeholder={`카드 ${idx + 1} 이름 (선택사항)`}
-                      value={cloneCardNames[idx] || ''}
-                      onChange={(e) => {
-                        const newNames = [...cloneCardNames];
-                        newNames[idx] = e.target.value;
-                        setCloneCardNames(newNames);
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowPatternCloneDialog(false)}>
-                취소
-              </Button>
-              <Button onClick={handlePatternClone}>
-                생성
               </Button>
             </DialogFooter>
           </DialogContent>
