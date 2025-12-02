@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, ChevronUp, ArrowUp, ArrowDown, Menu, StickyNote } from "lucide-react";
+import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, ChevronUp, ArrowUp, ArrowDown, Menu, StickyNote, X, Layers, FolderOpen, FolderClosed } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MatchCard, LoadedFile, CardMatch, CardCategory } from '@/lib/multiFileCardTypes';
 import { detectEncoding, encodeToEucKr, buildFullEucKrTable } from '@/lib/encodingUtils';
@@ -59,6 +59,9 @@ export default function MultiFileCardManager() {
   // 그룹 이름 입력 다이얼로그
   const [showGroupNameDialog, setShowGroupNameDialog] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState('');
+
+  // 플로팅 액션 버튼 (FAB)
+  const [fabOpen, setFabOpen] = useState(false);
 
   // 새 카드 생성 폼
   const [newCardName, setNewCardName] = useState('');
@@ -3072,6 +3075,99 @@ export default function MultiFileCardManager() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* 플로팅 액션 버튼 (FAB) */}
+      <div className="fixed bottom-6 right-6 z-50">
+        {/* FAB 메뉴 항목들 */}
+        <div className={`flex flex-col-reverse gap-2 mb-2 transition-all duration-200 ${fabOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+          {/* 전체 적용 다운로드 */}
+          <button
+            onClick={() => {
+              handleApplyAllAndDownload();
+              setFabOpen(false);
+            }}
+            className="flex items-center gap-2 bg-white border shadow-lg rounded-full px-4 py-2 hover:bg-gray-50 transition-colors"
+          >
+            <Download className="h-4 w-4" />
+            <span className="text-sm whitespace-nowrap">전체 적용 다운로드</span>
+          </button>
+
+          {/* 탭 합치기 / N개 합치기 */}
+          {selectMode && selectedCardIds.size >= 2 && (
+            <button
+              onClick={() => {
+                handleMergeToTabGroup();
+                setFabOpen(false);
+              }}
+              className="flex items-center gap-2 bg-blue-500 text-white shadow-lg rounded-full px-4 py-2 hover:bg-blue-600 transition-colors"
+            >
+              <Layers className="h-4 w-4" />
+              <span className="text-sm whitespace-nowrap">{selectedCardIds.size}개 합치기</span>
+            </button>
+          )}
+          <button
+            onClick={() => {
+              if (selectMode) {
+                setSelectMode(false);
+                setSelectedCardIds(new Set());
+              } else {
+                setSelectMode(true);
+              }
+              setFabOpen(false);
+            }}
+            className="flex items-center gap-2 bg-white border shadow-lg rounded-full px-4 py-2 hover:bg-gray-50 transition-colors"
+          >
+            <Layers className="h-4 w-4" />
+            <span className="text-sm whitespace-nowrap">{selectMode ? '선택 취소' : '탭 합치기'}</span>
+          </button>
+
+          {/* 카테고리 모두 펼치기 */}
+          <button
+            onClick={() => {
+              setCollapsedCategories(new Set());
+              setFabOpen(false);
+            }}
+            className="flex items-center gap-2 bg-white border shadow-lg rounded-full px-4 py-2 hover:bg-gray-50 transition-colors"
+          >
+            <FolderOpen className="h-4 w-4" />
+            <span className="text-sm whitespace-nowrap">모두 펼치기</span>
+          </button>
+
+          {/* 카테고리 모두 접기 */}
+          <button
+            onClick={() => {
+              setCollapsedCategories(new Set(categories.map(c => c.id)));
+              setFabOpen(false);
+            }}
+            className="flex items-center gap-2 bg-white border shadow-lg rounded-full px-4 py-2 hover:bg-gray-50 transition-colors"
+          >
+            <FolderClosed className="h-4 w-4" />
+            <span className="text-sm whitespace-nowrap">모두 접기</span>
+          </button>
+        </div>
+
+        {/* FAB 메인 버튼 */}
+        <button
+          onClick={() => setFabOpen(!fabOpen)}
+          className={`w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-200 ${
+            fabOpen ? 'bg-gray-700 rotate-45' : 'bg-blue-500 hover:bg-blue-600'
+          }`}
+        >
+          {fabOpen ? (
+            <X className="h-6 w-6 text-white" />
+          ) : (
+            <Plus className="h-6 w-6 text-white" />
+          )}
+        </button>
+      </div>
+
+      {/* FAB 외부 클릭시 닫기 */}
+      {fabOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setFabOpen(false)}
+        />
+      )}
     </div>
   );
 }
