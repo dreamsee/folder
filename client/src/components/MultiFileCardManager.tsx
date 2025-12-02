@@ -47,6 +47,19 @@ export default function MultiFileCardManager() {
   const [showNewCategoryDialog, setShowNewCategoryDialog] = useState(false);
   const [showEditCardDialog, setShowEditCardDialog] = useState(false);
 
+  // 탭 그룹 선택 모드
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set());
+
+  // 탭 그룹 편집 모달
+  const [tabGroupEditModalOpen, setTabGroupEditModalOpen] = useState(false);
+  const [editingTabGroupId, setEditingTabGroupId] = useState<string | null>(null);
+  const [activeTabInModal, setActiveTabInModal] = useState<string | null>(null);
+
+  // 그룹 이름 입력 다이얼로그
+  const [showGroupNameDialog, setShowGroupNameDialog] = useState(false);
+  const [groupNameInput, setGroupNameInput] = useState('');
+
   // 새 카드 생성 폼
   const [newCardName, setNewCardName] = useState('');
   const [newCardCategory, setNewCardCategory] = useState('default');
@@ -764,6 +777,112 @@ export default function MultiFileCardManager() {
     });
   };
 
+  // 탭 그룹으로 합치기 - 다이얼로그 열기
+  const handleMergeToTabGroup = () => {
+    if (selectedCardIds.size < 2) return;
+    setGroupNameInput('');
+    setShowGroupNameDialog(true);
+  };
+
+  // 실제 탭 그룹 생성
+  const confirmMergeToTabGroup = async () => {
+    if (selectedCardIds.size < 2) return;
+    if (!groupNameInput.trim()) {
+      toast({ title: "오류", description: "그룹 이름을 입력해주세요", variant: "destructive" });
+      return;
+    }
+
+    const selectedCards = cards.filter(c => selectedCardIds.has(c.id));
+    if (selectedCards.length < 2) return;
+
+    const firstCard = selectedCards[0];
+    const groupId = `group-${Date.now()}`;
+    const groupName = groupNameInput.trim();
+
+    const updatedCards = cards.map(card => {
+      if (selectedCardIds.has(card.id)) {
+        const groupOrder = selectedCards.findIndex(c => c.id === card.id);
+        return {
+          ...card,
+          categoryId: firstCard.categoryId,
+          groupId,
+          groupName,
+          groupOrder,
+          updatedAt: Date.now()
+        };
+      }
+      return card;
+    });
+
+    setCards(updatedCards);
+    for (const card of updatedCards.filter(c => selectedCardIds.has(c.id))) {
+      await 카드수정하기(card.id, card);
+    }
+
+    setSelectMode(false);
+    setSelectedCardIds(new Set());
+    setShowGroupNameDialog(false);
+    setGroupNameInput('');
+
+    toast({
+      title: "탭 그룹 생성",
+      description: `${selectedCards.length}개 카드가 "${groupName}" 그룹으로 합쳐졌습니다`
+    });
+  };
+
+  // 탭 그룹 해제
+  const handleUngroupTab = async (groupId: string) => {
+    const groupCards = cards.filter(c => c.groupId === groupId);
+
+    const updatedCards = cards.map(card => {
+      if (card.groupId === groupId) {
+        const { groupId: _, groupName: _n, groupOrder: __, ...rest } = card;
+        return { ...rest, updatedAt: Date.now() };
+      }
+      return card;
+    });
+
+    setCards(updatedCards);
+    for (const card of groupCards) {
+      const updated = updatedCards.find(c => c.id === card.id);
+      if (updated) await 카드수정하기(card.id, updated);
+    }
+
+    toast({
+      title: "탭 그룹 해제",
+      description: `${groupCards.length}개 카드가 개별로 분리되었습니다`
+    });
+  };
+
+  // 탭 그룹 편집 모달 열기
+  const openTabGroupEditModal = (groupId: string) => {
+    const groupCards = cards.filter(c => c.groupId === groupId);
+    if (groupCards.length > 0) {
+      setEditingTabGroupId(groupId);
+      setActiveTabInModal(groupCards[0].id);
+      setTabGroupEditModalOpen(true);
+    }
+  };
+
+  // 탭 그룹 삭제 (그룹 내 모든 카드 삭제)
+  const handleDeleteTabGroup = async (groupId: string) => {
+    const groupCards = cards.filter(c => c.groupId === groupId);
+    if (groupCards.length === 0) return;
+
+    const confirm = window.confirm(`"${groupCards[0].groupName}" 그룹의 ${groupCards.length}개 카드를 모두 삭제하시겠습니까?`);
+    if (!confirm) return;
+
+    for (const card of groupCards) {
+      await 카드삭제하기(card.id);
+    }
+    setCards(prev => prev.filter(c => c.groupId !== groupId));
+
+    toast({
+      title: "탭 그룹 삭제",
+      description: `${groupCards.length}개 카드가 삭제되었습니다`
+    });
+  };
+
   // 카드를 파일에 적용
   const handleApplyCardToFiles = async (cardId: string) => {
     const card = cards.find(c => c.id === cardId);
@@ -1319,6 +1438,29 @@ export default function MultiFileCardManager() {
               <Save className="h-4 w-4 mr-2" />
               전체 적용 다운로드
             </Button>
+            <Button
+              onClick={() => {
+                if (selectMode) {
+                  setSelectMode(false);
+                  setSelectedCardIds(new Set());
+                } else {
+                  setSelectMode(true);
+                }
+              }}
+              variant={selectMode ? "default" : "outline"}
+              size="sm"
+            >
+              {selectMode ? "선택 취소" : "탭 합치기"}
+            </Button>
+            {selectMode && selectedCardIds.size >= 2 && (
+              <Button
+                onClick={handleMergeToTabGroup}
+                variant="default"
+                size="sm"
+              >
+                {selectedCardIds.size}개 합치기
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -1555,16 +1697,192 @@ export default function MultiFileCardManager() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {categoryCards.map((card, cardIndex) => {
-                    const isExpanded = expandedCardId === card.id;
-                    const isEditingOrder = editingOrderCardId === card.id;
-                    return (
-                    <Card key={card.id} className="hover:shadow-md transition-shadow">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            {/* 순서 번호 */}
-                            {isEditingOrder ? (
+                  {(() => {
+                    // 그룹화된 카드와 개별 카드 분리
+                    const groupedCards = new Map<string, typeof categoryCards>();
+                    const individualCards: typeof categoryCards = [];
+
+                    categoryCards.forEach(card => {
+                      if (card.groupId) {
+                        if (!groupedCards.has(card.groupId)) {
+                          groupedCards.set(card.groupId, []);
+                        }
+                        groupedCards.get(card.groupId)!.push(card);
+                      } else {
+                        individualCards.push(card);
+                      }
+                    });
+
+                    // 그룹 내 카드들 정렬
+                    groupedCards.forEach((cards) => {
+                      cards.sort((a, b) => (a.groupOrder || 0) - (b.groupOrder || 0));
+                    });
+
+                    const renderItems: React.ReactNode[] = [];
+                    let itemIndex = 0;
+
+                    // 그룹화된 카드들 렌더링
+                    groupedCards.forEach((groupCards, groupId) => {
+                      const groupName = groupCards[0]?.groupName || '그룹';
+                      const firstCard = groupCards[0];
+
+                      renderItems.push(
+                        <Card key={groupId} className="hover:shadow-md transition-shadow border-2 border-blue-200">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {selectMode && (
+                                  <input
+                                    type="checkbox"
+                                    checked={groupCards.every(c => selectedCardIds.has(c.id))}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      const newSet = new Set(selectedCardIds);
+                                      if (e.target.checked) {
+                                        groupCards.forEach(c => newSet.add(c.id));
+                                      } else {
+                                        groupCards.forEach(c => newSet.delete(c.id));
+                                      }
+                                      setSelectedCardIds(newSet);
+                                    }}
+                                    className="w-4 h-4"
+                                  />
+                                )}
+                                <Badge variant="outline" className="text-xs px-1.5 py-0">
+                                  {++itemIndex}
+                                </Badge>
+                                <CardTitle className="text-sm">{groupName}</CardTitle>
+                                {/* 그룹 메모 아이콘 */}
+                                {firstCard && (
+                                  <Popover>
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <PopoverTrigger asChild>
+                                            <button
+                                              onClick={(e) => e.stopPropagation()}
+                                              className={`p-0.5 rounded hover:bg-gray-200 ${firstCard.memo ? 'text-yellow-600' : 'text-gray-400'}`}
+                                            >
+                                              <StickyNote className="h-3.5 w-3.5" />
+                                            </button>
+                                          </PopoverTrigger>
+                                        </TooltipTrigger>
+                                        {firstCard.memo && (
+                                          <TooltipContent side="top" className="max-w-xs">
+                                            <p className="whitespace-pre-wrap text-xs">{firstCard.memo}</p>
+                                          </TooltipContent>
+                                        )}
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                    <PopoverContent className="w-64 p-2" onClick={(e) => e.stopPropagation()}>
+                                      <div className="space-y-2">
+                                        <label className="text-xs font-medium">메모</label>
+                                        <textarea
+                                          defaultValue={firstCard.memo || ''}
+                                          placeholder="메모를 입력하세요..."
+                                          className="w-full h-20 text-xs p-2 border rounded resize-none"
+                                          onBlur={(e) => {
+                                            const newMemo = e.target.value.trim();
+                                            if (newMemo !== (firstCard.memo || '')) {
+                                              카드수정하기(firstCard.id, { ...firstCard, memo: newMemo || undefined });
+                                              setCards(prev => prev.map(c =>
+                                                c.id === firstCard.id ? { ...c, memo: newMemo || undefined } : c
+                                              ));
+                                            }
+                                          }}
+                                        />
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openTabGroupEditModal(groupId);
+                                  }}
+                                  className="h-6 w-6 p-0"
+                                  title="편집"
+                                >
+                                  <Edit2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteTabGroup(groupId);
+                                  }}
+                                  className="h-6 w-6 p-0"
+                                  title="삭제"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUngroupTab(groupId);
+                                  }}
+                                  className="h-6 px-2 text-xs"
+                                  title="탭 그룹 해제"
+                                >
+                                  해제
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="text-xs space-y-1 pl-6">
+                              {groupCards.map((card) => (
+                                <div
+                                  key={card.id}
+                                  className="text-gray-700 hover:text-blue-600 cursor-pointer hover:underline"
+                                  onClick={() => setSelectedCardId(card.id)}
+                                >
+                                  {card.name}
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    });
+
+                    // 개별 카드들 렌더링
+                    individualCards.forEach((card) => {
+                      const cardIndex = itemIndex++;
+                      const isExpanded = expandedCardId === card.id;
+                      const isEditingOrder = editingOrderCardId === card.id;
+
+                      renderItems.push(
+                        <Card key={card.id} className="hover:shadow-md transition-shadow">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {selectMode && (
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCardIds.has(card.id)}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      const newSet = new Set(selectedCardIds);
+                                      if (e.target.checked) {
+                                        newSet.add(card.id);
+                                      } else {
+                                        newSet.delete(card.id);
+                                      }
+                                      setSelectedCardIds(newSet);
+                                    }}
+                                    className="w-4 h-4"
+                                  />
+                                )}
+                                {/* 순서 번호 */}
+                                {isEditingOrder ? (
                               <Input
                                 type="number"
                                 value={editingOrderValue}
@@ -1719,8 +2037,11 @@ export default function MultiFileCardManager() {
                         )}
                       </CardContent>
                     </Card>
-                    );
-                  })}
+                      );
+                    });
+
+                    return renderItems;
+                  })()}
                 </div>
               )}
             </CardContent>
@@ -2580,6 +2901,173 @@ export default function MultiFileCardManager() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowSimilarDialog(false)}>
               취소
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 그룹 이름 입력 다이얼로그 */}
+      <Dialog open={showGroupNameDialog} onOpenChange={setShowGroupNameDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>탭 그룹 이름</DialogTitle>
+            <DialogDescription>
+              {selectedCardIds.size}개 카드를 합칠 그룹 이름을 입력하세요
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={groupNameInput}
+            onChange={(e) => setGroupNameInput(e.target.value)}
+            placeholder="그룹 이름"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                confirmMergeToTabGroup();
+              }
+            }}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGroupNameDialog(false)}>
+              취소
+            </Button>
+            <Button onClick={confirmMergeToTabGroup}>
+              합치기
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 탭 그룹 편집 모달 */}
+      <Dialog open={tabGroupEditModalOpen} onOpenChange={setTabGroupEditModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {editingTabGroupId && cards.find(c => c.groupId === editingTabGroupId)?.groupName || '그룹'} 편집
+            </DialogTitle>
+          </DialogHeader>
+          {editingTabGroupId && (() => {
+            const groupCards = cards
+              .filter(c => c.groupId === editingTabGroupId)
+              .sort((a, b) => (a.groupOrder || 0) - (b.groupOrder || 0));
+            const activeCard = groupCards.find(c => c.id === activeTabInModal) || groupCards[0];
+
+            return (
+              <div className="flex flex-col flex-1 overflow-hidden">
+                {/* 그룹 이름 수정 */}
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-medium whitespace-nowrap">그룹 이름:</span>
+                  <Input
+                    value={groupCards[0]?.groupName || ''}
+                    onChange={(e) => {
+                      const newGroupName = e.target.value;
+                      setCards(prev => prev.map(c =>
+                        c.groupId === editingTabGroupId ? { ...c, groupName: newGroupName } : c
+                      ));
+                    }}
+                    className="flex-1"
+                  />
+                </div>
+                {/* 탭 버튼들 */}
+                <div className="flex flex-wrap gap-1 border-b pb-2 mb-4">
+                  {groupCards.map((card) => (
+                    <button
+                      key={card.id}
+                      onClick={() => setActiveTabInModal(card.id)}
+                      title={card.name}
+                      className={`px-3 py-1.5 text-sm rounded-t max-w-[150px] truncate ${
+                        activeCard?.id === card.id
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >
+                      {card.name}
+                    </button>
+                  ))}
+                </div>
+
+                {/* 활성 탭 내용 */}
+                {activeCard && (
+                  <div className="flex-1 overflow-y-auto space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm font-medium whitespace-nowrap">카드 이름:</span>
+                      <Input
+                        value={activeCard.name}
+                        onChange={(e) => {
+                          const newName = e.target.value;
+                          setCards(prev => prev.map(c =>
+                            c.id === activeCard.id ? { ...c, name: newName } : c
+                          ));
+                        }}
+                        onBlur={() => {
+                          카드수정하기(activeCard.id, activeCard);
+                        }}
+                        className="flex-1"
+                      />
+                    </div>
+                    {activeCard.matches.map((match, idx) => (
+                      <div key={idx} className="space-y-1">
+                        <div className="text-xs text-gray-500 flex items-center gap-2">
+                          <span>파일{match.fileIndex + 1} {match.lineNumber}줄</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-5 text-xs px-2"
+                            onClick={() => {
+                              const file = files[match.fileIndex];
+                              if (file && match.lineNumber > 0 && match.lineNumber <= file.lines.length) {
+                                const originalLine = file.lines[match.lineNumber - 1];
+                                setCards(prev => prev.map(c => {
+                                  if (c.id !== activeCard.id) return c;
+                                  return {
+                                    ...c,
+                                    matches: c.matches.map((m, i) =>
+                                      i === idx ? { ...m, modifiedContent: originalLine } : m
+                                    )
+                                  };
+                                }));
+                              }
+                            }}
+                          >
+                            원본 가져오기
+                          </Button>
+                        </div>
+                        <textarea
+                          value={match.modifiedContent}
+                          onChange={(e) => {
+                            setCards(prev => prev.map(c => {
+                              if (c.id !== activeCard.id) return c;
+                              return {
+                                ...c,
+                                matches: c.matches.map((m, i) =>
+                                  i === idx ? { ...m, modifiedContent: e.target.value } : m
+                                )
+                              };
+                            }));
+                          }}
+                          className="w-full text-sm p-2 border border-gray-300 rounded resize-y min-h-[60px]"
+                          rows={3}
+                          spellCheck={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          <DialogFooter className="flex-shrink-0 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                // 저장하고 닫기
+                if (editingTabGroupId) {
+                  const groupCards = cards.filter(c => c.groupId === editingTabGroupId);
+                  groupCards.forEach(card => 카드수정하기(card.id, card));
+                }
+                setTabGroupEditModalOpen(false);
+              }}
+            >
+              저장 후 닫기
             </Button>
           </DialogFooter>
         </DialogContent>

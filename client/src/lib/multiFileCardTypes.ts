@@ -20,6 +20,9 @@ export interface MatchCard {
   matches: CardMatch[];  // 3개 파일의 매칭 정보
   memo?: string;  // 카드 메모
   order?: number;  // 카테고리 내 순서
+  groupId?: string;  // 탭 그룹 ID (같은 groupId = 같은 탭 그룹)
+  groupName?: string;  // 탭 그룹 이름
+  groupOrder?: number;  // 그룹 내 탭 순서
   createdAt: number;
   updatedAt: number;
 }
