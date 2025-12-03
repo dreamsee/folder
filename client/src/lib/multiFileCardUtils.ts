@@ -89,6 +89,17 @@ export async function 모든카드가져오기(): Promise<MatchCard[]> {
 }
 
 export async function 카드저장하기(cards: MatchCard[]): Promise<void> {
+  // 디버그: groupId가 있는 카드 확인
+  const groupedCards = cards.filter(c => c.groupId);
+  if (groupedCards.length > 0) {
+    console.log('[카드저장] groupId가 있는 카드:', groupedCards.map(c => ({
+      id: c.id,
+      name: c.name,
+      groupId: c.groupId,
+      groupName: c.groupName,
+      groupOrder: c.groupOrder
+    })));
+  }
   await MultiFileCard저장하기(cards);
 }
 

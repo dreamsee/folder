@@ -119,6 +119,18 @@ export async function 현재데이터를JSON형식으로변환(): Promise<노트
   const multiFileCardCategories = await 모든MultiFileCardCategories가져오기();
   const multiFileLoadedFiles = await 모든MultiFileLoadedFiles가져오기();
 
+  // 디버그: groupId가 있는 카드 확인
+  const groupedCards = multiFileCards.filter((c: any) => c.groupId);
+  console.log('[내보내기] IndexedDB에서 가져온 카드 중 groupId가 있는 카드 수:', groupedCards.length);
+  if (groupedCards.length > 0) {
+    console.log('[내보내기] groupId가 있는 카드:', groupedCards.map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      groupId: c.groupId,
+      groupName: c.groupName
+    })));
+  }
+
   // 내보내기용 형식으로 변환
   const 원본문서목록 = 원본문서목록Raw.map(doc => ({
     id: doc.id,

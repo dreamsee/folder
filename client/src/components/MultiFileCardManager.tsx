@@ -875,9 +875,8 @@ export default function MultiFileCardManager() {
     });
 
     setCards(updatedCards);
-    for (const card of updatedCards.filter(c => selectedCardIds.has(c.id))) {
-      await 카드수정하기(card.id, card);
-    }
+    // 전체 카드를 한 번에 저장 (개별 저장 시 비동기 타이밍 문제 방지)
+    await 카드저장하기(updatedCards);
 
     setSelectMode(false);
     setSelectedCardIds(new Set());
@@ -903,10 +902,8 @@ export default function MultiFileCardManager() {
     });
 
     setCards(updatedCards);
-    for (const card of groupCards) {
-      const updated = updatedCards.find(c => c.id === card.id);
-      if (updated) await 카드수정하기(card.id, updated);
-    }
+    // 전체 카드를 한 번에 저장
+    await 카드저장하기(updatedCards);
 
     toast({
       title: "탭 그룹 해제",
@@ -1223,6 +1220,13 @@ export default function MultiFileCardManager() {
         name: card.name,
         categoryId: card.categoryId,
         order: card.order ?? 0,
+        memo: card.memo,
+        // 그룹 정보 포함
+        groupId: card.groupId,
+        groupName: card.groupName,
+        groupOrder: card.groupOrder,
+        createdAt: card.createdAt,
+        updatedAt: card.updatedAt,
         matches: card.matches.map(match => {
           const file = files.find(f => f.index === match.fileIndex);
           return {
@@ -1321,6 +1325,11 @@ export default function MultiFileCardManager() {
           categoryId: mod.categoryId || 'default',
           matches: remappedMatches,
           order: mod.order ?? 0,
+          memo: mod.memo,
+          // 그룹 정보 복원
+          groupId: mod.groupId,
+          groupName: mod.groupName,
+          groupOrder: mod.groupOrder,
           createdAt: mod.createdAt || Date.now(),
           updatedAt: Date.now()
         };
@@ -3182,11 +3191,10 @@ export default function MultiFileCardManager() {
           <DialogFooter className="flex-shrink-0 mt-4">
             <Button
               variant="outline"
-              onClick={() => {
+              onClick={async () => {
                 // 저장하고 닫기
                 if (editingTabGroupId) {
-                  const groupCards = cards.filter(c => c.groupId === editingTabGroupId);
-                  groupCards.forEach(card => 카드수정하기(card.id, card));
+                  await 카드저장하기(cards);
                 }
                 setTabGroupEditModalOpen(false);
               }}
