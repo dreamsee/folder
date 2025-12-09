@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, ChevronUp, ArrowUp, ArrowDown, Menu, StickyNote, X, Layers, FolderOpen, FolderClosed } from "lucide-react";
+import { Trash2, Edit2, FolderPlus, Plus, Upload, Grid, Save, ChevronDown, ChevronRight, Download, Tag, Eye, EyeOff, ChevronUp, ArrowUp, ArrowDown, Menu, StickyNote, X, Layers, FolderOpen, FolderClosed, MoveRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { MatchCard, LoadedFile, CardMatch, CardCategory } from '@/lib/multiFileCardTypes';
 import { detectEncoding, encodeToEucKr, buildFullEucKrTable } from '@/lib/encodingUtils';
@@ -773,6 +773,33 @@ export default function MultiFileCardManager() {
     // 편집 모드 종료
     setEditingCategoryOrderId(null);
     setEditingCategoryOrderValue('');
+  };
+
+  // 카드를 다른 카테고리로 이동
+  const handleMoveCardToCategory = async (cardId: string, newCategoryId: string) => {
+    const card = cards.find(c => c.id === cardId);
+    if (!card || card.categoryId === newCategoryId) return;
+
+    const oldCategory = categories.find(c => c.id === card.categoryId);
+    const newCategory = categories.find(c => c.id === newCategoryId);
+
+    // 새 카테고리의 마지막 순서로 이동
+    const newCategoryCardCount = cards.filter(c => c.categoryId === newCategoryId).length;
+
+    // 카드 업데이트
+    const updatedCard = {
+      ...card,
+      categoryId: newCategoryId,
+      order: newCategoryCardCount
+    };
+
+    setCards(prev => prev.map(c => c.id === cardId ? updatedCard : c));
+    await 카드수정하기(cardId, { categoryId: newCategoryId, order: newCategoryCardCount });
+
+    toast({
+      title: "카드 이동 완료",
+      description: `"${card.name}"을(를) "${oldCategory?.name || '알 수 없음'}"에서 "${newCategory?.name || '알 수 없음'}"으로 이동했습니다`
+    });
   };
 
   // 매치 추가
@@ -1943,6 +1970,47 @@ export default function MultiFileCardManager() {
                                 >
                                   <Edit2 className="h-3 w-3" />
                                 </Button>
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="h-6 w-6 p-0"
+                                      title="카테고리 이동"
+                                    >
+                                      <MoveRight className="h-3 w-3" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-48 p-2" onClick={(e) => e.stopPropagation()}>
+                                    <div className="space-y-2">
+                                      <label className="text-xs font-medium">그룹 카테고리 이동</label>
+                                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                                        {categories
+                                          .filter(cat => cat.id !== firstCard.categoryId)
+                                          .map(cat => (
+                                            <Button
+                                              key={cat.id}
+                                              size="sm"
+                                              variant="ghost"
+                                              className="w-full justify-start text-xs h-7"
+                                              onClick={async () => {
+                                                for (const card of groupCards) {
+                                                  await handleMoveCardToCategory(card.id, cat.id);
+                                                }
+                                              }}
+                                            >
+                                              <div
+                                                className="w-2 h-2 rounded-full mr-2"
+                                                style={{ backgroundColor: cat.color }}
+                                              />
+                                              {cat.name}
+                                            </Button>
+                                          ))}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
                                 <Button
                                   size="sm"
                                   variant="ghost"
@@ -2113,6 +2181,43 @@ export default function MultiFileCardManager() {
                             >
                               <Edit2 className="h-3 w-3" />
                             </Button>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-6 w-6 p-0"
+                                  title="카테고리 이동"
+                                >
+                                  <MoveRight className="h-3 w-3" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-48 p-2" onClick={(e) => e.stopPropagation()}>
+                                <div className="space-y-2">
+                                  <label className="text-xs font-medium">카테고리 이동</label>
+                                  <div className="space-y-1 max-h-40 overflow-y-auto">
+                                    {categories
+                                      .filter(cat => cat.id !== card.categoryId)
+                                      .map(cat => (
+                                        <Button
+                                          key={cat.id}
+                                          size="sm"
+                                          variant="ghost"
+                                          className="w-full justify-start text-xs h-7"
+                                          onClick={() => handleMoveCardToCategory(card.id, cat.id)}
+                                        >
+                                          <div
+                                            className="w-2 h-2 rounded-full mr-2"
+                                            style={{ backgroundColor: cat.color }}
+                                          />
+                                          {cat.name}
+                                        </Button>
+                                      ))}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
                             <Button
                               size="sm"
                               variant="ghost"
