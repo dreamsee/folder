@@ -57,6 +57,10 @@ export default function MultiFileCardManager() {
   const [activeTabInModal, setActiveTabInModal] = useState<string | null>(null);
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
 
+  // 그룹 해제 모드
+  const [ungroupModeGroupId, setUngroupModeGroupId] = useState<string | null>(null);
+  const [ungroupSelectedCardIds, setUngroupSelectedCardIds] = useState<Set<string>>(new Set());
+
   // 그룹 이름 입력 다이얼로그
   const [showGroupNameDialog, setShowGroupNameDialog] = useState(false);
   const [groupNameInput, setGroupNameInput] = useState('');
@@ -956,7 +960,7 @@ export default function MultiFileCardManager() {
     });
   };
 
-  // 탭 그룹 해제
+  // 탭 그룹 해제 (전체)
   const handleUngroupTab = async (groupId: string) => {
     const groupCards = cards.filter(c => c.groupId === groupId);
 
@@ -969,12 +973,59 @@ export default function MultiFileCardManager() {
     });
 
     setCards(updatedCards);
-    // 전체 카드를 한 번에 저장
     await 카드저장하기(updatedCards);
+    setUngroupModeGroupId(null);
+    setUngroupSelectedCardIds(new Set());
 
     toast({
       title: "탭 그룹 해제",
       description: `${groupCards.length}개 카드가 개별로 분리되었습니다`
+    });
+  };
+
+  // 선택된 카드만 그룹에서 해제
+  const handleUngroupSelectedCards = async (groupId: string) => {
+    if (ungroupSelectedCardIds.size === 0) return;
+
+    const groupCards = cards.filter(c => c.groupId === groupId);
+    const remainingCount = groupCards.length - ungroupSelectedCardIds.size;
+
+    const updatedCards = cards.map(card => {
+      if (ungroupSelectedCardIds.has(card.id)) {
+        const { groupId: _, groupName: _n, groupOrder: __, ...rest } = card;
+        return { ...rest, updatedAt: Date.now() };
+      }
+      // 남은 카드들의 groupOrder 재정렬
+      if (card.groupId === groupId && !ungroupSelectedCardIds.has(card.id)) {
+        const remainingCards = groupCards.filter(c => !ungroupSelectedCardIds.has(c.id));
+        const newOrder = remainingCards.findIndex(c => c.id === card.id);
+        return { ...card, groupOrder: newOrder, updatedAt: Date.now() };
+      }
+      return card;
+    });
+
+    // 남은 카드가 1개 이하면 그룹 자체를 해제
+    if (remainingCount <= 1) {
+      const finalCards = updatedCards.map(card => {
+        if (card.groupId === groupId) {
+          const { groupId: _, groupName: _n, groupOrder: __, ...rest } = card;
+          return { ...rest, updatedAt: Date.now() };
+        }
+        return card;
+      });
+      setCards(finalCards);
+      await 카드저장하기(finalCards);
+    } else {
+      setCards(updatedCards);
+      await 카드저장하기(updatedCards);
+    }
+
+    setUngroupModeGroupId(null);
+    setUngroupSelectedCardIds(new Set());
+
+    toast({
+      title: "선택 해제",
+      description: `${ungroupSelectedCardIds.size}개 카드가 그룹에서 분리되었습니다`
     });
   };
 
@@ -2063,18 +2114,62 @@ export default function MultiFileCardManager() {
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </Button>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleUngroupTab(groupId);
-                                  }}
-                                  className="h-6 px-2 text-xs"
-                                  title="탭 그룹 해제"
-                                >
-                                  해제
-                                </Button>
+                                {ungroupModeGroupId === groupId ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setUngroupModeGroupId(null);
+                                        setUngroupSelectedCardIds(new Set());
+                                      }}
+                                      className="h-6 px-2 text-xs"
+                                      title="취소"
+                                    >
+                                      취소
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleUngroupTab(groupId);
+                                      }}
+                                      className="h-6 px-2 text-xs text-red-600 hover:text-red-700"
+                                      title="전체 해제"
+                                    >
+                                      전체해제
+                                    </Button>
+                                    {ungroupSelectedCardIds.size > 0 && (
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleUngroupSelectedCards(groupId);
+                                        }}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        {ungroupSelectedCardIds.size}개 해제
+                                      </Button>
+                                    )}
+                                  </>
+                                ) : (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setUngroupModeGroupId(groupId);
+                                      setUngroupSelectedCardIds(new Set());
+                                    }}
+                                    className="h-6 px-2 text-xs"
+                                    title="탭 그룹 해제"
+                                  >
+                                    해제
+                                  </Button>
+                                )}
                               </div>
                             </div>
                           </CardHeader>
@@ -2086,8 +2181,30 @@ export default function MultiFileCardManager() {
                                     <TooltipTrigger asChild>
                                       <div
                                         className={`text-gray-700 hover:text-blue-600 cursor-pointer hover:underline flex items-center gap-1 ${card.memo ? 'border-b border-yellow-400 inline-block' : ''}`}
-                                        onClick={() => setSelectedCardId(card.id)}
+                                        onClick={() => {
+                                          if (ungroupModeGroupId === groupId) {
+                                            // 해제 모드일 때는 체크박스 토글
+                                            const newSet = new Set(ungroupSelectedCardIds);
+                                            if (newSet.has(card.id)) {
+                                              newSet.delete(card.id);
+                                            } else {
+                                              newSet.add(card.id);
+                                            }
+                                            setUngroupSelectedCardIds(newSet);
+                                          } else {
+                                            setSelectedCardId(card.id);
+                                          }
+                                        }}
                                       >
+                                        {ungroupModeGroupId === groupId && (
+                                          <input
+                                            type="checkbox"
+                                            checked={ungroupSelectedCardIds.has(card.id)}
+                                            onChange={() => {}}
+                                            className="w-3 h-3 mr-1"
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        )}
                                         {card.name}
                                         {card.memo && <StickyNote className="h-3 w-3 text-yellow-600 inline" />}
                                       </div>
