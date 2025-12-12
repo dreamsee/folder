@@ -872,6 +872,45 @@ export default function MultiFileCardManager() {
     setShowGroupNameDialog(true);
   };
 
+  // 기존 그룹 이름으로 바로 합치기
+  const mergeWithExistingGroupName = async (existingGroupName: string) => {
+    if (selectedCardIds.size < 2) return;
+
+    const selectedCards = cards.filter(c => selectedCardIds.has(c.id));
+    if (selectedCards.length < 2) return;
+
+    const firstCard = selectedCards[0];
+    const groupId = `group-${Date.now()}`;
+
+    const updatedCards = cards.map(card => {
+      if (selectedCardIds.has(card.id)) {
+        const groupOrder = selectedCards.findIndex(c => c.id === card.id);
+        return {
+          ...card,
+          categoryId: firstCard.categoryId,
+          groupId,
+          groupName: existingGroupName,
+          groupOrder,
+          updatedAt: Date.now()
+        };
+      }
+      return card;
+    });
+
+    setCards(updatedCards);
+    await 카드저장하기(updatedCards);
+
+    setSelectMode(false);
+    setSelectedCardIds(new Set());
+    setShowGroupNameDialog(false);
+    setGroupNameInput('');
+
+    toast({
+      title: "탭 그룹 생성",
+      description: `${selectedCards.length}개 카드가 "${existingGroupName}" 그룹으로 합쳐졌습니다`
+    });
+  };
+
   // 실제 탭 그룹 생성
   const confirmMergeToTabGroup = async () => {
     if (selectedCardIds.size < 2) return;
@@ -3198,23 +3237,58 @@ export default function MultiFileCardManager() {
               {selectedCardIds.size}개 카드를 합칠 그룹 이름을 입력하세요
             </DialogDescription>
           </DialogHeader>
-          <Input
-            value={groupNameInput}
-            onChange={(e) => setGroupNameInput(e.target.value)}
-            placeholder="그룹 이름"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                confirmMergeToTabGroup();
-              }
-            }}
-            autoFocus
-          />
+          {/* 선택된 카드 중 기존 그룹이 있으면 해당 그룹 이름 버튼 표시 */}
+          {(() => {
+            const selectedGroupNames = [...new Set(
+              cards
+                .filter(c => selectedCardIds.has(c.id) && c.groupName)
+                .map(c => c.groupName!)
+            )];
+            if (selectedGroupNames.length > 0) {
+              return (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-gray-500">기존 그룹 이름 사용</label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedGroupNames.map((name) => (
+                      <Button
+                        key={name}
+                        variant="outline"
+                        size="sm"
+                        className="text-sm"
+                        onClick={() => mergeWithExistingGroupName(name)}
+                      >
+                        {name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })()}
+          {/* 새 그룹 이름 입력 */}
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-gray-500">새 그룹 이름</label>
+            <div className="flex gap-2">
+              <Input
+                value={groupNameInput}
+                onChange={(e) => setGroupNameInput(e.target.value)}
+                placeholder="새 그룹 이름 입력"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && groupNameInput.trim()) {
+                    confirmMergeToTabGroup();
+                  }
+                }}
+                className="flex-1"
+              />
+              <Button onClick={confirmMergeToTabGroup} disabled={!groupNameInput.trim()}>
+                생성
+              </Button>
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowGroupNameDialog(false)}>
               취소
-            </Button>
-            <Button onClick={confirmMergeToTabGroup}>
-              합치기
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3470,10 +3544,11 @@ export default function MultiFileCardManager() {
               if (selectMode) {
                 setSelectMode(false);
                 setSelectedCardIds(new Set());
+                setFabOpen(false);
               } else {
                 setSelectMode(true);
+                // 탭 합치기 모드 진입 시 FAB 메뉴 유지
               }
-              setFabOpen(false);
             }}
             className="flex items-center gap-2 bg-white border shadow-lg rounded-full px-4 py-2 hover:bg-gray-50 transition-colors"
           >
@@ -3521,8 +3596,8 @@ export default function MultiFileCardManager() {
         </button>
       </div>
 
-      {/* FAB 외부 클릭시 닫기 */}
-      {fabOpen && (
+      {/* FAB 외부 클릭시 닫기 (선택 모드가 아닐 때만) */}
+      {fabOpen && !selectMode && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => setFabOpen(false)}
