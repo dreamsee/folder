@@ -55,6 +55,7 @@ export default function MultiFileCardManager() {
   const [tabGroupEditModalOpen, setTabGroupEditModalOpen] = useState(false);
   const [editingTabGroupId, setEditingTabGroupId] = useState<string | null>(null);
   const [activeTabInModal, setActiveTabInModal] = useState<string | null>(null);
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
 
   // 그룹 이름 입력 다이얼로그
   const [showGroupNameDialog, setShowGroupNameDialog] = useState(false);
@@ -2041,13 +2042,24 @@ export default function MultiFileCardManager() {
                           <CardContent className="pt-0">
                             <div className="text-xs space-y-1 pl-6">
                               {groupCards.map((card) => (
-                                <div
-                                  key={card.id}
-                                  className="text-gray-700 hover:text-blue-600 cursor-pointer hover:underline"
-                                  onClick={() => setSelectedCardId(card.id)}
-                                >
-                                  {card.name}
-                                </div>
+                                <TooltipProvider key={card.id}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div
+                                        className={`text-gray-700 hover:text-blue-600 cursor-pointer hover:underline flex items-center gap-1 ${card.memo ? 'border-b border-yellow-400 inline-block' : ''}`}
+                                        onClick={() => setSelectedCardId(card.id)}
+                                      >
+                                        {card.name}
+                                        {card.memo && <StickyNote className="h-3 w-3 text-yellow-600 inline" />}
+                                      </div>
+                                    </TooltipTrigger>
+                                    {card.memo && (
+                                      <TooltipContent side="right" className="max-w-[300px]">
+                                        <p className="whitespace-pre-wrap text-xs">{card.memo}</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
+                                </TooltipProvider>
                               ))}
                             </div>
                           </CardContent>
@@ -2690,17 +2702,50 @@ export default function MultiFileCardManager() {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1">
                   <label className="text-xs font-medium text-gray-500">카드 이름</label>
-                  <Input
-                    value={selectedCard.name}
-                    onChange={(e) => {
-                      const newName = e.target.value;
-                      setCards(prev => prev.map(card =>
-                        card.id === selectedCard.id ? { ...card, name: newName } : card
-                      ));
-                      카드수정하기(selectedCard.id, { name: newName });
-                    }}
-                    className="mt-1"
-                  />
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      value={selectedCard.name}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        setCards(prev => prev.map(card =>
+                          card.id === selectedCard.id ? { ...card, name: newName } : card
+                        ));
+                        카드수정하기(selectedCard.id, { name: newName });
+                      }}
+                      className="flex-1"
+                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          className={`p-1.5 rounded hover:bg-gray-200 ${selectedCard.memo ? 'text-yellow-600' : 'text-gray-400'}`}
+                        >
+                          <StickyNote className="h-4 w-4" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-64" align="end">
+                        {selectedCard.memo && (
+                          <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
+                            <p className="whitespace-pre-wrap">{selectedCard.memo}</p>
+                          </div>
+                        )}
+                        <textarea
+                          placeholder="메모를 입력하세요..."
+                          defaultValue={selectedCard.memo || ''}
+                          className="w-full text-sm p-2 border border-gray-300 rounded resize-y min-h-[80px]"
+                          rows={3}
+                          onBlur={(e) => {
+                            const newMemo = e.target.value.trim();
+                            if (newMemo !== (selectedCard.memo || '')) {
+                              카드수정하기(selectedCard.id, { ...selectedCard, memo: newMemo || undefined });
+                              setCards(prev => prev.map(c =>
+                                c.id === selectedCard.id ? { ...c, memo: newMemo || undefined } : c
+                              ));
+                            }
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
                 <div className="flex gap-2 mt-5">
                   <Button
@@ -3205,21 +3250,71 @@ export default function MultiFileCardManager() {
                     className="flex-1"
                   />
                 </div>
-                {/* 탭 버튼들 */}
+                {/* 탭 버튼들 (드래그로 순서 변경 가능) */}
                 <div className="flex flex-wrap gap-1 border-b pb-2 mb-4">
-                  {groupCards.map((card) => (
-                    <button
-                      key={card.id}
-                      onClick={() => setActiveTabInModal(card.id)}
-                      title={card.name}
-                      className={`px-3 py-1.5 text-sm rounded-t max-w-[150px] truncate ${
-                        activeCard?.id === card.id
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      {card.name}
-                    </button>
+                  {groupCards.map((card, index) => (
+                    <TooltipProvider key={card.id}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              setDraggedTabId(card.id);
+                              e.dataTransfer.effectAllowed = 'move';
+                            }}
+                            onDragEnd={() => setDraggedTabId(null)}
+                            onDragOver={(e) => {
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = 'move';
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              if (draggedTabId && draggedTabId !== card.id) {
+                                // 드래그한 탭을 현재 탭 위치로 이동
+                                const draggedIndex = groupCards.findIndex(c => c.id === draggedTabId);
+                                const dropIndex = index;
+
+                                if (draggedIndex !== -1 && draggedIndex !== dropIndex) {
+                                  // groupOrder 재정렬
+                                  const newGroupCards = [...groupCards];
+                                  const [draggedCard] = newGroupCards.splice(draggedIndex, 1);
+                                  newGroupCards.splice(dropIndex, 0, draggedCard);
+
+                                  // 새로운 순서로 groupOrder 업데이트
+                                  setCards(prev => {
+                                    const updated = prev.map(c => {
+                                      const newIndex = newGroupCards.findIndex(gc => gc.id === c.id);
+                                      if (newIndex !== -1) {
+                                        return { ...c, groupOrder: newIndex };
+                                      }
+                                      return c;
+                                    });
+                                    카드저장하기(updated);
+                                    return updated;
+                                  });
+                                }
+                              }
+                              setDraggedTabId(null);
+                            }}
+                            onClick={() => setActiveTabInModal(card.id)}
+                            className={`px-3 py-1.5 text-sm rounded-t max-w-[150px] truncate cursor-grab active:cursor-grabbing ${
+                              activeCard?.id === card.id
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-100 hover:bg-gray-200'
+                            } ${card.memo ? 'border-b-2 border-yellow-400' : ''} ${
+                              draggedTabId === card.id ? 'opacity-50' : ''
+                            } ${draggedTabId && draggedTabId !== card.id ? 'border-2 border-dashed border-blue-300' : ''}`}
+                          >
+                            {card.name}
+                          </button>
+                        </TooltipTrigger>
+                        {card.memo && (
+                          <TooltipContent side="bottom" className="max-w-[300px]">
+                            <p className="whitespace-pre-wrap text-xs">{card.memo}</p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                   ))}
                 </div>
 
@@ -3241,6 +3336,37 @@ export default function MultiFileCardManager() {
                         }}
                         className="flex-1"
                       />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            className={`p-1.5 rounded hover:bg-gray-200 ${activeCard.memo ? 'text-yellow-600' : 'text-gray-400'}`}
+                          >
+                            <StickyNote className="h-4 w-4" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-64" align="end">
+                          {activeCard.memo && (
+                            <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
+                              <p className="whitespace-pre-wrap">{activeCard.memo}</p>
+                            </div>
+                          )}
+                          <textarea
+                            placeholder="메모를 입력하세요..."
+                            defaultValue={activeCard.memo || ''}
+                            className="w-full text-sm p-2 border border-gray-300 rounded resize-y min-h-[80px]"
+                            rows={3}
+                            onBlur={(e) => {
+                              const newMemo = e.target.value.trim();
+                              if (newMemo !== (activeCard.memo || '')) {
+                                카드수정하기(activeCard.id, { ...activeCard, memo: newMemo || undefined });
+                                setCards(prev => prev.map(c =>
+                                  c.id === activeCard.id ? { ...c, memo: newMemo || undefined } : c
+                                ));
+                              }
+                            }}
+                          />
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     {activeCard.matches.map((match, idx) => (
                       <div key={idx} className="space-y-1">
