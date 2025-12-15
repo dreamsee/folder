@@ -1,7 +1,12 @@
 import express, { type Request, Response, NextFunction } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { registerRoutes } from "./routes";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // 환경 변수 로드
 dotenv.config({ path: "../.env" });
@@ -76,6 +81,17 @@ app.use((req, res, next) => {
   // } else {
   //   serveStatic(app);
   // }
+
+  // 클라이언트 빌드 결과물 서빙 (production)
+  const clientDistPath = path.join(__dirname, "../client/dist");
+  app.use(express.static(clientDistPath));
+
+  // SPA 라우팅 - 모든 경로를 index.html로
+  app.get("*", (req, res) => {
+    if (!req.path.startsWith("/api")) {
+      res.sendFile(path.join(clientDistPath, "index.html"));
+    }
+  });
 
   // Railway는 PORT 환경변수 사용, 0.0.0.0 바인딩 필요
   const port = process.env.PORT || 6000;
