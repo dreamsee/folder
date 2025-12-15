@@ -19,9 +19,9 @@ function log(message: string, source = "express") {
 
 const app = express();
 
-// CORS 설정
+// CORS 설정 - 모든 origin 허용 (Railway 배포용)
 app.use(cors({
-  origin: ["http://localhost:5173", "http://localhost:3000"],
+  origin: true,
   credentials: true
 }));
 
@@ -77,11 +77,9 @@ app.use((req, res, next) => {
   //   serveStatic(app);
   // }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 6000;
-  server.listen(port, "localhost", () => {
+  // Railway는 PORT 환경변수 사용, 0.0.0.0 바인딩 필요
+  const port = process.env.PORT || 6000;
+  server.listen(Number(port), "0.0.0.0", () => {
     log(`serving on port ${port}`);
   });
 })();
