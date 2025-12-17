@@ -2026,13 +2026,13 @@ export default function MultiFileCardManager() {
                                         )}
                                       </Tooltip>
                                     </TooltipProvider>
-                                    <PopoverContent className="w-64 p-2" onClick={(e) => e.stopPropagation()}>
+                                    <PopoverContent className="w-auto min-w-64 max-w-[500px] p-2" onClick={(e) => e.stopPropagation()}>
                                       <div className="space-y-2">
                                         <label className="text-xs font-medium">메모</label>
                                         <textarea
                                           defaultValue={firstCard.memo || ''}
                                           placeholder="메모를 입력하세요..."
-                                          className="w-full h-20 text-xs p-2 border rounded resize-none"
+                                          className="w-full min-w-[200px] h-20 min-h-[80px] text-xs p-2 border rounded resize"
                                           onBlur={(e) => {
                                             const newMemo = e.target.value.trim();
                                             if (newMemo !== (firstCard.memo || '')) {
@@ -2315,13 +2315,13 @@ export default function MultiFileCardManager() {
                                   )}
                                 </Tooltip>
                               </TooltipProvider>
-                              <PopoverContent className="w-64 p-2" onClick={(e) => e.stopPropagation()}>
+                              <PopoverContent className="w-auto min-w-64 max-w-[500px] p-2" onClick={(e) => e.stopPropagation()}>
                                 <div className="space-y-2">
                                   <label className="text-xs font-medium">메모</label>
                                   <textarea
                                     defaultValue={card.memo || ''}
                                     placeholder="메모를 입력하세요..."
-                                    className="w-full h-20 text-xs p-2 border rounded resize-none"
+                                    className="w-full min-w-[200px] h-20 min-h-[80px] text-xs p-2 border rounded resize"
                                     onBlur={(e) => {
                                       const newMemo = e.target.value.trim();
                                       if (newMemo !== (card.memo || '')) {
@@ -2878,7 +2878,7 @@ export default function MultiFileCardManager() {
                           <StickyNote className="h-4 w-4" />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-64" align="end">
+                      <PopoverContent className="w-auto min-w-64 max-w-[500px]" align="end">
                         {selectedCard.memo && (
                           <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
                             <p className="whitespace-pre-wrap">{selectedCard.memo}</p>
@@ -2887,7 +2887,7 @@ export default function MultiFileCardManager() {
                         <textarea
                           placeholder="메모를 입력하세요..."
                           defaultValue={selectedCard.memo || ''}
-                          className="w-full text-sm p-2 border border-gray-300 rounded resize-y min-h-[80px]"
+                          className="w-full min-w-[200px] text-sm p-2 border border-gray-300 rounded resize min-h-[80px]"
                           rows={3}
                           onBlur={(e) => {
                             const newMemo = e.target.value.trim();
@@ -3535,7 +3535,7 @@ export default function MultiFileCardManager() {
                             <StickyNote className="h-4 w-4" />
                           </button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-64" align="end">
+                        <PopoverContent className="w-auto min-w-64 max-w-[500px]" align="end">
                           {activeCard.memo && (
                             <div className="mb-2 p-2 bg-yellow-50 rounded text-xs">
                               <p className="whitespace-pre-wrap">{activeCard.memo}</p>
@@ -3544,7 +3544,7 @@ export default function MultiFileCardManager() {
                           <textarea
                             placeholder="메모를 입력하세요..."
                             defaultValue={activeCard.memo || ''}
-                            className="w-full text-sm p-2 border border-gray-300 rounded resize-y min-h-[80px]"
+                            className="w-full min-w-[200px] text-sm p-2 border border-gray-300 rounded resize min-h-[80px]"
                             rows={3}
                             onBlur={(e) => {
                               const newMemo = e.target.value.trim();
